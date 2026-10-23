@@ -823,7 +823,7 @@ local window = Rayfield:CreateWindow({
     name = "RuinWare Client",
     icon = 98691154054966,
     subtitle = "Evade",
-    sidebarLayout = false,
+    sidebarLayout = true,
     theme = "Default",
     showIcon = 98691154054966,
     showName = "RuinWare",
@@ -3231,6 +3231,23 @@ S     C     P               (     T     A     B     )
 ]]--
 
 local ScriptTab = window:CreateTab({ name = "Script Settings", icon = 89152067769809 })
+
+do
+    ScriptTab:CreateDivider({ text = "Appearance" })
+
+    ScriptTab:CreateDropdown({
+        name = "Change Theme",
+        options = { "Default", "Cobalt", "Ember", "Amethyst", "Frost", "Rose" },
+        currentOption = { "Default" },
+        multiSelect = false,
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if pick then
+                window:ChangeTheme(pick)
+            end
+        end,
+    })
+end
 
 -- CREDITS
 local CreTab = window:CreateTab({ name = "Credits", icon = 110016491347992 })
