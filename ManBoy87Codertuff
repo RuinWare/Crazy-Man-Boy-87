@@ -3185,14 +3185,47 @@ C     O     S     M     E     T     I     C     S          (     T     A     B  
 local CosTab = window:CreateTab({ name = "Cosmetics", icon = 93893786571261 })
 buildEmoteChanger(CosTab, window)
 buildCosmeticChanger(CosTab, window)
--- TP
+
+--[[
+============================================================================
+
+T     E     L     E     P     O     R     T          (     T     A     B     )
+
+============================================================================
+]]--
+
 local TpTab = window:CreateTab({ name = "Teleport", icon = 138254104860948 })
--- VCL
+
+--[[
+============================================================================
+
+V     C     L          (     T     A     B     )
+
+============================================================================
+]]--
+
 local VclTab = window:CreateTab({ name = "Vehicle", icon = 12338080417 })
--- MAP
+
+--[[
+============================================================================
+
+M     A     P          (     T     A     B     )
+
+============================================================================
+]]--
+
 local MapTab = window:CreateTab({ name = "Map", icon = 78731952302365 })
--- SCRIPT
+
+--[[
+============================================================================
+
+S     C     P               (     T     A     B     )
+
+============================================================================
+]]--
+
 local ScriptTab = window:CreateTab({ name = "Script Settings", icon = 89152067769809 })
+
 -- CREDITS
 local CreTab = window:CreateTab({ name = "Credits", icon = 110016491347992 })
 
