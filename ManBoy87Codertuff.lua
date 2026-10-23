@@ -2509,156 +2509,6 @@ end
 
 --[[
 ============================================================================
-BP UNME
-============================================================================
-]]--
-
-do
-	local bypassEnabled = false
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
-
-	local EMOTE_PATHS = {
-		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Cats","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Animals","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","Military","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","RelicEmotesNew","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","PoseidonSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","BeeSet","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","Thanksgiving2025","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","OldRoblox","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","NewYears2024","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","LunarNewYear","Emotes"},
-		{"Items","ItemPacks","Events","2026","Valentines2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","StPatricks2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","Spring2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","SUMMER26","Emotes"},
-		{"Items","ItemPacks","Events","2026","HLWN2026","Emotes"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","DailyShop"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","Battlepass"},
-		{"Items","ItemPacks","Events","2025","Valentines2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Summer2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","StPatricks2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Hlwn2025","Emotes"},
-		{"Items","ItemPacks","Events","2024","Xmas2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Valentines2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","StPatricks2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Hlwn2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Halloween2024","Emotes"},
-		{"Items","ItemPacks","Events","2023","Hlwn2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Halloween2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Xmas2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Valentines2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Summer2023","Emotes"},
-		{"Items","ItemPacks","Events","2022","Hlwn2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Halloween2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Xmas2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Valentines2022","Emotes"},
-		{"Items","ItemPacks","Collab","ST","Emotes"},
-		{"Items","ItemPacks","Base","Special","Emotes"},
-		{"Items","ItemPacks","Base","NewShop","Emotes"},
-		{"Items","ItemPacks","Base","LevelShop","Emotes"},
-		{"Items","ItemPacks","Base","DailyShop","Emotes"},
-		{"Items","BaseItems","Emotes"},
-		{"Items","ItemPacks","Integration","M3GAN","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Gems","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
-	}
-
-	local function resolvePath(keys)
-		local ok, result = pcall(function()
-			local obj = ReplicatedStorage
-			for _, k in ipairs(keys) do obj = obj[k] end
-			return obj
-		end)
-		if ok and typeof(result) == "Instance" then return result end
-		return nil
-	end
-
-	local function getItemScript(item)
-		if item:IsA("ModuleScript") then return item end
-		for _, c in ipairs(item:GetChildren()) do
-			if c:IsA("ModuleScript") then return c end
-		end
-		return nil
-	end
-
-	local function applyBypass()
-		for _, path in ipairs(EMOTE_PATHS) do
-			local folder = resolvePath(path)
-			if folder then
-				for _, child in ipairs(folder:GetChildren()) do
-					-- Handle expanded folders like Battlepass/DailyShop
-					if child:IsA("Folder") and (child.Name:lower() == "battlepass" or child.Name:lower() == "dailyshop") then
-						for _, inner in ipairs(child:GetChildren()) do
-							local script = getItemScript(inner)
-							if script then
-								local ok, data = pcall(require, script)
-								if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
-									if not modifiedEmotes[inner] then
-										modifiedEmotes[inner] = data.EmoteInfo.SpeedMult
-									end
-									data.EmoteInfo.SpeedMult = 0.3
-								end
-							end
-						end
-					else
-						local script = getItemScript(child)
-						if script then
-							local ok, data = pcall(require, script)
-							if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
-								if not modifiedEmotes[child] then
-									modifiedEmotes[child] = data.EmoteInfo.SpeedMult
-								end
-								data.EmoteInfo.SpeedMult = 0.3
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-
-	local function revertBypass()
-		for item, originalSpeed in pairs(modifiedEmotes) do
-			local script = getItemScript(item)
-			if script then
-				local ok, data = pcall(require, script)
-				if ok and type(data) == "table" and data.EmoteInfo then
-					-- Restores to the saved original (which is 0 for unmovable emotes)
-					data.EmoteInfo.SpeedMult = originalSpeed
-				end
-			end
-		end
-		modifiedEmotes = {}
-	end
-
-	tab:CreateDivider()
-
-	tab:CreateToggle({
-		name = "Unmovable Emote Bypass",
-        icon = 102876083492144,
-		currentValue = false,
-		callback = function(v)
-			bypassEnabled = v
-			if bypassEnabled then
-				applyBypass()
-			else
-				revertBypass()
-			end
-		end,
-	})
-end
-
---[[
-============================================================================
 ESC
 ============================================================================
 ]]--
@@ -2820,6 +2670,156 @@ do
 			currentSpeedValue = v
 			if speedEnabled then
 				applySpeed() -- Updates live while the toggle is on
+			end
+		end,
+	})
+end
+
+--[[
+============================================================================
+BP UNME
+============================================================================
+]]--
+
+do
+	local bypassEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
+
+	local EMOTE_PATHS = {
+		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Cats","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Animals","Emotes"},
+		{"Items","ItemPacks","Gamepass","Legacy","StPatricks2023","Emotes"},
+		{"Items","ItemPacks","Gamepass","Legacy","Military","Emotes"},
+		{"Items","ItemPacks","Gamepass","2026","RelicEmotesNew","Emotes"},
+		{"Items","ItemPacks","Gamepass","2026","PoseidonSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","2026","BeeSet","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","Thanksgiving2025","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","OldRoblox","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","NewYears2024","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","LunarNewYear","Emotes"},
+		{"Items","ItemPacks","Events","2026","Valentines2026","Emotes"},
+		{"Items","ItemPacks","Events","2026","StPatricks2026","Emotes"},
+		{"Items","ItemPacks","Events","2026","Spring2026","Emotes"},
+		{"Items","ItemPacks","Events","2026","SUMMER26","Emotes"},
+		{"Items","ItemPacks","Events","2026","HLWN2026","Emotes"},
+		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","DailyShop"},
+		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","Battlepass"},
+		{"Items","ItemPacks","Events","2025","Valentines2025","Emotes"},
+		{"Items","ItemPacks","Events","2025","Summer2025","Emotes"},
+		{"Items","ItemPacks","Events","2025","StPatricks2025","Emotes"},
+		{"Items","ItemPacks","Events","2025","Hlwn2025","Emotes"},
+		{"Items","ItemPacks","Events","2024","Xmas2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","Valentines2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","StPatricks2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","Hlwn2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","Halloween2024","Emotes"},
+		{"Items","ItemPacks","Events","2023","Hlwn2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Halloween2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Xmas2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Valentines2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","StPatricks2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Summer2023","Emotes"},
+		{"Items","ItemPacks","Events","2022","Hlwn2022","Emotes"},
+		{"Items","ItemPacks","Events","2022","Halloween2022","Emotes"},
+		{"Items","ItemPacks","Events","2022","Xmas2022","Emotes"},
+		{"Items","ItemPacks","Events","2022","Valentines2022","Emotes"},
+		{"Items","ItemPacks","Collab","ST","Emotes"},
+		{"Items","ItemPacks","Base","Special","Emotes"},
+		{"Items","ItemPacks","Base","NewShop","Emotes"},
+		{"Items","ItemPacks","Base","LevelShop","Emotes"},
+		{"Items","ItemPacks","Base","DailyShop","Emotes"},
+		{"Items","BaseItems","Emotes"},
+		{"Items","ItemPacks","Integration","M3GAN","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Gems","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
+	}
+
+	local function resolvePath(keys)
+		local ok, result = pcall(function()
+			local obj = ReplicatedStorage
+			for _, k in ipairs(keys) do obj = obj[k] end
+			return obj
+		end)
+		if ok and typeof(result) == "Instance" then return result end
+		return nil
+	end
+
+	local function getItemScript(item)
+		if item:IsA("ModuleScript") then return item end
+		for _, c in ipairs(item:GetChildren()) do
+			if c:IsA("ModuleScript") then return c end
+		end
+		return nil
+	end
+
+	local function applyBypass()
+		for _, path in ipairs(EMOTE_PATHS) do
+			local folder = resolvePath(path)
+			if folder then
+				for _, child in ipairs(folder:GetChildren()) do
+					-- Handle expanded folders like Battlepass/DailyShop
+					if child:IsA("Folder") and (child.Name:lower() == "battlepass" or child.Name:lower() == "dailyshop") then
+						for _, inner in ipairs(child:GetChildren()) do
+							local script = getItemScript(inner)
+							if script then
+								local ok, data = pcall(require, script)
+								if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+									if not modifiedEmotes[inner] then
+										modifiedEmotes[inner] = data.EmoteInfo.SpeedMult
+									end
+									data.EmoteInfo.SpeedMult = 0.3
+								end
+							end
+						end
+					else
+						local script = getItemScript(child)
+						if script then
+							local ok, data = pcall(require, script)
+							if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+								if not modifiedEmotes[child] then
+									modifiedEmotes[child] = data.EmoteInfo.SpeedMult
+								end
+								data.EmoteInfo.SpeedMult = 0.3
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local function revertBypass()
+		for item, originalSpeed in pairs(modifiedEmotes) do
+			local script = getItemScript(item)
+			if script then
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" and data.EmoteInfo then
+					-- Restores to the saved original (which is 0 for unmovable emotes)
+					data.EmoteInfo.SpeedMult = originalSpeed
+				end
+			end
+		end
+		modifiedEmotes = {}
+	end
+
+	tab:CreateDivider({ text = "Emotes" })
+
+	tab:CreateToggle({
+		name = "Unmovable Emote Bypass",
+        icon = 102876083492144,
+		currentValue = false,
+		callback = function(v)
+			bypassEnabled = v
+			if bypassEnabled then
+				applyBypass()
+			else
+				revertBypass()
 			end
 		end,
 	})
