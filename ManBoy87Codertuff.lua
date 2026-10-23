@@ -1,6 +1,6 @@
 -- RUINWARE V.0.0
 -- CRAZY TUFF SCRIPT
--- ONE EXTRA LINE OF CODE 🔥
+-- ONE EXTRA LINE OF CODE
 -- ONE MORE
 -- DONT ATTEMPT TO: STEAL, HARVEST, DEOBF RUINWARE. DO NOT DISTRIBUTE WITHOUT PERMISSION FROM STAFF, COPYRIGHT 2026, RuinWare
 
@@ -2634,7 +2634,7 @@ do
 
     tab:CreateInput({
         name = "Amount",
-        placeholder = "e.g. 2",
+        placeholder = "e.g. 5",
         callback = function(text)
             local n = tonumber(text)
             if n then
