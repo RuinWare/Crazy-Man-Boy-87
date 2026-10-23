@@ -3298,27 +3298,7 @@ do
     local spinEnabled = false
     local spinDirection = "Clockwise"
     local spinRPS = 1
-
-    local spinHum, spinRoot
-
-    local function spinAttach(char)
-        spinHum = char:WaitForChild("Humanoid")
-        spinRoot = char:WaitForChild("HumanoidRootPart")
-        if spinEnabled then spinRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0) end
-    end
-
-    if player.Character then task.spawn(spinAttach, player.Character) end
-    player.CharacterAdded:Connect(function(c) task.spawn(spinAttach, c) end)
-
-    RunService.Heartbeat:Connect(function()
-        if not spinEnabled then return end
-        if not spinRoot or not spinRoot.Parent then return end
-        if not spinHum or spinHum.Health <= 0 then return end
-
-        local dir = (spinDirection == "Clockwise") and -1 or 1
-        local angular = spinRPS * dir * 2 * math.pi
-        spinRoot.AssemblyAngularVelocity = Vector3.new(0, angular, 0)
-    end)
+    local spinAngle = 0
 
     tab:CreateDivider()
 
@@ -3328,9 +3308,7 @@ do
         flag = "CharacterSpin_Toggle",
         callback = function(v)
             spinEnabled = v
-            if not v and spinRoot then
-                spinRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            end
+            if not v then spinAngle = 0 end
         end,
     })
 
@@ -3354,6 +3332,21 @@ do
         flag = "CharacterSpin_Slider",
         callback = function(v) spinRPS = v end,
     })
+
+    RunService.RenderStepped:Connect(function(dt)
+        if not spinEnabled then return end
+
+        local rigs = workspace:FindFirstChild("Rigs")
+        if not rigs then return end
+        local rig = rigs:FindFirstChild(player.Name)
+        if not rig then return end
+
+        local dir = (spinDirection == "Clockwise") and -1 or 1
+        spinAngle = spinAngle + spinRPS * dir * 2 * math.pi * dt
+
+        local pivot = rig:GetPivot()
+        rig:PivotTo(CFrame.new(pivot.Position) * CFrame.Angles(0, spinAngle, 0))
+    end)
 end
 
 --[[
