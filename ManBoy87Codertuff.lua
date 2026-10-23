@@ -2511,7 +2511,7 @@ end
 
 --[[
 ============================================================================
-
+JUMP SPEED
 ============================================================================
 ]]--
 
@@ -2580,7 +2580,7 @@ do
 
     tab:CreateToggle({
         name = "Jump Speed Changer",
-		icon = 79297485010070
+		icon = 79297485010070,
         currentValue = false,
         flag = "JumpSpeed_Toggle",
         callback = function(v) jumpSpeedEnabled = v end,
