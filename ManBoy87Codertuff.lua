@@ -3259,7 +3259,8 @@ do
         targetTab:CreateDivider()
         if prevName then
             targetTab:CreateButton({
-                name = "← Previous Tab",
+                name = "Previous Tab",
+				icon = 93740731423685,
                 callback = function()
                     pcall(function() window:Navigate(prevName) end)
                 end,
@@ -3267,7 +3268,8 @@ do
         end
         if nextName then
             targetTab:CreateButton({
-                name = "Next Tab →",
+                name = "Next Tab",
+				icon = 88792938137507,
                 callback = function()
                     pcall(function() window:Navigate(nextName) end)
                 end,
