@@ -2433,6 +2433,82 @@ end
 
 --[[
 ============================================================================
+LEGIT JUMP
+============================================================================
+]]--
+
+do
+    local jumpHeightEnabled = false
+    local jumpHeightValue = 50
+
+    local jhHum, jhRoot
+
+    local function applyJump()
+        if not jumpHeightEnabled then return end
+        if not jhHum or not jhRoot or not jhRoot.Parent then return end
+        if jhHum.Health <= 0 then return end
+        if jhHum.FloorMaterial == Enum.Material.Air then return end
+        jhRoot.AssemblyLinearVelocity = Vector3.new(
+            jhRoot.AssemblyLinearVelocity.X,
+            jumpHeightValue,
+            jhRoot.AssemblyLinearVelocity.Z
+        )
+    end
+
+    local function jhAttach(char)
+        jhHum = char:WaitForChild("Humanoid")
+        jhRoot = char:WaitForChild("HumanoidRootPart")
+        if jumpHeightEnabled then jhHum.JumpPower = 0 end
+    end
+
+    if player.Character then task.spawn(jhAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(jhAttach, c) end)
+
+    UserInputService.InputBegan:Connect(function(i, gp)
+        if gp then return end
+        if i.KeyCode == Enum.KeyCode.Space then
+            applyJump()
+        end
+    end)
+
+    task.spawn(function()
+        local pg = player:WaitForChild("PlayerGui")
+        local tg = pg:WaitForChild("TouchGui", 30)
+        if not tg then return end
+        local f = tg:WaitForChild("TouchControlFrame", 10)
+        if not f then return end
+        local b = f:WaitForChild("JumpButton", 10)
+        if not b then return end
+        b.MouseButton1Down:Connect(applyJump)
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Jump Height Changer",
+        currentValue = false,
+        flag = "JumpHeight_Toggle",
+        callback = function(v)
+            jumpHeightEnabled = v
+            if jhHum then
+                jhHum.JumpPower = v and 0 or 50
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Jump Height",
+        range = {25, 1000},
+        increment = 1,
+        suffix = "Power",
+        currentValue = 50,
+        flag = "JumpHeight_Slider",
+        callback = function(v) jumpHeightValue = v end,
+    })
+end
+
+--[[
+============================================================================
 BP UNME
 ============================================================================
 ]]--
