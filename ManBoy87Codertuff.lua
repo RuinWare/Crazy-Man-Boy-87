@@ -2623,6 +2623,7 @@ do
 
     tab:CreateToggle({
         name = "Gravity Changer",
+		icon = 137214837348305,
         currentValue = false,
         flag = "GravityChanger_Toggle",
         callback = function(v)
@@ -2637,6 +2638,7 @@ do
 
     tab:CreateSlider({
         name = "Gravity",
+		icon = 120597962040224,
         range = {0, 1000},
         increment = 0.1,
         suffix = "",
