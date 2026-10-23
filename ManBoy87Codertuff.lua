@@ -3252,6 +3252,45 @@ end
 -- CREDITS
 local CreTab = window:CreateTab({ name = "Credits", icon = 110016491347992 })
 
+-- Scroll Logic tuff Boi
+
+do
+    local function addTabNav(targetTab, prevName, nextName)
+        targetTab:CreateDivider()
+        if prevName then
+            targetTab:CreateButton({
+                name = "← Previous Tab",
+                callback = function()
+                    pcall(function() window:Navigate(prevName) end)
+                end,
+            })
+        end
+        if nextName then
+            targetTab:CreateButton({
+                name = "Next Tab →",
+                callback = function()
+                    pcall(function() window:Navigate(nextName) end)
+                end,
+            })
+        end
+    end
+
+    addTabNav(tab,       nil,              "Visuals")
+    addTabNav(VisTab,    "Main",           "Extra")
+    addTabNav(ExTab,     "Visuals",        "Player")
+    addTabNav(PlyrTab,   "Extra",          "Stats")
+    addTabNav(StsTab,    "Player",         "TAS")
+    addTabNav(TasTab,    "Stats",          "Auto Farm")
+    addTabNav(AfTab,     "TAS",            "Atmosphere")
+    addTabNav(AtmoTab,   "Auto Farm",      "Cosmetics")
+    addTabNav(CosTab,    "Atmosphere",     "Teleport")
+    addTabNav(TpTab,     "Cosmetics",      "Vehicle")
+    addTabNav(VclTab,    "Teleport",       "Map")
+    addTabNav(MapTab,    "Vehicle",        "Script Settings")
+    addTabNav(ScriptTab, "Map",            "Credits")
+    addTabNav(CreTab,    "Script Settings", nil)
+end
+
 -- ==================
 -- S C R I P T    E N D
 -- ==================
