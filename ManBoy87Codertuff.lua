@@ -2610,6 +2610,49 @@ end
 
 --[[
 ============================================================================
+LEGIT JUMP
+============================================================================
+]]--
+
+do
+    local gravityEnabled = false
+    local gravityValue = 196.2
+    local DEFAULT_GRAVITY = 196.2
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Gravity Changer",
+        currentValue = false,
+        flag = "GravityChanger_Toggle",
+        callback = function(v)
+            gravityEnabled = v
+            if v then
+                workspace.Gravity = gravityValue
+            else
+                workspace.Gravity = DEFAULT_GRAVITY
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Gravity",
+        range = {0, 1000},
+        increment = 0.1,
+        suffix = "",
+        currentValue = 196.2,
+        flag = "GravityChanger_Slider",
+        callback = function(v)
+            gravityValue = v
+            if gravityEnabled then
+                workspace.Gravity = v
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
 JUMP POWER
 ============================================================================
 ]]--
