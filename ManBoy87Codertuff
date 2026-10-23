@@ -1,3 +1,9 @@
+-- RUINWARE V.0.0
+-- CRAZY TUFF SCRIPT
+-- ONE EXTRA LINE OF CODE 🔥
+-- ONE MORE
+-- DONT ATTEMPT TO: STEAL, HARVEST, DEOBF RUINWARE. DO NOT DISTRIBUTE WITHOUT PERMISSION FROM STAFF, COPYRIGHT 2026, RuinWare
+
 -- RW WARNINGS
 print("RuinWare Loaded.")
 print("RuinWare Copyright 2026©")
@@ -3232,3 +3238,4 @@ local CreTab = window:CreateTab({ name = "Credits", icon = 110016491347992 })
 -- ==================
 -- S C R I P T    E N D
 -- ==================
+-- ``
