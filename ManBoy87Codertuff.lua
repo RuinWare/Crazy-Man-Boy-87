@@ -2610,7 +2610,7 @@ end
 
 --[[
 ============================================================================
-LEGIT JUMP
+G changer
 ============================================================================
 ]]--
 
@@ -3286,6 +3286,74 @@ do
 			end
 		end,
 	})
+end
+
+--[[
+============================================================================
+cs
+============================================================================
+]]--
+
+do
+    local spinEnabled = false
+    local spinDirection = "Clockwise"
+    local spinRPS = 1
+
+    local spinHum, spinRoot
+
+    local function spinAttach(char)
+        spinHum = char:WaitForChild("Humanoid")
+        spinRoot = char:WaitForChild("HumanoidRootPart")
+        if spinEnabled then spinRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0) end
+    end
+
+    if player.Character then task.spawn(spinAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(spinAttach, c) end)
+
+    RunService.Heartbeat:Connect(function()
+        if not spinEnabled then return end
+        if not spinRoot or not spinRoot.Parent then return end
+        if not spinHum or spinHum.Health <= 0 then return end
+
+        local dir = (spinDirection == "Clockwise") and -1 or 1
+        local angular = spinRPS * dir * 2 * math.pi
+        spinRoot.AssemblyAngularVelocity = Vector3.new(0, angular, 0)
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Character Spin",
+        currentValue = false,
+        flag = "CharacterSpin_Toggle",
+        callback = function(v)
+            spinEnabled = v
+            if not v and spinRoot then
+                spinRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            end
+        end,
+    })
+
+    tab:CreateDropdown({
+        name = "Rotation",
+        options = { "Clockwise", "Counterclockwise" },
+        currentOption = { "Clockwise" },
+        multiSelect = false,
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if pick then spinDirection = pick end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Spin Speed",
+        range = {0.1, 10},
+        increment = 0.1,
+        suffix = " RPS",
+        currentValue = 1,
+        flag = "CharacterSpin_Slider",
+        callback = function(v) spinRPS = v end,
+    })
 end
 
 --[[
