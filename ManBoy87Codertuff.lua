@@ -2046,153 +2046,108 @@ SPEED CHANGER
 ============================================================================
 ]]--
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local player = Players.LocalPlayer
-local speedChangerEnabled = false
-local targetSpeed = 100
-local currentSpeed = 0
-local ACCEL_RATE = 200
-local DECEL_RATE = 400
-local jumpedBackwards = false
+    local speedChangerEnabled = false
+    local speedValue = 1500
+    local cachedTag = nil
+    local cachedService = nil
+    local cachedCharacter = nil
 
-local speedCharConn
-local speedHum, speedRoot
+    local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+    local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
 
-local function speedGetLabel()
-    local pg = player:FindFirstChild("PlayerGui")
-    if not pg then return nil end
-    local g = pg:FindFirstChild("Game")
-    if not g then return nil end
-    local hud = g:FindFirstChild("HUD")
-    if not hud then return nil end
-    local overlay = hud:FindFirstChild("Overlay")
-    if not overlay then return nil end
-    local cs = overlay:FindFirstChild("CharacterStatus")
-    if not cs then return nil end
-    local bl = cs:FindFirstChild("BottomLeft")
-    if not bl then return nil end
-    local sp = bl:FindFirstChild("Speedometer")
-    if not sp then return nil end
-    return sp:FindFirstChild("Speed")
-end
-
-local function speedSetLabel(value)
-    local label = speedGetLabel()
-    if not label then return end
-    local txt = tostring(math.floor(value + 0.5))
-    if label:IsA("TextLabel") or label:IsA("TextButton") then
-        label.Text = txt
-    elseif label:IsA("StringValue") then
-        label.Value = txt
-    elseif label:IsA("NumberValue") or label:IsA("IntValue") then
-        label.Value = math.floor(value + 0.5)
-    end
-end
-
-local function speedAttach(char)
-    speedHum = char:WaitForChild("Humanoid")
-    speedRoot = char:WaitForChild("HumanoidRootPart")
-    jumpedBackwards = false
-    currentSpeed = 0
-
-    if speedChangerEnabled then
-        speedHum.WalkSpeed = 0
+    local function getService()
+        if cachedService then return cachedService end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
     end
 
-    if speedCharConn then speedCharConn:Disconnect() end
-    speedCharConn = speedHum.Jumping:Connect(function()
-        if not speedChangerEnabled then return end
-        if speedHum.MoveDirection.Magnitude > 0 then
-            local dot = speedRoot.CFrame.LookVector:Dot(speedHum.MoveDirection)
-            if dot < 0 then
-                jumpedBackwards = true
-            end
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            if type(char.Tag) == "number" and not cachedTag then cachedTag = char.Tag end
+            return char
+        end
+        return nil
+    end
+
+    local function getTag()
+        if cachedTag then return cachedTag end
+        getCharacter()
+        return cachedTag
+    end
+
+    local function setLocalSpeed(v)
+        local char = getCharacter()
+        if not char or not char.Movement or not char.Movement.MoveStats then return end
+        local stats = char.Movement.MoveStats
+        if stats.Modifiers then
+            stats.Modifiers.Speed = v
+        end
+        if stats.MoveStats then
+            stats.MoveStats.Speed = v
+        end
+    end
+
+    local function fireSpeed(v)
+        local tag = getTag()
+        if not tag or not firesignal then return end
+        pcall(firesignal, CharacterTask.OnClientEvent, tag, "ModifyMovement", {"Speed", v})
+        setLocalSpeed(v)
+    end
+
+    CharacterTask.OnClientEvent:Connect(function(first)
+        if type(first) == "number" then
+            cachedTag = first
+            cachedCharacter = nil
         end
     end)
+
+    player.CharacterAdded:Connect(function()
+        cachedTag = nil
+        cachedCharacter = nil
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not speedChangerEnabled then return end
+        fireSpeed(speedValue)
+    end)
+
+    tab:CreateDivider({ text = "Speed" })
+
+    tab:CreateToggle({
+        name = "Speed Changer",
+        currentValue = false,
+        flag = "SpeedChanger_Toggle",
+        callback = function(v)
+            speedChangerEnabled = v
+            if not v then
+                fireSpeed(1500)
+            end
+        end,
+    })
+
+    tab:CreateInput({
+        name = "Speed Amount",
+        placeholder = "1500",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                speedValue = n
+                if speedChangerEnabled then
+                    fireSpeed(speedValue)
+                end
+            end
+        end,
+    })
 end
-
-if player.Character then task.spawn(speedAttach, player.Character) end
-player.CharacterAdded:Connect(function(char) task.spawn(speedAttach, char) end)
-
-RunService.Heartbeat:Connect(function(dt)
-    if not speedChangerEnabled then return end
-    if not speedHum or not speedRoot then return end
-    if speedHum.Health <= 0 then return end
-
-    local moving = speedHum.MoveDirection.Magnitude > 0
-    local goingBack = false
-    if moving then
-        local dot = speedRoot.CFrame.LookVector:Dot(speedHum.MoveDirection)
-        goingBack = dot < 0
-    end
-
-    if moving then
-        if currentSpeed < targetSpeed then
-            currentSpeed = math.min(targetSpeed, currentSpeed + ACCEL_RATE * dt)
-        else
-            currentSpeed = targetSpeed
-        end
-    else
-        currentSpeed = math.max(0, currentSpeed - DECEL_RATE * dt)
-    end
-
-    local mult = 1
-    if goingBack then
-        if jumpedBackwards then
-            mult = 0.25
-        else
-            mult = 0.5
-        end
-    else
-        jumpedBackwards = false
-    end
-
-    local applied = currentSpeed * mult
-
-    if applied > 0 and moving then
-        local step = applied * dt
-        local dir = speedHum.MoveDirection.Unit
-        speedRoot.CFrame = speedRoot.CFrame + dir * step
-    end
-
-    speedSetLabel(applied)
-end)
-
-tab:CreateDivider({ text = "Speed" })
-
-
-tab:CreateToggle({
-    name = "Speed Changer",
-    icon = 103917802962919,
-    currentValue = false,
-    flag = "SpeedChanger_Toggle",
-    callback = function(value)
-        speedChangerEnabled = value
-        if not value then
-            currentSpeed = 0
-            jumpedBackwards = false
-            if speedHum then speedHum.WalkSpeed = 16 end
-            speedSetLabel(0)
-        else
-            if speedHum then speedHum.WalkSpeed = 0 end
-        end
-    end,
-})
-
-tab:CreateSlider({
-    name = "Speed",
-    icon = 79297485010070,
-    range = {33.3, 500.5},
-    increment = 0.1,
-    suffix = " sps",
-    currentValue = 100,
-    flag = "SpeedChanger_Slider",
-    callback = function(value)
-        targetSpeed = value
-    end,
-})
 
 --[[
 ============================================================================
