@@ -2433,6 +2433,113 @@ end
 
 --[[
 ============================================================================
+ASA CHANGER
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local airStrafeEnabled = false
+    local airStrafeValue = 182
+    local cachedTag = nil
+    local cachedService = nil
+    local cachedCharacter = nil
+
+    local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+    local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
+
+    local function getService()
+        if cachedService then return cachedService end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
+    end
+
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            if type(char.Tag) == "number" and not cachedTag then cachedTag = char.Tag end
+            return char
+        end
+        return nil
+    end
+
+    local function getTag()
+        if cachedTag then return cachedTag end
+        getCharacter()
+        return cachedTag
+    end
+
+    local function setLocalAirStrafe(v)
+        local char = getCharacter()
+        if not char or not char.Movement or not char.Movement.MoveStats then return end
+        local stats = char.Movement.MoveStats
+        if stats.Modifiers then
+            stats.Modifiers.AirStrafeAcceleration = v
+        end
+        if stats.MoveStats then
+            stats.MoveStats.AirStrafeAcceleration = v
+        end
+    end
+
+    local function fireAirStrafe(v)
+        local tag = getTag()
+        if not tag or not firesignal then return end
+        pcall(firesignal, CharacterTask.OnClientEvent, tag, "ModifyMovement", {"AirStrafeAcceleration", v})
+        setLocalAirStrafe(v)
+    end
+
+    CharacterTask.OnClientEvent:Connect(function(first)
+        if type(first) == "number" then
+            cachedTag = first
+            cachedCharacter = nil
+        end
+    end)
+
+    player.CharacterAdded:Connect(function()
+        cachedTag = nil
+        cachedCharacter = nil
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not airStrafeEnabled then return end
+        fireAirStrafe(airStrafeValue)
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Air Strafe Acceleration Changer",
+        currentValue = false,
+        flag = "AirStrafe_Toggle",
+        callback = function(v)
+            airStrafeEnabled = v
+            if not v then
+                fireAirStrafe(182)
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Air Strafe Acceleration",
+        range = {182, 10000},
+        increment = 1,
+        suffix = "",
+        currentValue = 182,
+        flag = "AirStrafe_Slider",
+        callback = function(v)
+            airStrafeValue = v
+        end,
+    })
+end
+
+--[[
+============================================================================
 JUMP POWER
 ============================================================================
 ]]--
@@ -2515,6 +2622,7 @@ JUMP SPEED
 ============================================================================
 ]]--
 
+--[[
 do
     local jumpSpeedEnabled = false
     local jumpSpeedValue = 0.5
@@ -2597,6 +2705,7 @@ do
         callback = function(v) jumpSpeedValue = v end,
     })
 end
+]]--
 
 --[[
 ============================================================================
