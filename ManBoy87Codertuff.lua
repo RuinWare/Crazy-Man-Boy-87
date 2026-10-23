@@ -2433,7 +2433,7 @@ end
 
 --[[
 ============================================================================
-LEGIT JUMP
+JUMP POWER
 ============================================================================
 ]]--
 
@@ -2486,6 +2486,7 @@ do
 
     tab:CreateToggle({
         name = "Jump Height Changer",
+		icon = 97668677854395,
         currentValue = false,
         flag = "JumpHeight_Toggle",
         callback = function(v)
@@ -2498,6 +2499,7 @@ do
 
     tab:CreateSlider({
         name = "Jump Height",
+		icon = 120597962040224,
         range = {25, 1000},
         increment = 1,
         suffix = "Power",
