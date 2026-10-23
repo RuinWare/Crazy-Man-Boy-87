@@ -2540,6 +2540,115 @@ end
 
 --[[
 ============================================================================
+JC CHANGER
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local jumpCapEnabled = false
+    local jumpCapValue = 2
+    local cachedTag = nil
+    local cachedService = nil
+    local cachedCharacter = nil
+
+    local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+    local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
+
+    local function getService()
+        if cachedService then return cachedService end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
+    end
+
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            if type(char.Tag) == "number" and not cachedTag then cachedTag = char.Tag end
+            return char
+        end
+        return nil
+    end
+
+    local function getTag()
+        if cachedTag then return cachedTag end
+        getCharacter()
+        return cachedTag
+    end
+
+    local function setLocalJumpCap(v)
+        local char = getCharacter()
+        if not char or not char.Movement or not char.Movement.MoveStats then return end
+        local stats = char.Movement.MoveStats
+        if stats.Modifiers then
+            stats.Modifiers.JumpCap = v
+        end
+        if stats.MoveStats then
+            stats.MoveStats.JumpCap = v
+        end
+    end
+
+    local function fireJumpCap(v)
+        local tag = getTag()
+        if not tag or not firesignal then return end
+        pcall(firesignal, CharacterTask.OnClientEvent, tag, "ModifyMovement", {"JumpCap", v})
+        setLocalJumpCap(v)
+    end
+
+    CharacterTask.OnClientEvent:Connect(function(first)
+        if type(first) == "number" then
+            cachedTag = first
+            cachedCharacter = nil
+        end
+    end)
+
+    player.CharacterAdded:Connect(function()
+        cachedTag = nil
+        cachedCharacter = nil
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not jumpCapEnabled then return end
+        fireJumpCap(jumpCapValue)
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Jump Cap Changer",
+        currentValue = false,
+        flag = "JumpCap_Toggle",
+        callback = function(v)
+            jumpCapEnabled = v
+            if not v then
+                fireJumpCap(2)
+            end
+        end,
+    })
+
+    tab:CreateInput({
+        name = "Amount",
+        placeholder = "e.g. 2",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                jumpCapValue = n
+                if jumpCapEnabled then
+                    fireJumpCap(jumpCapValue)
+                end
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
 JUMP POWER
 ============================================================================
 ]]--
