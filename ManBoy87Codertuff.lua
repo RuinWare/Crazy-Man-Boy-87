@@ -2124,6 +2124,7 @@ do
 
     tab:CreateToggle({
         name = "Speed Changer",
+		icon = 103917802962919,
         currentValue = false,
         flag = "SpeedChanger_Toggle",
         callback = function(v)
@@ -2136,6 +2137,7 @@ do
 
     tab:CreateInput({
         name = "Speed Amount",
+		icon = 79297485010070,
         placeholder = "1500",
         callback = function(text)
             local n = tonumber(text)
@@ -2470,6 +2472,7 @@ do
 
     tab:CreateToggle({
         name = "Air Strafe Acceleration Changer",
+		icon = 76591949215082,
         currentValue = false,
         flag = "AirStrafe_Toggle",
         callback = function(v)
@@ -2482,6 +2485,7 @@ do
 
     tab:CreateSlider({
         name = "Air Strafe Acceleration",
+		icon = 120597962040224,
         range = {182, 10000},
         increment = 1,
         suffix = "",
@@ -2577,6 +2581,7 @@ do
 
     tab:CreateToggle({
         name = "Jump Cap Changer",
+		icon = 116351309458675,
         currentValue = false,
         flag = "JumpCap_Toggle",
         callback = function(v)
@@ -2589,6 +2594,7 @@ do
 
     tab:CreateInput({
         name = "Amount",
+		icon = 120640130652888,
         placeholder = "e.g. 5",
         callback = function(text)
             local n = tonumber(text)
