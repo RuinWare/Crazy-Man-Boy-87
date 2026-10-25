@@ -3299,8 +3299,52 @@ do
     local spinDirection = "Clockwise"
     local spinRPS = 1
     local spinAngle = 0
-    local savedCamType = nil
-    local savedCamOffset = nil
+    local torsoRot = nil
+    local baseC0 = nil
+    local lastApplied = nil
+
+    local function findTorsoRot()
+        local rigs = workspace:FindFirstChild("Rigs")
+        if not rigs then return nil end
+        local rig = rigs:FindFirstChild(player.Name)
+        if not rig then return nil end
+        local joints = rig:FindFirstChild("Joints")
+        if not joints then return nil end
+        return joints:FindFirstChild("TorsoRot")
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not spinEnabled then return end
+        if not torsoRot or not torsoRot.Parent then
+            torsoRot = findTorsoRot()
+            baseC0 = nil
+            lastApplied = nil
+            return
+        end
+        local current = torsoRot.C0
+        if lastApplied and current == lastApplied then
+            return
+        end
+        baseC0 = current
+    end)
+
+    RunService.RenderStepped:Connect(function(dt)
+        if not spinEnabled then return end
+        if not torsoRot or not torsoRot.Parent then return end
+        if not baseC0 then return end
+        local dir = (spinDirection == "Clockwise") and -1 or 1
+        spinAngle = (spinAngle + spinRPS * dir * 2 * math.pi * dt) % (2 * math.pi)
+        local newC0 = baseC0 * CFrame.Angles(0, spinAngle, 0)
+        torsoRot.C0 = newC0
+        lastApplied = newC0
+    end)
+
+    player.CharacterAdded:Connect(function()
+        torsoRot = nil
+        baseC0 = nil
+        lastApplied = nil
+        spinAngle = 0
+    end)
 
     tab:CreateDivider()
 
@@ -3312,12 +3356,9 @@ do
             spinEnabled = v
             if not v then
                 spinAngle = 0
-                local cam = workspace.CurrentCamera
-                if cam and savedCamType then
-                    cam.CameraType = savedCamType
-                end
-                savedCamType = nil
-                savedCamOffset = nil
+                torsoRot = nil
+                baseC0 = nil
+                lastApplied = nil
             end
         end,
     })
@@ -3342,38 +3383,6 @@ do
         flag = "CharacterSpin_Slider",
         callback = function(v) spinRPS = v end,
     })
-
-    RunService.RenderStepped:Connect(function(dt)
-        if not spinEnabled then return end
-
-        local char = player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        local cam = workspace.CurrentCamera
-
-        if not savedCamOffset and cam then
-            savedCamType = cam.CameraType
-            savedCamOffset = cam.CFrame.Position - hrp.Position
-        end
-
-        local rigs = workspace:FindFirstChild("Rigs")
-        local rig = rigs and rigs:FindFirstChild(player.Name)
-
-        local dir = (spinDirection == "Clockwise") and -1 or 1
-        spinAngle = spinAngle + spinRPS * dir * 2 * math.pi * dt
-
-        if rig then
-            local pivot = rig:GetPivot()
-            rig:PivotTo(CFrame.new(pivot.Position) * CFrame.Angles(0, spinAngle, 0))
-        end
-
-        if cam and savedCamOffset then
-            cam.CameraType = Enum.CameraType.Scriptable
-            local camPos = hrp.Position + savedCamOffset
-            cam.CFrame = CFrame.new(camPos, hrp.Position)
-        end
-    end)
 end
 
 --[[
