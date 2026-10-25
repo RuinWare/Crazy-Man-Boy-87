@@ -3295,10 +3295,9 @@ LEGIT JUMP
 ]]--
 
 do
-    local wmoteEnabled = false
+    local emoteEnabled = false
     local torsoRot = nil
     local baseC0 = nil
-    local lastApplied = nil
 
     local function findTorsoRot()
         local rigs = workspace:FindFirstChild("Rigs")
@@ -3310,34 +3309,22 @@ do
         return joints:FindFirstChild("TorsoRot")
     end
 
-    RunService.Heartbeat:Connect(function()
-        if not wmoteEnabled then return end
+    RunService.RenderStepped:Connect(function()
+        if not emoteEnabled then return end
+
         if not torsoRot or not torsoRot.Parent then
             torsoRot = findTorsoRot()
-            baseC0 = nil
-            lastApplied = nil
-            return
+            if not torsoRot then return end
+            baseC0 = torsoRot.C0
         end
-        local current = torsoRot.C0
-        if lastApplied and current == lastApplied then
-            return
-        end
-        baseC0 = current
-    end)
-
-    RunService.RenderStepped:Connect(function()
-        if not wmoteEnabled then return end
-        if not torsoRot or not torsoRot.Parent then return end
         if not baseC0 then return end
-        local newC0 = CFrame.new(baseC0.Position)
-        torsoRot.C0 = newC0
-        lastApplied = newC0
+
+        torsoRot.C0 = CFrame.new(baseC0.Position)
     end)
 
     player.CharacterAdded:Connect(function()
         torsoRot = nil
         baseC0 = nil
-        lastApplied = nil
     end)
 
     tab:CreateDivider()
@@ -3345,13 +3332,12 @@ do
     tab:CreateToggle({
         name = "Emote Run",
         currentValue = false,
-        flag = "WmoteRun_Toggle",
+        flag = "EmoteRun_Toggle",
         callback = function(v)
-            wmoteEnabled = v
+            emoteEnabled = v
             if not v then
                 torsoRot = nil
                 baseC0 = nil
-                lastApplied = nil
             end
         end,
     })
