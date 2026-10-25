@@ -3290,6 +3290,75 @@ end
 
 --[[
 ============================================================================
+LEGIT JUMP
+============================================================================
+]]--
+
+do
+    local wmoteEnabled = false
+    local torsoRot = nil
+    local baseC0 = nil
+    local lastApplied = nil
+
+    local function findTorsoRot()
+        local rigs = workspace:FindFirstChild("Rigs")
+        if not rigs then return nil end
+        local rig = rigs:FindFirstChild(player.Name)
+        if not rig then return nil end
+        local joints = rig:FindFirstChild("Joints")
+        if not joints then return nil end
+        return joints:FindFirstChild("TorsoRot")
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not wmoteEnabled then return end
+        if not torsoRot or not torsoRot.Parent then
+            torsoRot = findTorsoRot()
+            baseC0 = nil
+            lastApplied = nil
+            return
+        end
+        local current = torsoRot.C0
+        if lastApplied and current == lastApplied then
+            return
+        end
+        baseC0 = current
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if not wmoteEnabled then return end
+        if not torsoRot or not torsoRot.Parent then return end
+        if not baseC0 then return end
+        local newC0 = CFrame.new(baseC0.Position)
+        torsoRot.C0 = newC0
+        lastApplied = newC0
+    end)
+
+    player.CharacterAdded:Connect(function()
+        torsoRot = nil
+        baseC0 = nil
+        lastApplied = nil
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Emote Run",
+        currentValue = false,
+        flag = "WmoteRun_Toggle",
+        callback = function(v)
+            wmoteEnabled = v
+            if not v then
+                torsoRot = nil
+                baseC0 = nil
+                lastApplied = nil
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
 cs
 ============================================================================
 ]]--
@@ -3346,7 +3415,7 @@ do
         spinAngle = 0
     end)
 
-    tab:CreateDivider()
+    tab:CreateDivider({ text = "Player" })
 
     tab:CreateToggle({
         name = "Character Spin",
