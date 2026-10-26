@@ -3296,35 +3296,25 @@ LEGIT JUMP
 
 do
     local emoteEnabled = false
-    local torsoRot = nil
-    local baseC0 = nil
-
-    local function findTorsoRot()
-        local rigs = workspace:FindFirstChild("Rigs")
-        if not rigs then return nil end
-        local rig = rigs:FindFirstChild(player.Name)
-        if not rig then return nil end
-        local joints = rig:FindFirstChild("Joints")
-        if not joints then return nil end
-        return joints:FindFirstChild("TorsoRot")
-    end
 
     RunService.RenderStepped:Connect(function()
         if not emoteEnabled then return end
+        local char = player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
 
-        if not torsoRot or not torsoRot.Parent then
-            torsoRot = findTorsoRot()
-            if not torsoRot then return end
-            baseC0 = torsoRot.C0
-        end
-        if not baseC0 then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+        local look = cam.CFrame.LookVector
+        local forward = Vector3.new(look.X, 0, look.Z)
+        if forward.Magnitude < 0.001 then return end
+        forward = forward.Unit
 
-        torsoRot.C0 = CFrame.new(baseC0.Position)
-    end)
-
-    player.CharacterAdded:Connect(function()
-        torsoRot = nil
-        baseC0 = nil
+        local pos = hrp.Position
+        local vel = hrp.AssemblyLinearVelocity
+        hrp.CFrame = CFrame.new(pos, pos + forward)
+        hrp.AssemblyLinearVelocity = vel
     end)
 
     tab:CreateDivider()
@@ -3333,13 +3323,7 @@ do
         name = "Emote Run",
         currentValue = false,
         flag = "EmoteRun_Toggle",
-        callback = function(v)
-            emoteEnabled = v
-            if not v then
-                torsoRot = nil
-                baseC0 = nil
-            end
-        end,
+        callback = function(v) emoteEnabled = v end,
     })
 end
 
