@@ -3431,6 +3431,7 @@ end
 
     tab:CreateToggle({
         name = "Emote Run",
+		icon = 113713061701553,
         currentValue = false,
         flag = "EmoteRun_Toggle",
         callback = function(v)
