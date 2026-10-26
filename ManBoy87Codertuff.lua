@@ -3290,32 +3290,142 @@ end
 
 --[[
 ============================================================================
-LEGIT JUMP
+EMOTE RUN
 ============================================================================
 ]]--
 
 do
-    local emoteEnabled = false
+    local ON_SRC = [==[
+-- LocalScript: ShiftlockOn
+-- Makes the player face the same direction as their camera and wins any
+-- fight with the game: it runs LAST every frame, on every physics step,
+-- and instantly whenever something changes the character's rotation.
 
-    RunService.RenderStepped:Connect(function()
-        if not emoteEnabled then return end
-        local char = player.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-        local cam = workspace.CurrentCamera
-        if not cam then return end
-        local look = cam.CFrame.LookVector
-        local forward = Vector3.new(look.X, 0, look.Z)
-        if forward.Magnitude < 0.001 then return end
-        forward = forward.Unit
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlock" -- must match the Off script
 
-        local pos = hrp.Position
-        local vel = hrp.AssemblyLinearVelocity
-        hrp.CFrame = CFrame.new(pos, pos + forward)
-        hrp.AssemblyLinearVelocity = vel
-    end)
+local loopConnections = {}
+local hookConnections = {}
+local hookedChar
+
+local function stop()
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	for _, c in ipairs(loopConnections) do c:Disconnect() end
+	for _, c in ipairs(hookConnections) do c:Disconnect() end
+	table.clear(loopConnections)
+	table.clear(hookConnections)
+	hookedChar = nil
+end
+
+local function face()
+	if not player:GetAttribute(NAME) then
+		stop()
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not camera or not hum or not root then return end
+
+	-- Re-hook on respawn: react the instant anything touches rotation
+	if char ~= hookedChar then
+		hookedChar = char
+		for _, c in ipairs(hookConnections) do c:Disconnect() end
+		table.clear(hookConnections)
+		table.insert(hookConnections, root:GetPropertyChangedSignal("CFrame"):Connect(face))
+		table.insert(hookConnections, hum:GetPropertyChangedSignal("AutoRotate"):Connect(face))
+	end
+
+	hum.AutoRotate = false
+
+	-- Physics-level lock
+	local align = root:FindFirstChild(NAME)
+	if not align then
+		local att = Instance.new("Attachment")
+		att.Name = NAME .. "Attachment"
+		att.Parent = root
+
+		align = Instance.new("AlignOrientation")
+		align.Name = NAME
+		align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		align.Attachment0 = att
+		align.RigidityEnabled = true
+		align.CFrame = root.CFrame
+		align.Parent = root
+	end
+
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 0.001 then return end
+	flat = flat.Unit
+
+	align.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+
+	-- Only rewrite the CFrame if it's actually wrong (prevents event loops)
+	if root.CFrame.LookVector:Dot(flat) < 0.99999 then
+		root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+player:SetAttribute(NAME, true)
+
+pcall(function()
+	RunService:UnbindFromRenderStep(NAME)
+end)
+RunService:BindToRenderStep(NAME, Enum.RenderPriority.Last.Value, face)
+table.insert(loopConnections, RunService.Stepped:Connect(face))
+table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+]==]
+
+    local OFF_SRC = [==[
+-- LocalScript: ShiftlockOff
+-- Turns the custom shiftlock off and restores normal character rotation.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlock" -- must match the On script
+
+player:SetAttribute(NAME, false) -- tells every On loop to shut down
+pcall(function()
+	RunService:UnbindFromRenderStep(NAME)
+end)
+
+local char = player.Character
+if not char then return end
+
+local root = char:FindFirstChild("HumanoidRootPart")
+if root then
+	local align = root:FindFirstChild(NAME)
+	if align then align:Destroy() end
+	local att = root:FindFirstChild(NAME .. "Attachment")
+	if att then att:Destroy() end
+end
+
+local hum = char:FindFirstChildOfClass("Humanoid")
+if hum then
+	hum.AutoRotate = true
+end
+]==]
+
+    local function runSource(src)
+        if loadstring then
+            local ok, fn = pcall(loadstring, src)
+            if ok and fn then pcall(fn) end
+        elseif getgenv and getgenv().loadstring then
+            local ok, fn = pcall(getgenv().loadstring, src)
+            if ok and fn then pcall(fn) end
+        end
+    end
 
     tab:CreateDivider()
 
@@ -3323,7 +3433,13 @@ do
         name = "Emote Run",
         currentValue = false,
         flag = "EmoteRun_Toggle",
-        callback = function(v) emoteEnabled = v end,
+        callback = function(v)
+            if v then
+                runSource(ON_SRC)
+            else
+                runSource(OFF_SRC)
+            end
+        end,
     })
 end
 
