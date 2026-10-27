@@ -3718,6 +3718,7 @@ end
 
     tab:CreateDropdown({
         name = "Direction",
+		icon = 110016491347992,
         options = { "Forward", "Backward" },
         currentOption = { "Forward" },
         multiSelect = false,
