@@ -3831,7 +3831,7 @@ end
 
 --[[
 ============================================================================
-PLAYER ROTATE THING
+PLAYER ROTATE
 ============================================================================
 ]]--
 
@@ -4036,7 +4036,7 @@ do
         flyRoot.AssemblyLinearVelocity = Vector3.zero
     end)
 
-    tab:CreateDivider()
+    tab:CreateDivider({ text = "Fly" })
 
     tab:CreateToggle({
         name = "Fly",
@@ -4058,6 +4058,75 @@ do
         currentValue = 100,
         flag = "Fly_Slider",
         callback = function(v) flySpeed = v end,
+    })
+end
+
+--[[
+============================================================================
+DOWN FLY
+============================================================================
+]]--
+
+do
+    local downFlyEnabled = false
+    local downFlySpeed = 50
+    local downFlyHum, downFlyRoot
+
+    local LOOK_DOWN_THRESHOLD = -0.7
+
+    local function downFlyAttach(char)
+        downFlyHum = char:WaitForChild("Humanoid")
+        downFlyRoot = char:WaitForChild("HumanoidRootPart")
+        if downFlyEnabled then downFlyHum.WalkSpeed = 0 end
+    end
+
+    if player.Character then task.spawn(downFlyAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(downFlyAttach, c) end)
+
+    RunService.Heartbeat:Connect(function(dt)
+        if not downFlyEnabled then return end
+        if not downFlyHum or not downFlyRoot or not downFlyRoot.Parent then return end
+        if downFlyHum.Health <= 0 then return end
+
+        downFlyHum.WalkSpeed = 0
+
+        local cam = workspace.CurrentCamera
+        if not cam then
+            downFlyRoot.AssemblyLinearVelocity = Vector3.zero
+            return
+        end
+
+        local lookingDown = cam.CFrame.LookVector.Y <= LOOK_DOWN_THRESHOLD
+
+        if lookingDown then
+            downFlyRoot.CFrame = downFlyRoot.CFrame + Vector3.new(0, downFlySpeed * dt, 0)
+        end
+
+        downFlyRoot.AssemblyLinearVelocity = Vector3.zero
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Down Fly",
+        currentValue = false,
+        flag = "DownFly_Toggle",
+        callback = function(v)
+            downFlyEnabled = v
+            if downFlyHum then
+                downFlyHum.WalkSpeed = v and 0 or 16
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Down Fly Speed",
+        range = {16.6, 500.5},
+        increment = 0.1,
+        suffix = " sps",
+        currentValue = 50,
+        flag = "DownFly_Slider",
+        callback = function(v) downFlySpeed = v end,
     })
 end
 
