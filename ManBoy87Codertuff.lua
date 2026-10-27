@@ -3948,14 +3948,12 @@ table.insert(loopConnections, RunService.Heartbeat:Connect(face))
 
     local OFF_SRC = [==[
 -- LocalScript: ShiftlockRotateOff
--- Turns the rotating shiftlock off and restores normal character rotation.
 
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
-local NAME = "CustomShiftlockRotate" -- must match ShiftlockRotateOn
+local NAME = "CustomShiftlockRotate"
 
--- Every running copy of the On script sees this change and shuts itself down
 player:SetAttribute(NAME, false)
 
 local char = player.Character
@@ -3979,21 +3977,35 @@ end
     local enabled = false
     local pending = false
 
+    local MARKER = "local ROTATION = Vector3.new(0, 90, 0)"
+
     local function buildOn()
-        local result = ON_TEMPLATE:gsub(
-            "local ROTATION = Vector3%.new%(0, 90, 0%)",
-            "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
-        )
-        return result
+        local idx = string.find(ON_TEMPLATE, MARKER, 1, true)
+        if not idx then
+            warn("[PlayerRotation] Marker not found in template")
+            return ON_TEMPLATE
+        end
+        local newLine = "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
+        local before = string.sub(ON_TEMPLATE, 1, idx - 1)
+        local after = string.sub(ON_TEMPLATE, idx + #MARKER)
+        return before .. newLine .. after
     end
 
-    local function runSource(src)
-        if loadstring then
-            local ok, fn = pcall(loadstring, src)
-            if ok and fn then pcall(fn) end
-        elseif getgenv and getgenv().loadstring then
-            local ok, fn = pcall(getgenv().loadstring, src)
-            if ok and fn then pcall(fn) end
+    local function runSource(src, tag)
+        local ls = loadstring or (getgenv and getgenv().loadstring)
+        if not ls then
+            warn("[PlayerRotation] loadstring unavailable")
+            return
+        end
+        local ok, fn = pcall(ls, src)
+        if not ok then
+            warn("[PlayerRotation] loadstring failed on " .. (tag or "?") .. ": " .. tostring(fn))
+            return
+        end
+        if not fn then return end
+        local ok2, err = pcall(fn)
+        if not ok2 then
+            warn("[PlayerRotation] runtime error in " .. (tag or "?") .. ": " .. tostring(err))
         end
     end
 
@@ -4004,8 +4016,8 @@ end
         task.defer(function()
             pending = false
             if not enabled then return end
-            runSource(OFF_SRC)
-            runSource(buildOn())
+            runSource(OFF_SRC, "OFF")
+            runSource(buildOn(), "ON")
         end)
     end
 
@@ -4018,9 +4030,9 @@ end
         callback = function(v)
             enabled = v
             if v then
-                runSource(buildOn())
+                runSource(buildOn(), "ON")
             else
-                runSource(OFF_SRC)
+                runSource(OFF_SRC, "OFF")
             end
         end,
     })
