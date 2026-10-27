@@ -3295,21 +3295,42 @@ EMOTE RUN
 ]]--
 
 do
-    local ON_SRC = [==[
--- LocalScript: ShiftlockOn
--- Makes the player face the same direction as their camera and wins any
--- fight with the game: it runs LAST every frame, on every physics step,
--- and instantly whenever something changes the character's rotation.
+    local SRC_FWD_ON = [==[
+-- LocalScript: ShiftlockOn  (detection system, FORWARD)
+-- Watches the game's CharacterTask event:
+--   FireServer("Emote", <any number except 0>)  -> shiftlock ON
+--   FireServer("Emote", 0)                      -> shiftlock OFF
+--   Respawning (new character)                  -> shiftlock OFF
+-- While ON, the player faces the SAME direction as the camera and wins
+-- any fight with the game (runs last every frame, every physics step, and
+-- instantly when something changes the rotation).
+-- Requires an executor with hookmetamethod / newcclosure / getnamecallmethod.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local player = Players.LocalPlayer
-local NAME = "CustomShiftlock" -- must match the Off script
+assert(hookmetamethod and newcclosure and getnamecallmethod,
+	"ShiftlockOn needs an executor with hookmetamethod support")
 
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlock"         -- shiftlock is currently active
+local SYSTEM = "CustomShiftlockSystem" -- detection system is running
+
+if player:GetAttribute(SYSTEM) then return end -- already running
+
+local event = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+
+local systemOn = true
+local active = false
 local loopConnections = {}
 local hookConnections = {}
 local hookedChar
+
+player:SetAttribute(SYSTEM, true)
+player:GetAttributeChangedSignal(SYSTEM):Connect(function()
+	systemOn = player:GetAttribute(SYSTEM) == true
+end)
 
 local function stop()
 	pcall(function()
@@ -3320,6 +3341,7 @@ local function stop()
 	table.clear(loopConnections)
 	table.clear(hookConnections)
 	hookedChar = nil
+	active = false
 end
 
 local function face()
@@ -3334,7 +3356,6 @@ local function face()
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	if not camera or not hum or not root then return end
 
-	-- Re-hook on respawn: react the instant anything touches rotation
 	if char ~= hookedChar then
 		hookedChar = char
 		for _, c in ipairs(hookConnections) do c:Disconnect() end
@@ -3345,7 +3366,6 @@ local function face()
 
 	hum.AutoRotate = false
 
-	-- Physics-level lock
 	local align = root:FindFirstChild(NAME)
 	if not align then
 		local att = Instance.new("Attachment")
@@ -3368,34 +3388,266 @@ local function face()
 
 	align.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
 
-	-- Only rewrite the CFrame if it's actually wrong (prevents event loops)
 	if root.CFrame.LookVector:Dot(flat) < 0.99999 then
 		root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
 		root.AssemblyAngularVelocity = Vector3.zero
 	end
 end
 
-player:SetAttribute(NAME, true)
+local function enable()
+	if active or not systemOn then return end
+	active = true
+	player:SetAttribute(NAME, true)
 
-pcall(function()
-	RunService:UnbindFromRenderStep(NAME)
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	RunService:BindToRenderStep(NAME, Enum.RenderPriority.Last.Value, face)
+	table.insert(loopConnections, RunService.Stepped:Connect(face))
+	table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+end
+
+local function disable()
+	player:SetAttribute(NAME, false)
+	stop()
+
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if root then
+		local align = root:FindFirstChild(NAME)
+		if align then align:Destroy() end
+		local att = root:FindFirstChild(NAME .. "Attachment")
+		if att then att:Destroy() end
+	end
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.AutoRotate = true
+	end
+end
+
+player.CharacterAdded:Connect(function()
+	if systemOn then
+		disable()
+	end
 end)
-RunService:BindToRenderStep(NAME, Enum.RenderPriority.Last.Value, face)
-table.insert(loopConnections, RunService.Stepped:Connect(face))
-table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+	local method = getnamecallmethod()
+
+	if systemOn and self == event and method == "FireServer" then
+		local action, value = ...
+		if action == "Emote" and type(value) == "number" then
+			if value == 0 then
+				task.defer(disable)
+			else
+				task.defer(enable)
+			end
+		end
+	end
+
+	return oldNamecall(self, ...)
+end))
 ]==]
 
-    local OFF_SRC = [==[
+    local SRC_FWD_OFF = [==[
 -- LocalScript: ShiftlockOff
--- Turns the custom shiftlock off and restores normal character rotation.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local NAME = "CustomShiftlock" -- must match the On script
+local NAME = "CustomShiftlock"
+local SYSTEM = "CustomShiftlockSystem"
 
-player:SetAttribute(NAME, false) -- tells every On loop to shut down
+player:SetAttribute(SYSTEM, false)
+player:SetAttribute(NAME, false)
+pcall(function()
+	RunService:UnbindFromRenderStep(NAME)
+end)
+
+local char = player.Character
+if not char then return end
+
+local root = char:FindFirstChild("HumanoidRootPart")
+if root then
+	local align = root:FindFirstChild(NAME)
+	if align then align:Destroy() end
+	local att = root:FindFirstChild(NAME .. "Attachment")
+	if att then att:Destroy() end
+end
+
+local hum = char:FindFirstChildOfClass("Humanoid")
+if hum then
+	hum.AutoRotate = true
+end
+]==]
+
+    local SRC_BWD_ON = [==[
+-- LocalScript: ShiftlockBackOn  (detection system)
+-- Watches the game's CharacterTask event:
+--   FireServer("Emote", <any number except 0>)  -> backwards shiftlock ON
+--   FireServer("Emote", 0)                      -> backwards shiftlock OFF
+--   Respawning (new character)                  -> backwards shiftlock OFF
+-- While ON, the player faces the OPPOSITE direction of the camera and wins
+-- any fight with the game.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+assert(hookmetamethod and newcclosure and getnamecallmethod,
+	"ShiftlockBackOn needs an executor with hookmetamethod support")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlockBack"
+local SYSTEM = "CustomShiftlockBackSystem"
+
+if player:GetAttribute(SYSTEM) then return end
+
+local event = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+
+local systemOn = true
+local active = false
+local loopConnections = {}
+local hookConnections = {}
+local hookedChar
+
+player:SetAttribute(SYSTEM, true)
+player:GetAttributeChangedSignal(SYSTEM):Connect(function()
+	systemOn = player:GetAttribute(SYSTEM) == true
+end)
+
+local function stop()
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	for _, c in ipairs(loopConnections) do c:Disconnect() end
+	for _, c in ipairs(hookConnections) do c:Disconnect() end
+	table.clear(loopConnections)
+	table.clear(hookConnections)
+	hookedChar = nil
+	active = false
+end
+
+local function face()
+	if not player:GetAttribute(NAME) then
+		stop()
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not camera or not hum or not root then return end
+
+	if char ~= hookedChar then
+		hookedChar = char
+		for _, c in ipairs(hookConnections) do c:Disconnect() end
+		table.clear(hookConnections)
+		table.insert(hookConnections, root:GetPropertyChangedSignal("CFrame"):Connect(face))
+		table.insert(hookConnections, hum:GetPropertyChangedSignal("AutoRotate"):Connect(face))
+	end
+
+	hum.AutoRotate = false
+
+	local align = root:FindFirstChild(NAME)
+	if not align then
+		local att = Instance.new("Attachment")
+		att.Name = NAME .. "Attachment"
+		att.Parent = root
+
+		align = Instance.new("AlignOrientation")
+		align.Name = NAME
+		align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		align.Attachment0 = att
+		align.RigidityEnabled = true
+		align.CFrame = root.CFrame
+		align.Parent = root
+	end
+
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 0.001 then return end
+	flat = -flat.Unit
+
+	align.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+
+	if root.CFrame.LookVector:Dot(flat) < 0.99999 then
+		root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+local function enable()
+	if active or not systemOn then return end
+	active = true
+	player:SetAttribute(NAME, true)
+
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	RunService:BindToRenderStep(NAME, Enum.RenderPriority.Last.Value, face)
+	table.insert(loopConnections, RunService.Stepped:Connect(face))
+	table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+end
+
+local function disable()
+	player:SetAttribute(NAME, false)
+	stop()
+
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if root then
+		local align = root:FindFirstChild(NAME)
+		if align then align:Destroy() end
+		local att = root:FindFirstChild(NAME .. "Attachment")
+		if att then att:Destroy() end
+	end
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.AutoRotate = true
+	end
+end
+
+player.CharacterAdded:Connect(function()
+	if systemOn then
+		disable()
+	end
+end)
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+	local method = getnamecallmethod()
+
+	if systemOn and self == event and method == "FireServer" then
+		local action, value = ...
+		if action == "Emote" and type(value) == "number" then
+			if value == 0 then
+				task.defer(disable)
+			else
+				task.defer(enable)
+			end
+		end
+	end
+
+	return oldNamecall(self, ...)
+end))
+]==]
+
+    local SRC_BWD_OFF = [==[
+-- LocalScript: ShiftlockBackOff
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlockBack"
+local SYSTEM = "CustomShiftlockBackSystem"
+
+player:SetAttribute(SYSTEM, false)
+player:SetAttribute(NAME, false)
 pcall(function()
 	RunService:UnbindFromRenderStep(NAME)
 end)
@@ -3427,18 +3679,53 @@ end
         end
     end
 
+    local enabled = false
+    local mode = "Forward"
+    local currentActive = nil
+
+    local function apply()
+        if currentActive == "forward" then
+            runSource(SRC_FWD_OFF)
+            currentActive = nil
+        elseif currentActive == "backward" then
+            runSource(SRC_BWD_OFF)
+            currentActive = nil
+        end
+
+        if enabled then
+            if mode == "Forward" then
+                runSource(SRC_FWD_ON)
+                currentActive = "forward"
+            else
+                runSource(SRC_BWD_ON)
+                currentActive = "backward"
+            end
+        end
+    end
+
     tab:CreateDivider()
 
     tab:CreateToggle({
-        name = "Emote Run",
+        name = "Emote Shiftlock",
 		icon = 113713061701553,
         currentValue = false,
-        flag = "EmoteRun_Toggle",
+        flag = "EmoteShiftlock_Toggle",
         callback = function(v)
-            if v then
-                runSource(ON_SRC)
-            else
-                runSource(OFF_SRC)
+            enabled = v
+            apply()
+        end,
+    })
+
+    tab:CreateDropdown({
+        name = "Direction",
+        options = { "Forward", "Backward" },
+        currentOption = { "Forward" },
+        multiSelect = false,
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if pick and pick ~= mode then
+                mode = pick
+                apply()
             end
         end,
     })
