@@ -3831,6 +3831,233 @@ end
 
 --[[
 ============================================================================
+PLAYER ROTATE THING
+============================================================================
+]]--
+
+do
+    local ON_TEMPLATE = [==[
+-- LocalScript: ShiftlockRotateOn
+-- Turns on automatically when run. Keeps the player rotated relative to the
+-- camera direction, and wins any fight with the game (runs last every frame,
+-- every physics step, and instantly when something changes the rotation).
+-- To change the rotation: edit ROTATION below, then run this script again.
+
+-- ================= EDIT THIS =================
+-- Rotation in degrees, applied on top of the camera direction:
+--   X = pitch (tilt forward / back)
+--   Y = yaw   (0 = forward, 180 = backwards, 90 = left, -90 = right)
+--   Z = roll  (tilt sideways)
+local ROTATION = Vector3.new(0, 90, 0)
+-- =============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlockRotate" -- must match ShiftlockRotateOff
+
+-- Each run gets its own id, so running this again replaces the old run
+local runId = tostring(os.clock())
+local BIND = NAME .. runId
+
+local rotation = CFrame.fromEulerAnglesYXZ(
+	math.rad(ROTATION.X),
+	math.rad(ROTATION.Y),
+	math.rad(ROTATION.Z)
+)
+
+local loopConnections = {}
+local hookConnections = {}
+local hookedChar
+
+local function stop()
+	pcall(function()
+		RunService:UnbindFromRenderStep(BIND)
+	end)
+	for _, c in ipairs(loopConnections) do c:Disconnect() end
+	for _, c in ipairs(hookConnections) do c:Disconnect() end
+	table.clear(loopConnections)
+	table.clear(hookConnections)
+	hookedChar = nil
+end
+
+local function face()
+	-- Off script (or a newer run) changes this, which shuts this run down
+	if player:GetAttribute(NAME) ~= runId then
+		stop()
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not camera or not hum or not root then return end
+
+	-- Hook the current character: react the instant anything touches rotation
+	if char ~= hookedChar then
+		hookedChar = char
+		for _, c in ipairs(hookConnections) do c:Disconnect() end
+		table.clear(hookConnections)
+		table.insert(hookConnections, root:GetPropertyChangedSignal("CFrame"):Connect(face))
+		table.insert(hookConnections, hum:GetPropertyChangedSignal("AutoRotate"):Connect(face))
+	end
+
+	hum.AutoRotate = false
+
+	-- Physics-level lock
+	local align = root:FindFirstChild(NAME)
+	if not align then
+		local att = Instance.new("Attachment")
+		att.Name = NAME .. "Attachment"
+		att.Parent = root
+
+		align = Instance.new("AlignOrientation")
+		align.Name = NAME
+		align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		align.Attachment0 = att
+		align.RigidityEnabled = true
+		align.CFrame = root.CFrame
+		align.Parent = root
+	end
+
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 0.001 then return end
+
+	-- Camera direction, then your ROTATION on top
+	local target = CFrame.lookAt(root.Position, root.Position + flat.Unit) * rotation
+	align.CFrame = target
+
+	-- Only rewrite the CFrame if it's actually wrong (prevents event loops)
+	local cur = root.CFrame
+	if cur.LookVector:Dot(target.LookVector) < 0.99999
+		or cur.UpVector:Dot(target.UpVector) < 0.99999 then
+		root.CFrame = target
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+player:SetAttribute(NAME, runId)
+
+RunService:BindToRenderStep(BIND, Enum.RenderPriority.Last.Value, face)
+table.insert(loopConnections, RunService.Stepped:Connect(face))
+table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+]==]
+
+    local OFF_SRC = [==[
+-- LocalScript: ShiftlockRotateOff
+-- Turns the rotating shiftlock off and restores normal character rotation.
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlockRotate" -- must match ShiftlockRotateOn
+
+-- Every running copy of the On script sees this change and shuts itself down
+player:SetAttribute(NAME, false)
+
+local char = player.Character
+if not char then return end
+
+local root = char:FindFirstChild("HumanoidRootPart")
+if root then
+	local align = root:FindFirstChild(NAME)
+	if align then align:Destroy() end
+	local att = root:FindFirstChild(NAME .. "Attachment")
+	if att then att:Destroy() end
+end
+
+local hum = char:FindFirstChildOfClass("Humanoid")
+if hum then
+	hum.AutoRotate = true
+end
+]==]
+
+    local pitch, yaw, roll = 0, 90, 0
+    local enabled = false
+    local pending = false
+
+    local function buildOn()
+        local result = ON_TEMPLATE:gsub(
+            "local ROTATION = Vector3%.new%(0, 90, 0%)",
+            "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
+        )
+        return result
+    end
+
+    local function runSource(src)
+        if loadstring then
+            local ok, fn = pcall(loadstring, src)
+            if ok and fn then pcall(fn) end
+        elseif getgenv and getgenv().loadstring then
+            local ok, fn = pcall(getgenv().loadstring, src)
+            if ok and fn then pcall(fn) end
+        end
+    end
+
+    local function refresh()
+        if not enabled then return end
+        if pending then return end
+        pending = true
+        task.defer(function()
+            pending = false
+            if not enabled then return end
+            runSource(OFF_SRC)
+            runSource(buildOn())
+        end)
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Player Rotation Changer",
+        currentValue = false,
+        flag = "PlayerRotation_Toggle",
+        callback = function(v)
+            enabled = v
+            if v then
+                runSource(buildOn())
+            else
+                runSource(OFF_SRC)
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Pitch",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        currentValue = 0,
+        flag = "PlayerRotation_Pitch",
+        callback = function(v) pitch = v; refresh() end,
+    })
+
+    tab:CreateSlider({
+        name = "Yaw",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        currentValue = 90,
+        flag = "PlayerRotation_Yaw",
+        callback = function(v) yaw = v; refresh() end,
+    })
+
+    tab:CreateSlider({
+        name = "Roll",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        currentValue = 0,
+        flag = "PlayerRotation_Roll",
+        callback = function(v) roll = v; refresh() end,
+    })
+end
+
+--[[
+============================================================================
 
 V     I     S     U     A     L     S          (     T     A     B     )
 
