@@ -3836,7 +3836,7 @@ PLAYER ROTATE THING
 ]]--
 
 do
-    local ON_TEMPLATE = [==[
+    local SRC_ROTATE_ON = [==[
 -- LocalScript: ShiftlockRotateOn
 -- Turns on automatically when run. Keeps the player rotated relative to the
 -- camera direction, and wins any fight with the game (runs last every frame,
@@ -3848,7 +3848,7 @@ do
 --   X = pitch (tilt forward / back)
 --   Y = yaw   (0 = forward, 180 = backwards, 90 = left, -90 = right)
 --   Z = roll  (tilt sideways)
-local ROTATION = Vector3.new(0, 90, 0)
+local ROTATION = Vector3.new(0, 0, 0)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -3946,14 +3946,14 @@ table.insert(loopConnections, RunService.Stepped:Connect(face))
 table.insert(loopConnections, RunService.Heartbeat:Connect(face))
 ]==]
 
-    local OFF_SRC = [==[
+    local SRC_ROTATE_OFF = [==[
 -- LocalScript: ShiftlockRotateOff
 -- Turns the rotating shiftlock off and restores normal character rotation.
 
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
-local NAME = "CustomShiftlockRotate"
+local NAME = "CustomShiftlockRotate" -- must match ShiftlockRotateOn
 
 -- Every running copy of the On script sees this change and shuts itself down
 player:SetAttribute(NAME, false)
@@ -3987,26 +3987,25 @@ end
 
     local enabled = false
     local pitch = 0
-    local yaw = 90
+    local yaw = 0
     local roll = 0
+    local active = false
 
     local function buildOnSource()
-        local src = ON_TEMPLATE
-        local search = "local ROTATION = Vector3.new(0, 90, 0)"
-        local replacement = "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
-        local idx = src:find(search, 1, true)
-        if idx then
-            src = src:sub(1, idx - 1) .. replacement .. src:sub(idx + #search)
-        end
+        local newLine = string.format("local ROTATION = Vector3.new(%s, %s, %s)", pitch, yaw, roll)
+        local src = SRC_ROTATE_ON:gsub("local ROTATION = Vector3%.new%(0, 0, 0%)", newLine, 1)
         return src
     end
 
-    local function stopAll()
-        runSource(OFF_SRC)
-    end
-
-    local function startCurrent()
-        runSource(buildOnSource())
+    local function apply()
+        if active then
+            runSource(SRC_ROTATE_OFF)
+            active = false
+        end
+        if enabled then
+            runSource(buildOnSource())
+            active = true
+        end
     end
 
     tab:CreateDivider()
@@ -4014,14 +4013,10 @@ end
     tab:CreateToggle({
         name = "Player Rotation Changer",
         currentValue = false,
-        flag = "PlayerRotation_Toggle",
+        flag = "PlayerRotate_Toggle",
         callback = function(v)
             enabled = v
-            if v then
-                startCurrent()
-            else
-                stopAll()
-            end
+            apply()
         end,
     })
 
@@ -4031,13 +4026,10 @@ end
         increment = 0.1,
         suffix = "°",
         currentValue = 0,
-        flag = "PlayerRotation_Pitch",
+        flag = "PlayerRotate_Pitch",
         callback = function(v)
             pitch = v
-            if enabled then
-                stopAll()
-                startCurrent()
-            end
+            if enabled then apply() end
         end,
     })
 
@@ -4046,14 +4038,11 @@ end
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
-        currentValue = 90,
-        flag = "PlayerRotation_Yaw",
+        currentValue = 0,
+        flag = "PlayerRotate_Yaw",
         callback = function(v)
             yaw = v
-            if enabled then
-                stopAll()
-                startCurrent()
-            end
+            if enabled then apply() end
         end,
     })
 
@@ -4063,13 +4052,10 @@ end
         increment = 0.1,
         suffix = "°",
         currentValue = 0,
-        flag = "PlayerRotation_Roll",
+        flag = "PlayerRotate_Roll",
         callback = function(v)
             roll = v
-            if enabled then
-                stopAll()
-                startCurrent()
-            end
+            if enabled then apply() end
         end,
     })
 end
