@@ -4008,25 +4008,35 @@ do
         flyHum.WalkSpeed = 0
 
         local moveDir = flyHum.MoveDirection
-        local wish = Vector3.new(moveDir.X, 0, moveDir.Z)
-        if wish.Magnitude > 0 then wish = wish.Unit end
+        local moveFlat = Vector3.new(moveDir.X, 0, moveDir.Z)
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            wish = wish + Vector3.new(0, 1, 0)
-        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
-            or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            wish = wish + Vector3.new(0, -1, 0)
+        if moveFlat.Magnitude < 0.001 then
+            flyRoot.AssemblyLinearVelocity = Vector3.zero
+            return
+        end
+        moveFlat = moveFlat.Unit
+
+        local cam = workspace.CurrentCamera
+        local camLook = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
+        local camFlat = Vector3.new(camLook.X, 0, camLook.Z)
+
+        local verticalComponent = 0
+        if camFlat.Magnitude > 0.01 then
+            camFlat = camFlat.Unit
+            local forwardness = camFlat:Dot(moveFlat)
+            verticalComponent = forwardness * camLook.Y * flySpeed * 0.55
+        else
+            verticalComponent = camLook.Y * flySpeed * 0.55
         end
 
-        if wish.Magnitude > 0.001 then
-            wish = wish.Unit
-            flyRoot.CFrame = flyRoot.CFrame + wish * flySpeed * dt
-        end
+        local horizontal = moveFlat * flySpeed * dt
+        local vertical = Vector3.new(0, verticalComponent * dt, 0)
 
+        flyRoot.CFrame = flyRoot.CFrame + horizontal + vertical
         flyRoot.AssemblyLinearVelocity = Vector3.zero
     end)
 
-    tab:CreateDivider({ text = "Player Extras" })
+    tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Fly",
