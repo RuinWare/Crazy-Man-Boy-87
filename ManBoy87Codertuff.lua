@@ -3982,6 +3982,77 @@ end
 
 --[[
 ============================================================================
+Fly
+============================================================================
+]]--
+
+do
+    local flyEnabled = false
+    local flySpeed = 100
+    local flyHum, flyRoot
+
+    local function flyAttach(char)
+        flyHum = char:WaitForChild("Humanoid")
+        flyRoot = char:WaitForChild("HumanoidRootPart")
+        if flyEnabled then flyHum.WalkSpeed = 0 end
+    end
+
+    if player.Character then task.spawn(flyAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(flyAttach, c) end)
+
+    RunService.Heartbeat:Connect(function(dt)
+        if not flyEnabled then return end
+        if not flyHum or not flyRoot or not flyRoot.Parent then return end
+        if flyHum.Health <= 0 then return end
+
+        flyHum.WalkSpeed = 0
+
+        local moveDir = flyHum.MoveDirection
+        local wish = Vector3.new(moveDir.X, 0, moveDir.Z)
+        if wish.Magnitude > 0 then wish = wish.Unit end
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            wish = wish + Vector3.new(0, 1, 0)
+        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+            or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            wish = wish + Vector3.new(0, -1, 0)
+        end
+
+        if wish.Magnitude > 0.001 then
+            wish = wish.Unit
+            flyRoot.CFrame = flyRoot.CFrame + wish * flySpeed * dt
+        end
+
+        flyRoot.AssemblyLinearVelocity = Vector3.zero
+    end)
+
+    tab:CreateDivider({ text = "Player Extras" })
+
+    tab:CreateToggle({
+        name = "Fly",
+        currentValue = false,
+        flag = "Fly_Toggle",
+        callback = function(v)
+            flyEnabled = v
+            if flyHum then
+                flyHum.WalkSpeed = v and 0 or 16
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Fly Speed",
+        range = {16.6, 500.5},
+        increment = 0.1,
+        suffix = " sps",
+        currentValue = 100,
+        flag = "Fly_Slider",
+        callback = function(v) flySpeed = v end,
+    })
+end
+
+--[[
+============================================================================
 
 V     I     S     U     A     L     S          (     T     A     B     )
 
