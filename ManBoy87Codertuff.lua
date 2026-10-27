@@ -3706,7 +3706,7 @@ end
     tab:CreateDivider()
 
     tab:CreateToggle({
-        name = "Emote Shiftlock",
+        name = "Emote Run",
 		icon = 113713061701553,
         currentValue = false,
         flag = "EmoteShiftlock_Toggle",
