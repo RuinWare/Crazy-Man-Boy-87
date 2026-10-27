@@ -3975,11 +3975,22 @@ if hum then
 end
 ]==]
 
-    local function runSource(src)
+    local function runSource(src, tag)
         if loadstring then
             local ok, fn = pcall(loadstring, src)
-            if ok and fn then pcall(fn) end
-        elseif getgenv and getgenv().loadstring then
+            if not ok then
+                warn("[" .. tag .. "] loadstring failed: " .. tostring(fn))
+                return
+            end
+            if fn then
+                local ok2, err = pcall(fn)
+                if not ok2 then
+                    warn("[" .. tag .. "] runtime error: " .. tostring(err))
+                end
+            end
+            return
+        end
+        if getgenv and getgenv().loadstring then
             local ok, fn = pcall(getgenv().loadstring, src)
             if ok and fn then pcall(fn) end
         end
@@ -3993,17 +4004,22 @@ end
 
     local function buildOnSource()
         local newLine = string.format("local ROTATION = Vector3.new(%s, %s, %s)", pitch, yaw, roll)
-        local src = SRC_ROTATE_ON:gsub("local ROTATION = Vector3%.new%(0, 0, 0%)", newLine, 1)
-        return src
+        local needle = "local ROTATION = Vector3.new(0, 0, 0)"
+        local startPos, endPos = string.find(SRC_ROTATE_ON, needle, 1, true)
+        if not startPos then
+            warn("[Player Rotation] ROTATION line not found in source — running unchanged")
+            return SRC_ROTATE_ON
+        end
+        return SRC_ROTATE_ON:sub(1, startPos - 1) .. newLine .. SRC_ROTATE_ON:sub(endPos + 1)
     end
 
     local function apply()
         if active then
-            runSource(SRC_ROTATE_OFF)
+            runSource(SRC_ROTATE_OFF, "RotateOff")
             active = false
         end
         if enabled then
-            runSource(buildOnSource())
+            runSource(buildOnSource(), "RotateOn")
             active = true
         end
     end
