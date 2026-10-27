@@ -3883,7 +3883,6 @@ local function stop()
 end
 
 local function face()
-	-- Off script (or a newer run) changes this, which shuts this run down
 	if player:GetAttribute(NAME) ~= runId then
 		stop()
 		return
@@ -3895,7 +3894,6 @@ local function face()
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	if not camera or not hum or not root then return end
 
-	-- Hook the current character: react the instant anything touches rotation
 	if char ~= hookedChar then
 		hookedChar = char
 		for _, c in ipairs(hookConnections) do c:Disconnect() end
@@ -3906,7 +3904,6 @@ local function face()
 
 	hum.AutoRotate = false
 
-	-- Physics-level lock
 	local align = root:FindFirstChild(NAME)
 	if not align then
 		local att = Instance.new("Attachment")
@@ -3926,11 +3923,9 @@ local function face()
 	local flat = Vector3.new(look.X, 0, look.Z)
 	if flat.Magnitude < 0.001 then return end
 
-	-- Camera direction, then your ROTATION on top
 	local target = CFrame.lookAt(root.Position, root.Position + flat.Unit) * rotation
 	align.CFrame = target
 
-	-- Only rewrite the CFrame if it's actually wrong (prevents event loops)
 	local cur = root.CFrame
 	if cur.LookVector:Dot(target.LookVector) < 0.99999
 		or cur.UpVector:Dot(target.UpVector) < 0.99999 then
@@ -3975,20 +3970,34 @@ end
 
     local pitch, yaw, roll = 0, 90, 0
     local enabled = false
+    local chunkCounter = 0
     local pending = false
 
-    local MARKER = "local ROTATION = Vector3.new(0, 90, 0)"
+    local ROTATION_MARKER = "local ROTATION = Vector3.new(0, 90, 0)"
+    local RUNID_MARKER = "local runId = tostring(os.clock())"
 
     local function buildOn()
-        local idx = string.find(ON_TEMPLATE, MARKER, 1, true)
-        if not idx then
-            warn("[PlayerRotation] Marker not found in template")
-            return ON_TEMPLATE
+        chunkCounter = chunkCounter + 1
+        local unique = "_" .. tostring(chunkCounter)
+        local src = ON_TEMPLATE
+
+        local i1 = string.find(src, ROTATION_MARKER, 1, true)
+        if i1 then
+            local newLine = "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
+            src = string.sub(src, 1, i1 - 1) .. newLine .. string.sub(src, i1 + #ROTATION_MARKER)
+        else
+            warn("[PlayerRotation] ROTATION marker not found")
         end
-        local newLine = "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
-        local before = string.sub(ON_TEMPLATE, 1, idx - 1)
-        local after = string.sub(ON_TEMPLATE, idx + #MARKER)
-        return before .. newLine .. after
+
+        local i2 = string.find(src, RUNID_MARKER, 1, true)
+        if i2 then
+            local newLine = "local runId = tostring(os.clock()) .. '" .. unique .. "'"
+            src = string.sub(src, 1, i2 - 1) .. newLine .. string.sub(src, i2 + #RUNID_MARKER)
+        else
+            warn("[PlayerRotation] runId marker not found")
+        end
+
+        return src
     end
 
     local function runSource(src, tag)
@@ -3999,13 +4008,13 @@ end
         end
         local ok, fn = pcall(ls, src)
         if not ok then
-            warn("[PlayerRotation] loadstring failed on " .. (tag or "?") .. ": " .. tostring(fn))
+            warn("[PlayerRotation] compile fail " .. (tag or "?") .. ": " .. tostring(fn))
             return
         end
         if not fn then return end
         local ok2, err = pcall(fn)
         if not ok2 then
-            warn("[PlayerRotation] runtime error in " .. (tag or "?") .. ": " .. tostring(err))
+            warn("[PlayerRotation] run fail " .. (tag or "?") .. ": " .. tostring(err))
         end
     end
 
@@ -4024,7 +4033,7 @@ end
     tab:CreateDivider()
 
     tab:CreateToggle({
-        name = "Player Rotation Cmdmdhanger",
+        name = "Player Rotation Changer",
         currentValue = false,
         flag = "PlayerRotation_Toggle",
         callback = function(v)
