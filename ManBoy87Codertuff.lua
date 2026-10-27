@@ -4024,7 +4024,7 @@ end
     tab:CreateDivider()
 
     tab:CreateToggle({
-        name = "Player Rotation Changer",
+        name = "Player Rotation Cmdmdhanger",
         currentValue = false,
         flag = "PlayerRotation_Toggle",
         callback = function(v)
