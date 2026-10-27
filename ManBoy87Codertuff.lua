@@ -3883,6 +3883,7 @@ local function stop()
 end
 
 local function face()
+	-- Off script (or a newer run) changes this, which shuts this run down
 	if player:GetAttribute(NAME) ~= runId then
 		stop()
 		return
@@ -3894,6 +3895,7 @@ local function face()
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	if not camera or not hum or not root then return end
 
+	-- Hook the current character: react the instant anything touches rotation
 	if char ~= hookedChar then
 		hookedChar = char
 		for _, c in ipairs(hookConnections) do c:Disconnect() end
@@ -3904,6 +3906,7 @@ local function face()
 
 	hum.AutoRotate = false
 
+	-- Physics-level lock
 	local align = root:FindFirstChild(NAME)
 	if not align then
 		local att = Instance.new("Attachment")
@@ -3923,9 +3926,11 @@ local function face()
 	local flat = Vector3.new(look.X, 0, look.Z)
 	if flat.Magnitude < 0.001 then return end
 
+	-- Camera direction, then your ROTATION on top
 	local target = CFrame.lookAt(root.Position, root.Position + flat.Unit) * rotation
 	align.CFrame = target
 
+	-- Only rewrite the CFrame if it's actually wrong (prevents event loops)
 	local cur = root.CFrame
 	if cur.LookVector:Dot(target.LookVector) < 0.99999
 		or cur.UpVector:Dot(target.UpVector) < 0.99999 then
@@ -3943,12 +3948,14 @@ table.insert(loopConnections, RunService.Heartbeat:Connect(face))
 
     local OFF_SRC = [==[
 -- LocalScript: ShiftlockRotateOff
+-- Turns the rotating shiftlock off and restores normal character rotation.
 
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
 local NAME = "CustomShiftlockRotate"
 
+-- Every running copy of the On script sees this change and shuts itself down
 player:SetAttribute(NAME, false)
 
 local char = player.Character
@@ -3968,66 +3975,38 @@ if hum then
 end
 ]==]
 
-    local pitch, yaw, roll = 0, 90, 0
+    local function runSource(src)
+        if loadstring then
+            local ok, fn = pcall(loadstring, src)
+            if ok and fn then pcall(fn) end
+        elseif getgenv and getgenv().loadstring then
+            local ok, fn = pcall(getgenv().loadstring, src)
+            if ok and fn then pcall(fn) end
+        end
+    end
+
     local enabled = false
-    local chunkCounter = 0
-    local pending = false
+    local pitch = 0
+    local yaw = 90
+    local roll = 0
 
-    local ROTATION_MARKER = "local ROTATION = Vector3.new(0, 90, 0)"
-    local RUNID_MARKER = "local runId = tostring(os.clock())"
-
-    local function buildOn()
-        chunkCounter = chunkCounter + 1
-        local unique = "_" .. tostring(chunkCounter)
+    local function buildOnSource()
         local src = ON_TEMPLATE
-
-        local i1 = string.find(src, ROTATION_MARKER, 1, true)
-        if i1 then
-            local newLine = "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
-            src = string.sub(src, 1, i1 - 1) .. newLine .. string.sub(src, i1 + #ROTATION_MARKER)
-        else
-            warn("[PlayerRotation] ROTATION marker not found")
+        local search = "local ROTATION = Vector3.new(0, 90, 0)"
+        local replacement = "local ROTATION = Vector3.new(" .. pitch .. ", " .. yaw .. ", " .. roll .. ")"
+        local idx = src:find(search, 1, true)
+        if idx then
+            src = src:sub(1, idx - 1) .. replacement .. src:sub(idx + #search)
         end
-
-        local i2 = string.find(src, RUNID_MARKER, 1, true)
-        if i2 then
-            local newLine = "local runId = tostring(os.clock()) .. '" .. unique .. "'"
-            src = string.sub(src, 1, i2 - 1) .. newLine .. string.sub(src, i2 + #RUNID_MARKER)
-        else
-            warn("[PlayerRotation] runId marker not found")
-        end
-
         return src
     end
 
-    local function runSource(src, tag)
-        local ls = loadstring or (getgenv and getgenv().loadstring)
-        if not ls then
-            warn("[PlayerRotation] loadstring unavailable")
-            return
-        end
-        local ok, fn = pcall(ls, src)
-        if not ok then
-            warn("[PlayerRotation] compile fail " .. (tag or "?") .. ": " .. tostring(fn))
-            return
-        end
-        if not fn then return end
-        local ok2, err = pcall(fn)
-        if not ok2 then
-            warn("[PlayerRotation] run fail " .. (tag or "?") .. ": " .. tostring(err))
-        end
+    local function stopAll()
+        runSource(OFF_SRC)
     end
 
-    local function refresh()
-        if not enabled then return end
-        if pending then return end
-        pending = true
-        task.defer(function()
-            pending = false
-            if not enabled then return end
-            runSource(OFF_SRC, "OFF")
-            runSource(buildOn(), "ON")
-        end)
+    local function startCurrent()
+        runSource(buildOnSource())
     end
 
     tab:CreateDivider()
@@ -4039,9 +4018,9 @@ end
         callback = function(v)
             enabled = v
             if v then
-                runSource(buildOn(), "ON")
+                startCurrent()
             else
-                runSource(OFF_SRC, "OFF")
+                stopAll()
             end
         end,
     })
@@ -4053,7 +4032,13 @@ end
         suffix = "°",
         currentValue = 0,
         flag = "PlayerRotation_Pitch",
-        callback = function(v) pitch = v; refresh() end,
+        callback = function(v)
+            pitch = v
+            if enabled then
+                stopAll()
+                startCurrent()
+            end
+        end,
     })
 
     tab:CreateSlider({
@@ -4063,7 +4048,13 @@ end
         suffix = "°",
         currentValue = 90,
         flag = "PlayerRotation_Yaw",
-        callback = function(v) yaw = v; refresh() end,
+        callback = function(v)
+            yaw = v
+            if enabled then
+                stopAll()
+                startCurrent()
+            end
+        end,
     })
 
     tab:CreateSlider({
@@ -4073,7 +4064,13 @@ end
         suffix = "°",
         currentValue = 0,
         flag = "PlayerRotation_Roll",
-        callback = function(v) roll = v; refresh() end,
+        callback = function(v)
+            roll = v
+            if enabled then
+                stopAll()
+                startCurrent()
+            end
+        end,
     })
 end
 
