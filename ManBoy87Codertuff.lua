@@ -1002,7 +1002,7 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks[""AutoJump""] = function(v) autoJumpEnabled = v end
+_G.RWCallbacks["AutoJump"] = function(v) autoJumpEnabled = v end
 
 tab:CreateToggle({
     name = "Ramp Protection",
@@ -1151,7 +1151,7 @@ do
         callback = function(v) djEnabled = v end,
     })
 	
-_G.RWCallbacks[""LegitJump""] = function(v) djEnabled = v end
+_G.RWCallbacks["LegitJump"] = function(v) djEnabled = v end
 	
     tab:CreateToggle({
         name = "Legit Jump Ramp Protection",
@@ -1308,7 +1308,7 @@ do
         callback = function(v) hjEnabled = v end,
     })
 
-_G.RWCallbacks[""HoldJump""] = function(v) hjEnabled = v end
+_G.RWCallbacks["HoldJump"] = function(v) hjEnabled = v end
 	
     tab:CreateToggle({
         name = "Hold Jump Ramp Protection",
@@ -1421,7 +1421,7 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks[""EasyBounce""] = function(v) easyBounceEnabled = v end
+_G.RWCallbacks["EasyBounce"] = function(v) easyBounceEnabled = v end
 
 tab:CreateSlider({
     name = "Easy Bounce Multiplier",
@@ -1518,7 +1518,7 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks[""LegitBounce""] = function(v) legitBounceEnabled = v end
+_G.RWCallbacks["LegitBounce"] = function(v) legitBounceEnabled = v end
 
 tab:CreateSlider({
     name = "Hard Bounce Multiplier",
@@ -1623,7 +1623,7 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks[""LegitBounce""] = function(v) legitBounceEnabled = v end
+_G.RWCallbacks["LegitBounce"] = function(v) legitBounceEnabled = v end
 
 --[[
 ============================================================================
@@ -1776,7 +1776,7 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks[""InfSlide""] = function(v) infSlideEnabled = v; if not v then sliding = false; fireFriction(5) end end
+_G.RWCallbacks["InfSlide"] = function(v) infSlideEnabled = v; if not v then sliding = false; fireFriction(5) end end
 
 tab:CreateSlider({
     name = "Inf Slide Speed",
@@ -1876,7 +1876,7 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks[""YLock""] = function(v) yLockEnabled = v; toggleYLock(v) end
+_G.RWCallbacks["YLock"] = function(v) yLockEnabled = v; toggleYLock(v) end
 
 --[[
 ============================================================================
