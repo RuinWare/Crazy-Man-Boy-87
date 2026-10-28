@@ -1,0 +1,612 @@
+-- ============================================================
+-- TEXT
+-- ============================================================
+local TEXT = "test"
+
+-- ============================================================
+-- CODE
+-- ============================================================
+-- This runs when you click the box and it turns ON.
+local function OnCode()
+	-- vvvvvvvvvvvvvvvvvvvv  PASTE YOUR ON CODE HERE  vvvvvvvvvvvvvvvvvvvv
+
+-- LocalScript: ShiftlockRotateOn
+-- Turns on automatically when run. Keeps the player rotated relative to the
+-- camera direction, and wins any fight with the game (runs last every frame,
+-- every physics step, and instantly when something changes the rotation).
+-- To change the rotation: edit ROTATION below, then run this script again.
+
+-- ================= EDIT THIS =================
+-- Rotation in degrees, applied on top of the camera direction:
+--   X = pitch (tilt forward / back)
+--   Y = yaw   (0 = forward, 180 = backwards, 90 = left, -90 = right)
+--   Z = roll  (tilt sideways)
+local ROTATION = Vector3.new(0, 90, 0)
+-- =============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlockRotate" -- must match ShiftlockRotateOff
+
+-- Each run gets its own id, so running this again replaces the old run
+local runId = tostring(os.clock())
+local BIND = NAME .. runId
+
+local rotation = CFrame.fromEulerAnglesYXZ(
+	math.rad(ROTATION.X),
+	math.rad(ROTATION.Y),
+	math.rad(ROTATION.Z)
+)
+
+local loopConnections = {}
+local hookConnections = {}
+local hookedChar
+
+local function stop()
+	pcall(function()
+		RunService:UnbindFromRenderStep(BIND)
+	end)
+	for _, c in ipairs(loopConnections) do c:Disconnect() end
+	for _, c in ipairs(hookConnections) do c:Disconnect() end
+	table.clear(loopConnections)
+	table.clear(hookConnections)
+	hookedChar = nil
+end
+
+local function face()
+	-- Off script (or a newer run) changes this, which shuts this run down
+	if player:GetAttribute(NAME) ~= runId then
+		stop()
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not camera or not hum or not root then return end
+
+	-- Hook the current character: react the instant anything touches rotation
+	if char ~= hookedChar then
+		hookedChar = char
+		for _, c in ipairs(hookConnections) do c:Disconnect() end
+		table.clear(hookConnections)
+		table.insert(hookConnections, root:GetPropertyChangedSignal("CFrame"):Connect(face))
+		table.insert(hookConnections, hum:GetPropertyChangedSignal("AutoRotate"):Connect(face))
+	end
+
+	hum.AutoRotate = false
+
+	-- Physics-level lock
+	local align = root:FindFirstChild(NAME)
+	if not align then
+		local att = Instance.new("Attachment")
+		att.Name = NAME .. "Attachment"
+		att.Parent = root
+
+		align = Instance.new("AlignOrientation")
+		align.Name = NAME
+		align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		align.Attachment0 = att
+		align.RigidityEnabled = true
+		align.CFrame = root.CFrame
+		align.Parent = root
+	end
+
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 0.001 then return end
+
+	-- Camera direction, then your ROTATION on top
+	local target = CFrame.lookAt(root.Position, root.Position + flat.Unit) * rotation
+	align.CFrame = target
+
+	-- Only rewrite the CFrame if it's actually wrong (prevents event loops)
+	local cur = root.CFrame
+	if cur.LookVector:Dot(target.LookVector) < 0.99999
+		or cur.UpVector:Dot(target.UpVector) < 0.99999 then
+		root.CFrame = target
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+player:SetAttribute(NAME, runId)
+
+RunService:BindToRenderStep(BIND, Enum.RenderPriority.Last.Value, face)
+table.insert(loopConnections, RunService.Stepped:Connect(face))
+table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+
+	-- ^^^^^^^^^^^^^^^^^^^^  PASTE YOUR ON CODE HERE  ^^^^^^^^^^^^^^^^^^^^
+end
+
+-- This runs when you click the box again and it turns OFF.
+local function OffCode()
+	-- vvvvvvvvvvvvvvvvvvvv  PASTE YOUR OFF CODE HERE  vvvvvvvvvvvvvvvvvvvv
+
+-- LocalScript: ShiftlockRotateOff
+-- Turns the rotating shiftlock off and restores normal character rotation.
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlockRotate" -- must match ShiftlockRotateOn
+
+-- Every running copy of the On script sees this change and shuts itself down
+player:SetAttribute(NAME, false)
+
+local char = player.Character
+if not char then return end
+
+local root = char:FindFirstChild("HumanoidRootPart")
+if root then
+	local align = root:FindFirstChild(NAME)
+	if align then align:Destroy() end
+	local att = root:FindFirstChild(NAME .. "Attachment")
+	if att then att:Destroy() end
+end
+
+local hum = char:FindFirstChildOfClass("Humanoid")
+if hum then
+	hum.AutoRotate = true
+end
+
+	-- ^^^^^^^^^^^^^^^^^^^^  PASTE YOUR OFF CODE HERE  ^^^^^^^^^^^^^^^^^^^^
+end
+
+-- ============================================================
+--  OPTIONAL  -  LOOK AND FEEL (safe to ignore)
+-- ============================================================
+local TEXT_SIZE = 18                            -- fixed size, never changes when resizing
+local FONT = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.SemiBold)
+local START_SIZE = Vector2.new(130, 130)        -- perfect square to start
+local MIN_SIZE = Vector2.new(100, 100)
+local MAX_SIZE = Vector2.new(520, 360)
+local SPAWN = Vector2.new(0.5, 0.5)             -- where it appears (0-1 of the screen, 0.5 / 0.5 = center)
+local CORNER = 0.24                             -- roundness (fraction of the shorter side)
+local BG_COLOR = Color3.fromRGB(18, 18, 20)     -- deep dark gray
+local BG_TRANSPARENCY = 0.05                    -- 0 = solid, higher = more see-through
+local GLOW_ASSET = "rbxassetid://76150694119616"
+local GLOW_COLOR = Color3.new(1, 1, 1)
+local GLOW_SPREAD = 36                          -- how far the glow reaches past the box (pixels)
+local GLOW_BRIGHTNESS = 0.9                     -- 0 to 1
+local SCREEN_MARGIN = 6                         -- the box always stays this far inside the screen
+local RUN_OFF_CODE_ON_DESTROY = true          -- run the OFF code if the GUI is destroyed while ON
+
+-- ============================================================
+--  DO NOT EDIT BELOW THIS LINE
+-- ============================================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CollectionService = game:GetService("CollectionService")
+
+local TAG = "DraggableBoxGui" -- must match DestroyAllGuis
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local WHITE = Color3.new(1, 1, 1)
+local BG_HOVER = BG_COLOR:Lerp(WHITE, 0.06)
+local BG_ON = BG_COLOR:Lerp(WHITE, 0.12)
+local STROKE_IDLE = 0.9
+local BAR_IDLE = 0.55
+local ICON_IDLE = 0.45
+local TEXT_TRANSPARENCY = 0.05
+
+-- Random 20-character name, different for every GUI
+local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+local rng = Random.new()
+
+local function randomName(length)
+	local out = {}
+	for i = 1, length do
+		local n = rng:NextInteger(1, #CHARS)
+		out[i] = CHARS:sub(n, n)
+	end
+	return table.concat(out)
+end
+
+local function tween(obj, time, props, style, direction)
+	local t = TweenService:Create(
+		obj,
+		TweenInfo.new(time, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out),
+		props
+	)
+	t:Play()
+	return t
+end
+
+local function make(class, props, parent)
+	local inst = Instance.new(class)
+	for key, value in pairs(props) do
+		inst[key] = value
+	end
+	inst.Parent = parent
+	return inst
+end
+
+local function isPress(input)
+	return input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+end
+
+local function p2(input)
+	return Vector2.new(input.Position.X, input.Position.Y)
+end
+
+local function run(fn)
+	task.spawn(function()
+		local ok, err = pcall(fn)
+		if not ok then warn(err) end
+	end)
+end
+
+-- Highest place available: hidden UI container > CoreGui > PlayerGui
+local function parentGui(gui)
+	local targets = {}
+	if gethui then
+		local ok, container = pcall(gethui)
+		if ok and container then targets[#targets + 1] = container end
+	end
+	local okCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+	if okCore and coreGui then targets[#targets + 1] = coreGui end
+	targets[#targets + 1] = playerGui
+
+	for _, target in ipairs(targets) do
+		local ok = pcall(function() gui.Parent = target end)
+		if ok and gui.Parent == target then return end
+	end
+end
+
+----------------------------------------------------------------
+-- Build the GUI
+----------------------------------------------------------------
+local screenGui = make("ScreenGui", {
+	Name = randomName(20),
+	ResetOnSpawn = false,
+	IgnoreGuiInset = true,
+	DisplayOrder = 2147483647, -- above every other GUI
+	OnTopOfCoreBlur = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, nil)
+screenGui:SetAttribute(TAG, "Toggle")
+CollectionService:AddTag(screenGui, TAG)
+parentGui(screenGui)
+
+local function viewport()
+	local size = screenGui.AbsoluteSize
+	if size.X < 1 or size.Y < 1 then
+		size = workspace.CurrentCamera.ViewportSize
+	end
+	return size
+end
+
+local function fitSize(size)
+	local v = viewport()
+	return Vector2.new(
+		math.min(size.X, v.X - SCREEN_MARGIN * 2),
+		math.min(size.Y, v.Y - SCREEN_MARGIN * 2)
+	)
+end
+
+local function clampCenter(center, size)
+	local v = viewport()
+	local half = size / 2
+	local minX, minY = half.X + SCREEN_MARGIN, half.Y + SCREEN_MARGIN
+	return Vector2.new(
+		math.clamp(center.X, minX, math.max(minX, v.X - minX)),
+		math.clamp(center.Y, minY, math.max(minY, v.Y - minY))
+	)
+end
+
+-- Both versions use the same size and the same SPAWN point, so they appear in the exact same spot
+local startSize = fitSize(START_SIZE)
+local v0 = viewport()
+local startCenter = clampCenter(Vector2.new(v0.X * SPAWN.X, v0.Y * SPAWN.Y), startSize)
+
+-- Holder: the thing that moves and resizes. Everything lives inside it.
+local holder = make("Frame", {
+	Name = "Holder",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromOffset(startCenter.X, startCenter.Y),
+	Size = UDim2.fromOffset(startSize.X, startSize.Y),
+	BackgroundTransparency = 1,
+}, screenGui)
+
+local popScale = make("UIScale", { Name = "PopScale", Scale = 0.7 }, holder)
+
+-- Glow: soft image behind the box
+local glow = make("ImageLabel", {
+	Name = "Glow",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.new(1, GLOW_SPREAD * 2, 1, GLOW_SPREAD * 2),
+	BackgroundTransparency = 1,
+	Image = GLOW_ASSET,
+	ImageColor3 = GLOW_COLOR,
+	ImageTransparency = 1,
+	ScaleType = Enum.ScaleType.Stretch,
+	ZIndex = 1,
+}, holder)
+
+-- strength: 0 = off, 1 = full flash
+local function setGlow(strength, time, style)
+	tween(glow, time, { ImageTransparency = 1 - GLOW_BRIGHTNESS * strength }, style)
+end
+
+-- Box
+local box = make("Frame", {
+	Name = "Box",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = BG_COLOR,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 2,
+}, holder)
+make("UICorner", { CornerRadius = UDim.new(CORNER, 0) }, box)
+local stroke = make("UIStroke", {
+	Color = WHITE,
+	Transparency = 1,
+	Thickness = 1,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+}, box)
+
+-- Clickable body
+local body = make("TextButton", {
+	Name = "Body",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 1,
+}, box)
+
+-- Text: fixed size, never scales
+local label = make("TextLabel", {
+	Name = "Label",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, -8),
+	Size = UDim2.new(1, -28, 1, -48),
+	BackgroundTransparency = 1,
+	Text = TEXT,
+	TextColor3 = WHITE,
+	TextTransparency = 1,
+	TextSize = TEXT_SIZE,
+	TextScaled = false,
+	TextWrapped = true,
+	FontFace = FONT,
+	ZIndex = 2,
+}, box)
+
+-- Drag bar: fixed pixel size (does not scale with the box)
+local dragHit = make("TextButton", {
+	Name = "DragHit",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, 0),
+	Size = UDim2.fromOffset(72, 22),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 5,
+}, box)
+local bar = make("Frame", {
+	Name = "Bar",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -9),
+	Size = UDim2.fromOffset(36, 4),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 5,
+}, dragHit)
+make("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
+
+-- Resize handle: one rounded corner shape, fixed pixel size
+local ICON = 16
+local ICON_THICK = 2.5
+local ICON_RADIUS = 10
+local ICON_SHAPE = ICON + 20
+
+local handle = make("TextButton", {
+	Name = "ResizeHandle",
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, 0, 1, 0),
+	Size = UDim2.fromOffset(34, 34),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 5,
+}, box)
+local iconClip = make("Frame", {
+	Name = "Icon",
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, -9, 1, -9),
+	Size = UDim2.fromOffset(ICON, ICON),
+	BackgroundTransparency = 1,
+	ClipsDescendants = true,
+	ZIndex = 5,
+}, handle)
+-- A big rounded outline whose bottom-right corner is all that shows through the clip
+local iconShape = make("Frame", {
+	Name = "Shape",
+	Position = UDim2.fromOffset(ICON - ICON_THICK - ICON_SHAPE, ICON - ICON_THICK - ICON_SHAPE),
+	Size = UDim2.fromOffset(ICON_SHAPE, ICON_SHAPE),
+	BackgroundTransparency = 1,
+	ZIndex = 5,
+}, iconClip)
+make("UICorner", { CornerRadius = UDim.new(0, ICON_RADIUS) }, iconShape)
+local iconStroke = make("UIStroke", {
+	Color = WHITE,
+	Thickness = ICON_THICK,
+	Transparency = 1,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+}, iconShape)
+
+----------------------------------------------------------------
+-- Smooth move + resize (with off-screen protection every frame)
+----------------------------------------------------------------
+local connections = {}
+
+local sizeTarget = startSize
+local posTarget = startCenter
+local sizeCur, posCur = startSize, startCenter
+
+connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
+	sizeTarget = fitSize(sizeTarget)
+	posTarget = clampCenter(posTarget, sizeTarget)
+
+	local alpha = 1 - math.exp(-dt * 26)
+	sizeCur = fitSize(sizeCur:Lerp(sizeTarget, alpha))
+	posCur = clampCenter(posCur:Lerp(posTarget, alpha), sizeCur)
+
+	holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
+	holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
+end)
+
+local dragging, resizing = false, false
+local activeInput, inputStart
+local dragOrigin, resizeOriginSize, resizeTopLeft
+
+-- Drag: only while holding the bar
+dragHit.InputBegan:Connect(function(input)
+	if not isPress(input) or dragging or resizing then return end
+	dragging = true
+	activeInput = input
+	inputStart = p2(input)
+	dragOrigin = posTarget
+	tween(bar, 0.2, { BackgroundTransparency = 0.15, Size = UDim2.fromOffset(46, 4) })
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			dragging = false
+			tween(bar, 0.3, { BackgroundTransparency = BAR_IDLE, Size = UDim2.fromOffset(36, 4) })
+		end
+	end)
+end)
+dragHit.MouseEnter:Connect(function()
+	if not dragging then tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end
+end)
+dragHit.MouseLeave:Connect(function()
+	if not dragging then tween(bar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
+end)
+
+-- Resize: only while holding the corner handle
+handle.InputBegan:Connect(function(input)
+	if not isPress(input) or dragging or resizing then return end
+	resizing = true
+	activeInput = input
+	inputStart = p2(input)
+	resizeOriginSize = sizeTarget
+	resizeTopLeft = posTarget - sizeTarget / 2
+	tween(iconStroke, 0.2, { Transparency = 0.05 })
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			resizing = false
+			tween(iconStroke, 0.3, { Transparency = ICON_IDLE })
+		end
+	end)
+end)
+handle.MouseEnter:Connect(function()
+	if not resizing then tween(iconStroke, 0.2, { Transparency = 0.2 }) end
+end)
+handle.MouseLeave:Connect(function()
+	if not resizing then tween(iconStroke, 0.25, { Transparency = ICON_IDLE }) end
+end)
+
+connections[#connections + 1] = UserInputService.InputChanged:Connect(function(input)
+	if not (dragging or resizing) then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement and input ~= activeInput then return end
+
+	local delta = p2(input) - inputStart
+	if dragging then
+		posTarget = clampCenter(dragOrigin + delta, sizeTarget)
+	else
+		local v = viewport()
+		local newSize = Vector2.new(
+			math.clamp(resizeOriginSize.X + delta.X, MIN_SIZE.X, MAX_SIZE.X),
+			math.clamp(resizeOriginSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y)
+		)
+		-- never grow past the edge of the screen
+		newSize = Vector2.new(
+			math.min(newSize.X, v.X - SCREEN_MARGIN - resizeTopLeft.X),
+			math.min(newSize.Y, v.Y - SCREEN_MARGIN - resizeTopLeft.Y)
+		)
+		sizeTarget = newSize
+		posTarget = resizeTopLeft + newSize / 2 -- top-left corner stays put
+	end
+end)
+
+----------------------------------------------------------------
+-- Click: press animation, on/off state, glow, run ON / OFF code
+----------------------------------------------------------------
+local isOn = false
+local stateToken = 0
+
+local function setState(on)
+	isOn = on
+	stateToken += 1
+	local token = stateToken
+
+	tween(box, 0.25, { BackgroundColor3 = on and BG_ON or BG_COLOR })
+	tween(stroke, 0.25, { Transparency = on and 0.3 or STROKE_IDLE, Thickness = on and 2 or 1 })
+
+	if on then
+		-- bright flash, then settle into a steady glow
+		setGlow(1, 0.08, Enum.EasingStyle.Quad)
+		task.delay(0.1, function()
+			if token ~= stateToken or not screenGui.Parent then return end
+			setGlow(0.55, 0.3, Enum.EasingStyle.Sine)
+		end)
+	else
+		setGlow(0, 0.25, Enum.EasingStyle.Sine)
+	end
+end
+
+body.InputBegan:Connect(function(input)
+	if isPress(input) then tween(popScale, 0.12, { Scale = 0.96 }) end
+end)
+body.InputEnded:Connect(function(input)
+	if isPress(input) then tween(popScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back) end
+end)
+body.MouseEnter:Connect(function()
+	tween(box, 0.25, { BackgroundColor3 = isOn and BG_ON:Lerp(WHITE, 0.06) or BG_HOVER })
+end)
+body.MouseLeave:Connect(function()
+	tween(box, 0.3, { BackgroundColor3 = isOn and BG_ON or BG_COLOR })
+	tween(popScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+end)
+
+body.Activated:Connect(function()
+	local nextState = not isOn
+	setState(nextState)
+	run(nextState and OnCode or OffCode)
+end)
+
+----------------------------------------------------------------
+-- Cleanup + pop-in
+----------------------------------------------------------------
+screenGui.Destroying:Connect(function()
+	for _, c in ipairs(connections) do c:Disconnect() end
+	table.clear(connections)
+	if isOn and RUN_OFF_CODE_ON_DESTROY then
+		isOn = false
+		run(OffCode)
+	end
+end)
+
+local fades = {
+	{ box, "BackgroundTransparency", BG_TRANSPARENCY },
+	{ stroke, "Transparency", STROKE_IDLE },
+	{ label, "TextTransparency", TEXT_TRANSPARENCY },
+	{ bar, "BackgroundTransparency", BAR_IDLE },
+	{ iconStroke, "Transparency", ICON_IDLE },
+}
+tween(popScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+for _, f in ipairs(fades) do
+	tween(f[1], 0.4, { [f[2]] = f[3] }, Enum.EasingStyle.Quad)
+end
