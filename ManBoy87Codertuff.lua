@@ -4132,6 +4132,48 @@ end
 
 --[[
 ============================================================================
+LAG SWITCH
+============================================================================
+]]--
+
+do
+    local lagDuration = 1
+    local lagging = false
+    local originalFps = 60
+    if getfpscap then
+        pcall(function() originalFps = getfpscap() end)
+    end
+
+    local function triggerLag()
+        if lagging then return end
+        if not setfpscap then return end
+        lagging = true
+        pcall(setfpscap, 1)
+        task.wait(lagDuration)
+        pcall(setfpscap, originalFps)
+        lagging = false
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateButton({
+        name = "Lag Switch",
+        callback = triggerLag,
+    })
+
+    tab:CreateSlider({
+        name = "Lag Duration",
+        range = {0.1, 5},
+        increment = 0.1,
+        suffix = "s",
+        currentValue = 1,
+        flag = "LagSwitch_Slider",
+        callback = function(v) lagDuration = v end,
+    })
+end
+
+--[[
+============================================================================
 
 V     I     S     U     A     L     S          (     T     A     B     )
 
