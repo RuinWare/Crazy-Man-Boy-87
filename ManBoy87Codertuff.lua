@@ -4620,7 +4620,6 @@ do
     addTabNav(CreTab,    "Script Settings", nil)
 end
 
-
 do
     local BUTTON_BODY = [==[
 local TEXT_SIZE = 18
