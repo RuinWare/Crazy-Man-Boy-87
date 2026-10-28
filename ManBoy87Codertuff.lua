@@ -1950,6 +1950,8 @@ do
         end,
     })
 
+_G.RWCallbacks["FrontalJump"] = function(v) frontalEnabled = v; if fHum then fHum.WalkSpeed = v and 0 or 16 end end
+	
     tab:CreateToggle({
         name = "Frontal Jump Ramp Protection",
         icon = 111308594268728,
@@ -1957,8 +1959,6 @@ do
         flag = "FrontalJump_Ramp_Toggle",
         callback = function(v) frontalRamp = v end,
     })
-
-_G.RWCallbacks["FrontalJump"] = function(v) frontalEnabled = v; if fHum then fHum.WalkSpeed = v and 0 or 16 end end
 	
     tab:CreateSlider({
         name = "Frontal Jump Speed",
