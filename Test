@@ -1,0 +1,9 @@
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
+local window = Rayfield:CreateWindow({
+    name = "Example Hub",
+    subtitle = "Rayfield Gen2",
+    sidebarLayout = true,
+})
+
+TestTab = window:CreateTab({ name = "Home", icon = 93364949241311 })
+
