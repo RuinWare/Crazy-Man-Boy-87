@@ -31,7 +31,7 @@ E     M     O     T     E          L     O     G     I     C
 local function buildEmoteChanger(tab, window)
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-	local PATHS = {
+	local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
@@ -224,7 +224,7 @@ local function buildEmoteChanger(tab, window)
 	local function getEmoteItems()
 		if _emoteCache then return _emoteCache end
 		local all, seen = {}, {}
-		for _, path in ipairs(PATHS) do
+		for _, path in ipairs(SHARED_PATHS) do
 			local f = resolvePath(path)
 			if f then
 				for _, child in ipairs(f:GetChildren()) do
@@ -2876,59 +2876,7 @@ do
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
 
-	local EMOTE_PATHS = {
-		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Cats","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Animals","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","Military","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","RelicEmotesNew","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","PoseidonSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","BeeSet","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","Thanksgiving2025","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","OldRoblox","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","NewYears2024","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","LunarNewYear","Emotes"},
-		{"Items","ItemPacks","Events","2026","Valentines2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","StPatricks2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","Spring2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","SUMMER26","Emotes"},
-		{"Items","ItemPacks","Events","2026","HLWN2026","Emotes"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","DailyShop"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","Battlepass"},
-		{"Items","ItemPacks","Events","2025","Valentines2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Summer2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","StPatricks2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Hlwn2025","Emotes"},
-		{"Items","ItemPacks","Events","2024","Xmas2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Valentines2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","StPatricks2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Hlwn2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Halloween2024","Emotes"},
-		{"Items","ItemPacks","Events","2023","Hlwn2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Halloween2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Xmas2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Valentines2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Summer2023","Emotes"},
-		{"Items","ItemPacks","Events","2022","Hlwn2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Halloween2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Xmas2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Valentines2022","Emotes"},
-		{"Items","ItemPacks","Collab","ST","Emotes"},
-		{"Items","ItemPacks","Base","Special","Emotes"},
-		{"Items","ItemPacks","Base","NewShop","Emotes"},
-		{"Items","ItemPacks","Base","LevelShop","Emotes"},
-		{"Items","ItemPacks","Base","DailyShop","Emotes"},
-		{"Items","BaseItems","Emotes"},
-		{"Items","ItemPacks","Integration","M3GAN","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Gems","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
-	}
+	local EMOTE_PATHS = SHARED_PATHS
 
 	local function resolvePath(keys)
 		local ok, result = pcall(function()
@@ -3043,59 +2991,7 @@ do
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
 
-	local EMOTE_PATHS = {
-		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Cats","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Animals","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","Military","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","RelicEmotesNew","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","PoseidonSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","BeeSet","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","Thanksgiving2025","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","OldRoblox","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","NewYears2024","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","LunarNewYear","Emotes"},
-		{"Items","ItemPacks","Events","2026","Valentines2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","StPatricks2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","Spring2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","SUMMER26","Emotes"},
-		{"Items","ItemPacks","Events","2026","HLWN2026","Emotes"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","DailyShop"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","Battlepass"},
-		{"Items","ItemPacks","Events","2025","Valentines2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Summer2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","StPatricks2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Hlwn2025","Emotes"},
-		{"Items","ItemPacks","Events","2024","Xmas2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Valentines2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","StPatricks2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Hlwn2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Halloween2024","Emotes"},
-		{"Items","ItemPacks","Events","2023","Hlwn2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Halloween2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Xmas2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Valentines2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Summer2023","Emotes"},
-		{"Items","ItemPacks","Events","2022","Hlwn2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Halloween2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Xmas2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Valentines2022","Emotes"},
-		{"Items","ItemPacks","Collab","ST","Emotes"},
-		{"Items","ItemPacks","Base","Special","Emotes"},
-		{"Items","ItemPacks","Base","NewShop","Emotes"},
-		{"Items","ItemPacks","Base","LevelShop","Emotes"},
-		{"Items","ItemPacks","Base","DailyShop","Emotes"},
-		{"Items","BaseItems","Emotes"},
-		{"Items","ItemPacks","Integration","M3GAN","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Gems","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
-	}
+	local EMOTE_PATHS = SHARED_PATHS
 
 	local function resolvePath(keys)
 		local ok, result = pcall(function()
@@ -3193,59 +3089,7 @@ do
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
 
-	local EMOTE_PATHS = {
-		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Cats","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Animals","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Gamepass","Legacy","Military","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","RelicEmotesNew","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","PoseidonSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","2026","BeeSet","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","Thanksgiving2025","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","OldRoblox","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","NewYears2024","Emotes"},
-		{"Items","ItemPacks","EventsDailyShop","LunarNewYear","Emotes"},
-		{"Items","ItemPacks","Events","2026","Valentines2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","StPatricks2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","Spring2026","Emotes"},
-		{"Items","ItemPacks","Events","2026","SUMMER26","Emotes"},
-		{"Items","ItemPacks","Events","2026","HLWN2026","Emotes"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","DailyShop"},
-		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","Battlepass"},
-		{"Items","ItemPacks","Events","2025","Valentines2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Summer2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","StPatricks2025","Emotes"},
-		{"Items","ItemPacks","Events","2025","Hlwn2025","Emotes"},
-		{"Items","ItemPacks","Events","2024","Xmas2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Valentines2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","StPatricks2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Hlwn2024","Emotes"},
-		{"Items","ItemPacks","Events","2024","Halloween2024","Emotes"},
-		{"Items","ItemPacks","Events","2023","Hlwn2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Halloween2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Xmas2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Valentines2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","StPatricks2023","Emotes"},
-		{"Items","ItemPacks","Events","2023","Summer2023","Emotes"},
-		{"Items","ItemPacks","Events","2022","Hlwn2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Halloween2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Xmas2022","Emotes"},
-		{"Items","ItemPacks","Events","2022","Valentines2022","Emotes"},
-		{"Items","ItemPacks","Collab","ST","Emotes"},
-		{"Items","ItemPacks","Base","Special","Emotes"},
-		{"Items","ItemPacks","Base","NewShop","Emotes"},
-		{"Items","ItemPacks","Base","LevelShop","Emotes"},
-		{"Items","ItemPacks","Base","DailyShop","Emotes"},
-		{"Items","BaseItems","Emotes"},
-		{"Items","ItemPacks","Integration","M3GAN","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","Gems","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
-		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
-	}
+	local EMOTE_PATHS = SHARED_PATHS
 
 	local function resolvePath(keys)
 		local ok, result = pcall(function()
@@ -5298,4 +5142,3 @@ end
 -- ==================
 -- S C R I P T    E N D
 -- ==================
--- ``
