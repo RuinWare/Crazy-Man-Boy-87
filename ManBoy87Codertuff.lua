@@ -1,7 +1,3 @@
-print("RuinWare Loaded.")
-print("RuinWare Copyright 2026©")
-warn("⚠️ ANY ATTEMPT TO CRACK, DEOBFUSCATE THIS SCRIPT WILL NOT BE TOLERATED. MAY RESULT IN A BAN AND OR LEGAL ACTION.")
-
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
 
 _G.RWCallbacks = _G.RWCallbacks or {}
@@ -1618,14 +1614,6 @@ _G.RWCallbacks["LegitBounce"] = function(v) legitBounceEnabled = v end
 
 --[[
 ============================================================================
-Fence bounce idk
-============================================================================
-]]--
-
--- failed again
-
---[[
-============================================================================
 INF SLIDE
 ============================================================================
 ]]--
@@ -1778,14 +1766,6 @@ tab:CreateSlider({
     flag = "InfSlide_Speed",
     callback = function(v) infSlideSpeed = v end,
 })
-
---[[
-============================================================================
-CROUCH SPAM
-============================================================================
-]]--
-
--- broken :(
 
 --[[
 ============================================================================
@@ -2763,97 +2743,6 @@ _G.RWCallbacks["JumpHeight"] = function(v) jumpHeightEnabled = v; if jhHum then 
         callback = function(v) jumpHeightValue = v end,
     })
 end
-
---[[
-============================================================================
-JUMP SPEED
-============================================================================
-]]--
-
---[[
-do
-    local jumpSpeedEnabled = false
-    local jumpSpeedValue = 0.5
-
-    local jsHum, jsRoot
-    local jsActive = false
-    local jsExtraG = 0
-
-    local function jsAttach(char)
-        jsHum = char:WaitForChild("Humanoid")
-        jsRoot = char:WaitForChild("HumanoidRootPart")
-        jsActive = false
-
-        jsHum.StateChanged:Connect(function(_, newState)
-            if newState ~= Enum.HumanoidStateType.Jumping then return end
-            if not jumpSpeedEnabled then return end
-            task.defer(function()
-                if not jumpSpeedEnabled then return end
-                if not jsHum or not jsRoot or not jsRoot.Parent then return end
-                local vel = jsRoot.AssemblyLinearVelocity
-                if vel.Y < 1 then return end
-                local g = workspace.Gravity
-                if g <= 0 then return end
-
-                local v0 = vel.Y
-                local H = (v0 * v0) / (2 * g)
-                local T = jumpSpeedValue
-                if T < 0.01 then T = 0.01 end
-
-                local g_new = (8 * H) / (T * T)
-                local v0_new = (4 * H) / T
-
-                jsExtraG = g_new - g
-                jsActive = true
-                jsRoot.AssemblyLinearVelocity = Vector3.new(vel.X, v0_new, vel.Z)
-            end)
-        end)
-    end
-
-    if player.Character then task.spawn(jsAttach, player.Character) end
-    player.CharacterAdded:Connect(function(c) task.spawn(jsAttach, c) end)
-
-    RunService.PreSimulation:Connect(function(dt)
-        if not jumpSpeedEnabled then return end
-        if not jsActive then return end
-        if not jsHum or not jsRoot or not jsRoot.Parent then
-            jsActive = false
-            return
-        end
-        if jsHum.FloorMaterial ~= Enum.Material.Air then
-            jsActive = false
-            return
-        end
-        local vel = jsRoot.AssemblyLinearVelocity
-        jsRoot.AssemblyLinearVelocity = Vector3.new(
-            vel.X,
-            vel.Y - jsExtraG * dt,
-            vel.Z
-        )
-    end)
-
-    tab:CreateDivider()
-
-    tab:CreateToggle({
-        name = "Jump Speed Changer",
-		icon = 79297485010070,
-        currentValue = false,
-        flag = "JumpSpeed_Toggle",
-        callback = function(v) jumpSpeedEnabled = v end,
-    })
-
-    tab:CreateSlider({
-        name = "Speed",
-		icon = 120597962040224,
-        range = {0.01, 5.00},
-        increment = 0.01,
-        suffix = "s",
-        currentValue = 0.5,
-        flag = "JumpSpeed_Slider",
-        callback = function(v) jumpSpeedValue = v end,
-    })
-end
-]]--
 
 --[[
 ============================================================================
