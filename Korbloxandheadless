@@ -1,4 +1,4 @@
-local function buildExtras(tab, window)
+local function buildExtras(VisTab, window)
 	local Players = game:GetService("Players")
 	local LP = Players.LocalPlayer
 
@@ -8,7 +8,7 @@ local function buildExtras(tab, window)
 	-- Tracks saved accessories per rig to restore them when turned off
 	local savedAccessories = {}
 
-	tab:CreateDropdown({
+	VisTab:CreateDropdown({
 		name = "Headless",
     icon = 122114796313973,
 		options = { "Off", "Only Head", "All" },
@@ -33,7 +33,7 @@ local function buildExtras(tab, window)
 		end,
 	})
 
-	tab:CreateDropdown({
+	VisTab:CreateDropdown({
 		name = "Korblox",
     icon = 85858833083747,
 		options = { "Off", "Right Leg", "Left Leg", "Both" },
