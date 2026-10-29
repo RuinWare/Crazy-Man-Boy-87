@@ -782,11 +782,9 @@ E     D     I     T     S
 end
 
 -- K AND H
-do
-   
+
    local HAK = "loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Korbloxandheadless"))()"
-	
-end
+
 --[[
 ============================================================================
 ============================================================================
