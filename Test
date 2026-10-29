@@ -7,3 +7,4 @@ local window = Rayfield:CreateWindow({
 
 TestTab = window:CreateTab({ name = "Home", icon = 93364949241311 })
 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Teststring"))()
