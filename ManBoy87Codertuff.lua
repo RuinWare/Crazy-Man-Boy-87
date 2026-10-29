@@ -783,7 +783,7 @@ end
 
 -- K AND H
 
-local HAK = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Korbloxandheadless"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Korbloxandheadless"))()
 
 --[[
 ============================================================================
