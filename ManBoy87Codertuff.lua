@@ -2645,7 +2645,7 @@ do
         end,
     })
 
-_G.RWCallbacks["GravityChanger"] = function(v) gravityEnabled = v; workspace.Gravity = v and gravityValue or 196.2 end end
+_G.RWCallbacks["GravityChanger"] = function(v) gravityEnabled = v; workspace.Gravity = v and gravityValue or 196.2 end
 	
     tab:CreateSlider({
         name = "Gravity",
