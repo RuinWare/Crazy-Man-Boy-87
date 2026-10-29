@@ -1,12 +1,11 @@
-local function buildExtras(VisTab, window)
-	local Players = game:GetService("Players")
-	local LP = Players.LocalPlayer
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
 
-	local headlessMode = "Off"
-	local korbloxMode = "Off"
+local headlessMode = "Off"
+local korbloxMode = "Off"
 	
-	-- Tracks saved accessories per rig to restore them when turned off
-	local savedAccessories = {}
+-- Tracks saved accessories per rig to restore them when turned off
+local savedAccessories = {}
 
 	VisTab:CreateDropdown({
 		name = "Headless",
@@ -148,4 +147,3 @@ local function buildExtras(VisTab, window)
 			task.wait(0.5)
 		end
 	end)
-end
