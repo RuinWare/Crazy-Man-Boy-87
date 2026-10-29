@@ -1,18 +1,8 @@
--- RUINWARE V.0.0
--- CRAZY TUFF SCRIPT
--- ONE EXTRA LINE OF CODE
--- ONE MORE
--- DONT ATTEMPT TO: STEAL, HARVEST, DEOBF RUINWARE. DO NOT DISTRIBUTE WITHOUT PERMISSION FROM STAFF, COPYRIGHT 2026, RuinWare
-
--- RW WARNINGS
 print("RuinWare Loaded.")
 print("RuinWare Copyright 2026©")
 warn("⚠️ ANY ATTEMPT TO CRACK, DEOBFUSCATE THIS SCRIPT WILL NOT BE TOLERATED. MAY RESULT IN A BAN AND OR LEGAL ACTION.")
 
-
--- Load main
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
--- MB LOGIC
 
 _G.RWCallbacks = _G.RWCallbacks or {}
 _G.RWSet = function(name, value)
@@ -1519,7 +1509,7 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks["LegitBounce"] = function(v) legitBounceEnabled = v end
+_G.RWCallbacks["HardBounce"] = function(v) hardBounceEnabled = v end
 
 tab:CreateSlider({
     name = "Hard Bounce Multiplier",
