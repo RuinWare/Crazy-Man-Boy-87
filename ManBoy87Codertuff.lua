@@ -6,17 +6,7 @@ _G.RWSet = function(name, value)
     if cb then cb(value) end
 end
 
---[[
-============================================================================
-
-E     M     O     T     E          L     O     G     I     C
-
-============================================================================
-]]--
-
-
-local function buildEmoteChanger(tab, window)
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- EMOET PATHS
 
 	local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
@@ -70,7 +60,21 @@ local function buildEmoteChanger(tab, window)
 		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
-	}
+}
+
+--[[
+============================================================================
+
+E     M     O     T     E          L     O     G     I     C
+
+============================================================================
+]]--
+
+
+local function buildEmoteChanger(tab, window)
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local PATHS = SHARED_PATHS
 
 	local EXPAND_NAMES       = { battlepass = true, dailyshop = true, admin = true }
 	local ROCKINSTRIDE_SOUND = 114846968069031
@@ -211,7 +215,7 @@ local function buildEmoteChanger(tab, window)
 	local function getEmoteItems()
 		if _emoteCache then return _emoteCache end
 		local all, seen = {}, {}
-		for _, path in ipairs(SHARED_PATHS) do
+		for _, path in ipairs(PATHS) do
 			local f = resolvePath(path)
 			if f then
 				for _, child in ipairs(f:GetChildren()) do
