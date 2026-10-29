@@ -13,6 +13,7 @@ warn("⚠️ ANY ATTEMPT TO CRACK, DEOBFUSCATE THIS SCRIPT WILL NOT BE TOLERATED
 -- Load main
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
 -- MB LOGIC
+
 _G.RWCallbacks = _G.RWCallbacks or {}
 _G.RWSet = function(name, value)
     local cb = _G.RWCallbacks[name]
