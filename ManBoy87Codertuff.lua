@@ -4301,8 +4301,11 @@ do
 end
 
 do
-    local BUTTON_BODY = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Button-body"))()
-    local DELETE_BODY = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Button-delete"))()
+    local BUTTON_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Button-body"
+    local DELETE_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Button-delete"
+
+    local BUTTON_BODY = game:HttpGet(BUTTON_URL)
+    local DELETE_BODY = game:HttpGet(DELETE_URL)
 
     local function buildButtonSource(name, flag, onBody, offBody)
         return 'local TEXT = ' .. string.format("%q", name) .. '\n' ..
