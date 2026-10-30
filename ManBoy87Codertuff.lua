@@ -3953,6 +3953,119 @@ end
 
 --[[
 ============================================================================
+STREAK SAVER
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local TeleportService = game:GetService("TeleportService")
+
+    -- EDIT THIS: script that runs after "Rejoin + Auto Load" teleports you
+    local AUTO_LOAD_SCRIPT = [==[
+-- This runs in the new session after rejoining
+print("Auto Load: Streak Saver rejoined!")
+-- loadstring(game:HttpGet("https://your-script-url-here"))()
+]==]
+
+    local streakSaverEnabled = false
+    local streakMethod = "Notify"
+    local triggered = false
+
+    local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Events"):WaitForChild("UpdateCharacterDataRegistry")
+
+    local function fireQueue(src)
+        if queue_on_teleport then
+            local ok = pcall(queue_on_teleport, src)
+            if ok then return true end
+        end
+        if queueonteleport then
+            local ok = pcall(queueonteleport, src)
+            if ok then return true end
+        end
+        if syn and syn.queue_on_teleport then
+            local ok = pcall(syn.queue_on_teleport, src)
+            if ok then return true end
+        end
+        return false
+    end
+
+    local function triggerStreakSaver()
+        if triggered then return end
+        triggered = true
+
+        if streakMethod == "Notify" then
+            window:Notify({
+                title = "STREAK AT RISK!",
+                content = "You have been downed, leave the game to save your streak.",
+                duration = 8,
+            })
+        elseif streakMethod == "Kick" then
+            player:Kick("Streak Saver Ran")
+        elseif streakMethod == "Rejoin" then
+            pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
+        elseif streakMethod == "Rejoin + Auto Load" then
+            fireQueue(AUTO_LOAD_SCRIPT)
+            pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
+        end
+    end
+
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        if getnamecallmethod() == "FireServer" and self == UpdateCharacterDataRegistry then
+            if streakSaverEnabled then
+                local args = {...}
+                for _, a in ipairs(args) do
+                    if type(a) == "table" then
+                        for _, v in pairs(a) do
+                            if type(v) == "string" and v == "Downed" then
+                                triggerStreakSaver()
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+
+    player.CharacterAdded:Connect(function()
+        triggered = false
+    end)
+
+    tab:CreateDivider({ text = "Extra" })
+
+    tab:CreateToggle({
+        name = "Auto Streak Saver",
+        currentValue = false,
+        flag = "StreakSaver_Toggle",
+        callback = function(v)
+            streakSaverEnabled = v
+            if not v then triggered = false end
+        end,
+    })
+
+    tab:CreateDropdown({
+        name = "Method",
+        options = { "Notify", "Kick", "Rejoin", "Rejoin + Auto Load" },
+        currentOption = { "Notify" },
+        multiSelect = false,
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if pick then streakMethod = pick end
+        end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["StreakSaver"] = function(v)
+        streakSaverEnabled = v
+        if not v then triggered = false end
+    end
+end
+
+--[[
+============================================================================
 
 V     I     S     U     A     L     S          (     T     A     B     )
 
