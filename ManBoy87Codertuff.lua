@@ -3963,9 +3963,7 @@ do
 
     -- EDIT THIS: script that runs after "Rejoin + Auto Load" teleports you
     local AUTO_LOAD_SCRIPT = [==[
--- This runs in the new session after rejoining
-print("Auto Load: Streak Saver rejoined!")
--- loadstring(game:HttpGet("https://your-script-url-here"))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Auto%20join"))()
 ]==]
 
     local streakSaverEnabled = false
