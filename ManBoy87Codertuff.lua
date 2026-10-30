@@ -3922,18 +3922,59 @@ LAG SWITCH
 do
     local lagDuration = 1
     local lagging = false
-    local originalFps = 60
-    if getfpscap then
-        pcall(function() originalFps = getfpscap() end)
-    end
 
     local function triggerLag()
         if lagging then return end
-        if not setfpscap then return end
         lagging = true
-        pcall(setfpscap, 1)
+
+        local savedFps = 60
+        if getfpscap then pcall(function() savedFps = getfpscap() end) end
+
+        local cam = workspace.CurrentCamera
+        local savedCamType = cam and cam.CameraType
+        local savedCamCFrame = cam and cam.CFrame
+
+        -- Method 1: FPS cap
+        if setfpscap then pcall(setfpscap, 1) end
+
+        -- Method 2: disable 3D rendering entirely
+        pcall(function() RunService:Set3dRenderingEnabled(false) end)
+
+        -- Method 3: freeze camera + disable render/heartbeat connections
+        local disabled = {}
+        if getconnections then
+            for _, signal in ipairs({RunService.RenderStepped, RunService.Heartbeat}) do
+                local ok, conns = pcall(getconnections, signal)
+                if ok and conns then
+                    for _, c in ipairs(conns) do
+                        if c.Enabled and c.Disable then
+                            local ok2 = pcall(function() c:Disable() end)
+                            if ok2 then table.insert(disabled, c) end
+                        end
+                    end
+                end
+            end
+        end
+
+        if cam and savedCamCFrame then
+            pcall(function()
+                cam.CameraType = Enum.CameraType.Scriptable
+                cam.CFrame = savedCamCFrame
+            end)
+        end
+
         task.wait(lagDuration)
-        pcall(setfpscap, originalFps)
+
+        -- restore
+        for _, c in ipairs(disabled) do
+            pcall(function() c:Enable() end)
+        end
+        if setfpscap then pcall(setfpscap, savedFps) end
+        pcall(function() RunService:Set3dRenderingEnabled(true) end)
+        if cam and savedCamType then
+            pcall(function() cam.CameraType = savedCamType end)
+        end
+
         lagging = false
     end
 
