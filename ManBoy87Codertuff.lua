@@ -3716,6 +3716,7 @@ do
 
     tab:CreateToggle({
         name = "Player Rotation Changer",
+		icon = 99119903049132,
         currentValue = false,
         flag = "PlayerRotate_Toggle",
         callback = function(v)
@@ -3728,6 +3729,7 @@ _G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else
 
     tab:CreateSlider({
         name = "Pitch",
+		icon = 133687388764527,
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
@@ -3738,6 +3740,7 @@ _G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else
 
     tab:CreateSlider({
         name = "Yaw",
+		icon = 90577927197495,
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
@@ -3748,6 +3751,7 @@ _G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else
 
     tab:CreateSlider({
         name = "Roll",
+		icon = 129301968670639,
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
@@ -3817,6 +3821,7 @@ do
 
     tab:CreateToggle({
         name = "Fly",
+		icon = 101627766519965,
         currentValue = false,
         flag = "Fly_Toggle",
         callback = function(v)
@@ -3831,6 +3836,7 @@ _G.RWCallbacks["Fly"] = function(v) flyEnabled = v; if flyHum then flyHum.WalkSp
 
     tab:CreateSlider({
         name = "Fly Speed",
+		icon = 79297485010070,
         range = {16.6, 500.5},
         increment = 0.1,
         suffix = " sps",
@@ -3888,6 +3894,7 @@ do
 
     tab:CreateToggle({
         name = "Down Fly",
+		icon = 109241289516213,
         currentValue = false,
         flag = "DownFly_Toggle",
         callback = function(v)
@@ -3902,6 +3909,7 @@ _G.RWCallbacks["DownFly"] = function(v) downFlyEnabled = v; if downFlyHum then d
 
     tab:CreateSlider({
         name = "Down Fly Speed",
+		icon = 79297485010070,
         range = {16.6, 500.5},
         increment = 0.1,
         suffix = " sps",
@@ -3924,6 +3932,7 @@ do
 
     tab:CreateButton({
         name = "Lag Switch",
+		icon = 122975828478366,
         callback = function()
             local start = tick()
             while tick() - start < lagDuration do end
@@ -3932,6 +3941,7 @@ do
 
     tab:CreateSlider({
         name = "Lag Duration",
+		icon = 136077598178846,
         range = {0.1, 5},
         increment = 0.1,
         suffix = "s",
