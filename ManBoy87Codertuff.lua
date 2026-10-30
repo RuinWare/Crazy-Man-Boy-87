@@ -3976,18 +3976,34 @@ print("Auto Load: Streak Saver rejoined!")
 
     local function fireQueue(src)
         if queue_on_teleport then
-            local ok = pcall(queue_on_teleport, src)
-            if ok then return true end
+            if pcall(queue_on_teleport, src) then return true end
         end
         if queueonteleport then
-            local ok = pcall(queueonteleport, src)
-            if ok then return true end
+            if pcall(queueonteleport, src) then return true end
         end
         if syn and syn.queue_on_teleport then
-            local ok = pcall(syn.queue_on_teleport, src)
-            if ok then return true end
+            if pcall(syn.queue_on_teleport, src) then return true end
         end
         return false
+    end
+
+    local function sendNotify()
+        local payload = {
+            title = "STREAK AT RISK!",
+            content = "You have been downed, leave the game to save your streak.",
+            duration = 8,
+        }
+        local ok = pcall(function() window:Notify(payload) end)
+        if ok then return end
+        ok = pcall(function() Rayfield:Notify(payload) end)
+        if ok then return end
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "STREAK AT RISK!",
+                Text = "You have been downed, leave the game to save your streak.",
+                Duration = 8,
+            })
+        end)
     end
 
     local function triggerStreakSaver()
@@ -3995,11 +4011,7 @@ print("Auto Load: Streak Saver rejoined!")
         triggered = true
 
         if streakMethod == "Notify" then
-            window:Notify({
-                title = "STREAK AT RISK!",
-                content = "You have been downed, leave the game to save your streak.",
-                duration = 8,
-            })
+            sendNotify()
         elseif streakMethod == "Kick" then
             player:Kick("Streak Saver Ran")
         elseif streakMethod == "Rejoin" then
@@ -4019,7 +4031,7 @@ print("Auto Load: Streak Saver rejoined!")
                     if type(a) == "table" then
                         for _, v in pairs(a) do
                             if type(v) == "string" and v == "Downed" then
-                                triggerStreakSaver()
+                                task.defer(triggerStreakSaver)
                                 break
                             end
                         end
@@ -4034,7 +4046,7 @@ print("Auto Load: Streak Saver rejoined!")
         triggered = false
     end)
 
-    tab:CreateDivider({ text = "Extra" })
+    tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Auto Streak Saver",
