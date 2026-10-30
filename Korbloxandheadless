@@ -1,28 +1,34 @@
-local Players = game:GetService("Players")
-local LP = Players.LocalPlayer
+do
+	local Players = game:GetService("Players")
+	local LP = Players.LocalPlayer
 
-local headlessMode = "Off"
-local korbloxMode = "Off"
-	
--- Tracks saved accessories per rig to restore them when turned off
-local savedAccessories = {}
+	local headlessMode = "Off"
+	local korbloxMode = "Off"
+	local savedAccessories = {}
+
+VisTab:CreateDivider({ text = "Headless" })
 
 	VisTab:CreateDropdown({
 		name = "Headless",
-    icon = 122114796313973,
+        icon = 85858833083747,
 		options = { "Off", "Only Head", "All" },
-		currentOption = { "Off" },
+		default = { "Off" },
 		multiSelect = false,
 		callback = function(selected)
 			headlessMode = type(selected) == "table" and selected[1] or selected
-			-- Immediately restore accessories if turning off "All"
 			if headlessMode ~= "All" then
 				for rig, accs in pairs(savedAccessories) do
 					if rig and rig.Parent then
-						for _, acc in pairs(accs) do
-							local exists = rig:FindFirstChild(acc.Name) or (rig:FindFirstChild("Head") and rig.Head:FindFirstChild(acc.Name))
+						local head = rig:FindFirstChild("Head")
+						local hum = rig:FindFirstChildOfClass("Humanoid")
+						for accName, accClone in pairs(accs) do
+							local exists = rig:FindFirstChild(accName) or (head and head:FindFirstChild(accName))
 							if not exists then
-								acc:Clone().Parent = rig
+								if hum and accClone:IsA("Accessory") then
+									hum:AddAccessory(accClone:Clone())
+								else
+									accClone:Clone().Parent = head or rig
+								end
 							end
 						end
 					end
@@ -32,18 +38,19 @@ local savedAccessories = {}
 		end,
 	})
 
+VisTab:CreateDivider({ text = "Korblox" })
+
 	VisTab:CreateDropdown({
 		name = "Korblox",
-    icon = 85858833083747,
+        icon = 122114796313973,
 		options = { "Off", "Right Leg", "Left Leg", "Both" },
-		currentOption = { "Off" },
+		default = { "Off" },
 		multiSelect = false,
 		callback = function(selected)
 			korbloxMode = type(selected) == "table" and selected[1] or selected
 		end,
 	})
 
-	-- Update Loop (every 0.5 seconds)
 	task.spawn(function()
 		while true do
 			local rigs = workspace:FindFirstChild("Rigs")
@@ -52,9 +59,10 @@ local savedAccessories = {}
 					if child.Name == LP.Name then
 						local rig = child
 						local head = rig:FindFirstChild("Head")
+						local hum = rig:FindFirstChildOfClass("Humanoid")
 
-						-- Handle Headless
 						if head then
+							-- Handle Headless Visibility
 							if headlessMode == "Only Head" or headlessMode == "All" then
 								head.Transparency = 1
 								for _, d in ipairs(head:GetDescendants()) do
@@ -71,7 +79,7 @@ local savedAccessories = {}
 								end
 							end
 
-							-- Handle Accessories (All mode)
+							-- Handle Accessory Removal (All mode)
 							if headlessMode == "All" then
 								if not savedAccessories[rig] then savedAccessories[rig] = {} end
 								
@@ -88,13 +96,18 @@ local savedAccessories = {}
 								process(rig)
 								process(head)
 								
+							-- Restore Accessories (Only Head / Off mode)
 							elseif headlessMode == "Only Head" or headlessMode == "Off" then
-								-- Restore accessories if they were hidden
 								if savedAccessories[rig] then
 									for accName, accClone in pairs(savedAccessories[rig]) do
 										local exists = rig:FindFirstChild(accName) or head:FindFirstChild(accName)
 										if not exists then
-											accClone:Clone().Parent = rig
+											-- RESTORE PROPERLY: If it's an Accessory, use Humanoid:AddAccessory
+											if hum and accClone:IsA("Accessory") then
+												hum:AddAccessory(accClone:Clone())
+											else
+												accClone:Clone().Parent = head or rig
+											end
 										end
 									end
 									savedAccessories[rig] = nil
@@ -147,3 +160,4 @@ local savedAccessories = {}
 			task.wait(0.5)
 		end
 	end)
+end
