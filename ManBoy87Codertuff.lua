@@ -1,13 +1,3 @@
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
-
-_G.RWCallbacks = _G.RWCallbacks or {}
-_G.RWSet = function(name, value)
-    local cb = _G.RWCallbacks[name]
-    if cb then cb(value) end
-end
-
--- EMOET PATHS
-
 	local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
@@ -61,6 +51,14 @@ end
 		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
 }
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
+
+_G.RWCallbacks = _G.RWCallbacks or {}
+_G.RWSet = function(name, value)
+    local cb = _G.RWCallbacks[name]
+    if cb then cb(value) end
+end
 
 --[[
 ============================================================================
