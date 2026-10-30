@@ -1,0 +1,25 @@
+local URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/ManBoy87Codertuff.lua"
+local ok, err = pcall(function()
+    local src = game:HttpGet(URL)
+    print("=== fetched:", #src, "bytes")
+
+    src = ("\n" .. src):gsub("\r\n", "\n")
+
+    src = src:gsub("\nlocal ([^\n]*=)", "\n%1")
+
+    src = src:sub(2)
+
+    print("=== after strip:", #src, "bytes")
+
+    local fn, compileErr = loadstring(src)
+    print("=== compiled?", fn ~= nil, "err:", compileErr)
+
+    if fn then
+        local ok2, runErr = pcall(fn)
+        print("=== ran ok?", ok2, "err:", runErr)
+    end
+end)
+
+if not ok then
+    warn("=== outer error:", err)
+end
