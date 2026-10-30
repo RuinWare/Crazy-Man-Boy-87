@@ -4241,6 +4241,61 @@ do
     end
 end
 
+do
+    ScriptTab:CreateDivider({ text = "Keybinds" })
+
+    local FEATURES = {
+        { "Auto Jump",                       "AutoJump" },
+        { "Legit Jump",                      "LegitJump" },
+        { "Hold Jump",                       "HoldJump" },
+        { "Easy Bounce",                     "EasyBounce" },
+        { "Hard Bounce",                     "HardBounce" },
+        { "Legit Bounce",                    "LegitBounce" },
+        { "Inf Slide",                       "InfSlide" },
+        { "Y Lock",                          "YLock" },
+        { "Frontal Jump",                    "FrontalJump" },
+        { "Backward Jump",                   "BackwardJump" },
+        { "Speed Changer",                   "SpeedChanger" },
+        { "TP Walk",                         "TPWalk" },
+        { "Instant Acceleration",            "InstantAccel" },
+        { "Friction Changer",                "FrictionChanger" },
+        { "Air Strafe Acceleration Changer", "AirStrafe" },
+        { "Jump Cap Changer",                "JumpCap" },
+        { "Gravity Changer",                 "GravityChanger" },
+        { "Jump Height Changer",             "JumpHeight" },
+        { "Emote Run",                       "EmoteRun" },
+        { "Character Spin",                  "CharacterSpin" },
+        { "Player Rotation Changer",         "PlayerRotate" },
+        { "Fly",                             "Fly" },
+        { "Down Fly",                        "DownFly" },
+    }
+
+    local kbStates = {}
+
+    ScriptTab:CreateButton({
+        name = "Reset All Keybind States",
+        callback = function()
+            for k in pairs(kbStates) do
+                kbStates[k] = false
+            end
+        end,
+    })
+
+    for _, f in ipairs(FEATURES) do
+        local featureName, cbName = f[1], f[2]
+        ScriptTab:CreateKeybind({
+            name = featureName,
+            currentKeybind = "None",
+            holdToInteract = false,
+            flag = "KB_" .. cbName,
+            callback = function()
+                kbStates[cbName] = not (kbStates[cbName] or false)
+                _G.RWSet(cbName, kbStates[cbName])
+            end,
+        })
+    end
+end
+
 -- CREDITS
 local CreTab = window:CreateTab({ name = "Credits", icon = 110016491347992 })
 
