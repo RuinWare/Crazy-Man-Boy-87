@@ -3987,6 +3987,20 @@ print("Auto Load: Streak Saver rejoined!")
         return false
     end
 
+    local function doTeleport()
+        local ok = false
+        if game.JobId and game.JobId ~= "" then
+            ok = pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+            end)
+        end
+        if not ok then
+            pcall(function()
+                TeleportService:Teleport(game.PlaceId, player)
+            end)
+        end
+    end
+
     local function sendNotify()
         local payload = {
             title = "STREAK AT RISK!",
@@ -4015,10 +4029,11 @@ print("Auto Load: Streak Saver rejoined!")
         elseif streakMethod == "Kick" then
             player:Kick("Streak Saver Ran")
         elseif streakMethod == "Rejoin" then
-            pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
+            doTeleport()
         elseif streakMethod == "Rejoin + Auto Load" then
             fireQueue(AUTO_LOAD_SCRIPT)
-            pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
+            task.wait(0.1)
+            doTeleport()
         end
     end
 
