@@ -7,7 +7,7 @@ do
 	local korbloxMode = "Off"
 	local savedAccessories = {}
 
-	-- FORCE TRANSPARENCY ON TARGET INDEX EVERY FRAME
+	-- FORCE TRANSPARENCY ON TARGET INDEX EVERY FRAME (IGNORES DROPDOWN STATE)
 	RunService.Heartbeat:Connect(function()
 		pcall(function()
 			local rig = workspace.Rigs:GetChildren()[7]
@@ -16,7 +16,7 @@ do
 				if target then
 					if target:IsA("BasePart") or target:IsA("Decal") or target:IsA("Texture") then
 						target.Transparency = 1
-					elseif target:IsA("Accessory") or target:IsA("Model") then
+					else
 						for _, d in ipairs(target:GetDescendants()) do
 							if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
 								d.Transparency = 1
@@ -38,17 +38,9 @@ do
 			if headlessMode ~= "All" then
 				for rig, accs in pairs(savedAccessories) do
 					if rig and rig.Parent then
-						local head = rig:FindFirstChild("Head")
-						local hum = rig:FindFirstChildOfClass("Humanoid")
-						for accName, accClone in pairs(accs) do
-							local exists = rig:FindFirstChild(accName) or (head and head:FindFirstChild(accName))
-							if not exists then
-								if hum and accClone:IsA("Accessory") then
-									hum:AddAccessory(accClone:Clone())
-								else
-									accClone:Clone().Parent = head or rig
-								end
-							end
+						for accName, accInstance in pairs(accs) do
+							-- RESTORES THE EXACT ORIGINAL ACCESSORY INSTANCE
+							accInstance.Parent = rig
 						end
 					end
 				end
@@ -75,22 +67,29 @@ do
 					if child.Name == LP.Name then
 						local rig = child
 						local head = rig:FindFirstChild("Head")
-						local hum = rig:FindFirstChildOfClass("Humanoid")
 
 						if head then
+							-- Get the specific index to ignore
+							local ignoreTarget = nil
+							pcall(function() ignoreTarget = workspace.Rigs:GetChildren()[7].Head:GetChildren()[10] end)
+
 							-- Handle Headless Visibility
 							if headlessMode == "Only Head" or headlessMode == "All" then
 								head.Transparency = 1
 								for _, d in ipairs(head:GetDescendants()) do
-									if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
-										d.Transparency = 1
+									if d ~= ignoreTarget and not (ignoreTarget and d:IsDescendantOf(ignoreTarget)) then
+										if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
+											d.Transparency = 1
+										end
 									end
 								end
 							elseif headlessMode == "Off" then
 								head.Transparency = 0
 								for _, d in ipairs(head:GetDescendants()) do
-									if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
-										d.Transparency = 0
+									if d ~= ignoreTarget and not (ignoreTarget and d:IsDescendantOf(ignoreTarget)) then
+										if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
+											d.Transparency = 0
+										end
 									end
 								end
 							end
@@ -103,8 +102,9 @@ do
 									for _, c in ipairs(container:GetChildren()) do
 										if c:IsA("Accessory") or c:IsA("Hat") or c.Name == "Hair" or c:IsA("Face") then
 											if not savedAccessories[rig][c.Name] then
-												savedAccessories[rig][c.Name] = c:Clone()
-												c:Destroy()
+												-- Save the actual instance and hide it
+												savedAccessories[rig][c.Name] = c
+												c.Parent = nil
 											end
 										end
 									end
@@ -115,16 +115,9 @@ do
 							-- Restore Accessories (Only Head / Off mode)
 							elseif headlessMode == "Only Head" or headlessMode == "Off" then
 								if savedAccessories[rig] then
-									for accName, accClone in pairs(savedAccessories[rig]) do
-										local exists = rig:FindFirstChild(accName) or head:FindFirstChild(accName)
-										if not exists then
-											-- RESTORE PROPERLY
-											if hum and accClone:IsA("Accessory") then
-												hum:AddAccessory(accClone:Clone())
-											else
-												accClone:Clone().Parent = head or rig
-											end
-										end
+									for accName, accInstance in pairs(savedAccessories[rig]) do
+										-- Put the exact original accessory back
+										accInstance.Parent = rig
 									end
 									savedAccessories[rig] = nil
 								end
