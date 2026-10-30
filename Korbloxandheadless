@@ -1,16 +1,35 @@
 do
 	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
 	local LP = Players.LocalPlayer
 
 	local headlessMode = "Off"
 	local korbloxMode = "Off"
 	local savedAccessories = {}
 
-VisTab:CreateDivider({ text = "Headless" })
+	-- FORCE TRANSPARENCY ON TARGET INDEX EVERY FRAME
+	RunService.Heartbeat:Connect(function()
+		pcall(function()
+			local rig = workspace.Rigs:GetChildren()[7]
+			if rig and rig:FindFirstChild("Head") then
+				local target = rig.Head:GetChildren()[10]
+				if target then
+					if target:IsA("BasePart") or target:IsA("Decal") or target:IsA("Texture") then
+						target.Transparency = 1
+					elseif target:IsA("Accessory") or target:IsA("Model") then
+						for _, d in ipairs(target:GetDescendants()) do
+							if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
+								d.Transparency = 1
+							end
+						end
+					end
+				end
+			end
+		end)
+	end)
 
 	VisTab:CreateDropdown({
 		name = "Headless",
-        icon = 85858833083747,
 		options = { "Off", "Only Head", "All" },
 		default = { "Off" },
 		multiSelect = false,
@@ -38,11 +57,8 @@ VisTab:CreateDivider({ text = "Headless" })
 		end,
 	})
 
-VisTab:CreateDivider({ text = "Korblox" })
-
 	VisTab:CreateDropdown({
 		name = "Korblox",
-        icon = 122114796313973,
 		options = { "Off", "Right Leg", "Left Leg", "Both" },
 		default = { "Off" },
 		multiSelect = false,
@@ -102,7 +118,7 @@ VisTab:CreateDivider({ text = "Korblox" })
 									for accName, accClone in pairs(savedAccessories[rig]) do
 										local exists = rig:FindFirstChild(accName) or head:FindFirstChild(accName)
 										if not exists then
-											-- RESTORE PROPERLY: If it's an Accessory, use Humanoid:AddAccessory
+											-- RESTORE PROPERLY
 											if hum and accClone:IsA("Accessory") then
 												hum:AddAccessory(accClone:Clone())
 											else
