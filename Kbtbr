@@ -3,7 +3,7 @@
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-local FLAG = ">"      -- name of this turn bind (the Off script needs the same flag)
+local FLAG = "RIGH"      -- name of this turn bind (the Off script needs the same flag)
 local DRT = "RIGHT"       -- "LEFT" or "RIGHT"
 local PIXELS = LRTBNM         -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
 
