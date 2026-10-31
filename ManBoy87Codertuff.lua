@@ -4101,6 +4101,8 @@ do
     local STOP_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Stop"
 
     local bindEnabled = false
+    local leftKey = nil
+    local rightKey = nil
     local leftHeld = false
     local rightHeld = false
 
@@ -4124,6 +4126,15 @@ do
         end
     end
 
+    local function setKey(raw)
+        if type(raw) == "EnumItem" then
+            return raw
+        elseif type(raw) == "string" and raw ~= "None" and raw ~= "" then
+            return Enum.KeyCode[raw]
+        end
+        return nil
+    end
+
     tab:CreateDivider({ text = "Turn Binds" })
 
     tab:CreateToggle({
@@ -4141,44 +4152,47 @@ do
     tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
-        holdToInteract = true,
+        holdToInteract = false,
         flag = "TurnBinds_Left",
-        callback = function(state)
-            if not bindEnabled then return end
-            if state == true then
-                if not leftHeld then
-                    leftHeld = true
-                    runUrl(LEFT_URL)
-                end
-            elseif state == false then
-                if leftHeld then
-                    leftHeld = false
-                    if not rightHeld then runUrl(STOP_URL) end
-                end
-            end
+        callback = function(raw)
+            local k = setKey(raw)
+            if k then leftKey = k end
         end,
     })
 
     tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
-        holdToInteract = true,
+        holdToInteract = false,
         flag = "TurnBinds_Right",
-        callback = function(state)
-            if not bindEnabled then return end
-            if state == true then
-                if not rightHeld then
-                    rightHeld = true
-                    runUrl(RIGHT_URL)
-                end
-            elseif state == false then
-                if rightHeld then
-                    rightHeld = false
-                    if not leftHeld then runUrl(STOP_URL) end
-                end
-            end
+        callback = function(raw)
+            local k = setKey(raw)
+            if k then rightKey = k end
         end,
     })
+
+    RunService.Heartbeat:Connect(function()
+        if not bindEnabled then return end
+
+        local leftDown  = leftKey and UserInputService:IsKeyDown(leftKey) or false
+        local rightDown = rightKey and UserInputService:IsKeyDown(rightKey) or false
+
+        if leftDown and not leftHeld then
+            leftHeld = true
+            runUrl(LEFT_URL)
+        elseif not leftDown and leftHeld then
+            leftHeld = false
+            if not rightDown then runUrl(STOP_URL) end
+        end
+
+        if rightDown and not rightHeld then
+            rightHeld = true
+            runUrl(RIGHT_URL)
+        elseif not rightDown and rightHeld then
+            rightHeld = false
+            if not leftDown then runUrl(STOP_URL) end
+        end
+    end)
 
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
