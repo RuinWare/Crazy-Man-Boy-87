@@ -4096,9 +4096,16 @@ TB
 ]]--
 
 do
-    local LEFT_URL   = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb"
-    local RIGHT_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"
-    local DELETE_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb"
+    local LEFT_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Kbtbl"
+    local RIGHT_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Kbtbr"
+    local STOP_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Stop"
+
+    local bindEnabled = false
+    local leftHeld = false
+    local rightHeld = false
+
+    getgenv().KTB = 5
+    _G.KTB = 5
 
     local function runUrl(url)
         if not loadstring then return end
@@ -4108,6 +4115,15 @@ do
         if fn then pcall(fn) end
     end
 
+    local function releaseAll()
+        local wasHeld = leftHeld or rightHeld
+        leftHeld = false
+        rightHeld = false
+        if wasHeld then
+            runUrl(STOP_URL)
+        end
+    end
+
     tab:CreateDivider({ text = "Turn Binds" })
 
     tab:CreateToggle({
@@ -4115,27 +4131,52 @@ do
         currentValue = false,
         flag = "TurnBinds_Toggle",
         callback = function(v)
-            -- placeholder: keybinds are print-only for now
+            bindEnabled = v
+            if not v then
+                releaseAll()
+            end
         end,
     })
 
     tab:CreateKeybind({
         name = "Left:",
-        currentKeybind = "Q",
-        holdToInteract = false,
+        currentKeybind = "None",
+        holdToInteract = true,
         flag = "TurnBinds_Left",
-        callback = function(key)
-            print("[Turn Binds] Left keybind pressed:", key)
+        callback = function(state)
+            if not bindEnabled then return end
+            if state == true then
+                if not leftHeld then
+                    leftHeld = true
+                    runUrl(LEFT_URL)
+                end
+            elseif state == false then
+                if leftHeld then
+                    leftHeld = false
+                    if not rightHeld then runUrl(STOP_URL) end
+                end
+            end
         end,
     })
 
     tab:CreateKeybind({
         name = "Right:",
-        currentKeybind = "E",
-        holdToInteract = false,
+        currentKeybind = "None",
+        holdToInteract = true,
         flag = "TurnBinds_Right",
-        callback = function(key)
-            print("[Turn Binds] Right keybind pressed:", key)
+        callback = function(state)
+            if not bindEnabled then return end
+            if state == true then
+                if not rightHeld then
+                    rightHeld = true
+                    runUrl(RIGHT_URL)
+                end
+            elseif state == false then
+                if rightHeld then
+                    rightHeld = false
+                    if not leftHeld then runUrl(STOP_URL) end
+                end
+            end
         end,
     })
 
@@ -4145,11 +4186,11 @@ do
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
-                runUrl(LEFT_URL)
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb")
                 task.wait(0.1)
-                runUrl(RIGHT_URL)
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
             else
-                runUrl(DELETE_URL)
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
             end
         end,
     })
@@ -4161,7 +4202,8 @@ do
         currentValue = 5,
         flag = "TurnBinds_Speed",
         callback = function(v)
-            -- unused placeholder
+            getgenv().KTB = v
+            _G.KTB = v
         end,
     })
 end
