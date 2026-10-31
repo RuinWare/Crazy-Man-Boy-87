@@ -1,0 +1,134 @@
+-- Turn Binds On
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+local FLAG = ">"      -- name of this turn bind (the Off script needs the same flag)
+local DRT = "RIGHT"       -- "LEFT" or "RIGHT"
+local PIXELS = LRTBNM         -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
+
+-- ============================================================
+-- DO NOT EDIT BELOW THIS LINE
+-- ============================================================
+-- Turns the player's camera left or right, nonstop, until Turn Binds Off runs.
+-- It feeds the turn into Roblox's own camera input, exactly like the player dragging
+-- the screen or moving the mouse a tiny bit each frame. So it works on mobile and PC,
+-- nothing is forced, and the player can still move and look around normally.
+-- Only left/right is added, never up/down, so the Y level never changes.
+-- No executor functions are used, so it can't crash from a missing or broken one.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+-- Flag rules: no spaces and none of these characters
+local FLAG_FORBIDDEN = [===['";*()^%$+×÷=/€£¥₩`~\|<>{}[]▪︎○●□■♤♡◇♧☆⊙°•¤《》¡¿,.]===]
+
+local function flagProblem(flag)
+	if type(flag) ~= "string" or flag == "" then
+		return "the flag is empty"
+	end
+	if flag:find("%s") then
+		return "the flag contains a space"
+	end
+	local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+	for _, cp in utf8.codes(FLAG_FORBIDDEN) do
+		banned[cp] = true
+	end
+	for _, cp in utf8.codes(flag) do
+		if banned[cp] then
+			return 'the flag contains a character that is not allowed: "' .. utf8.char(cp) .. '"'
+		end
+	end
+	return nil
+end
+
+local flagOk, problem = pcall(flagProblem, FLAG)
+if not flagOk then problem = "the flag is not valid text" end
+if problem then
+	warn("Turn Binds: " .. problem .. " (FLAG = " .. tostring(FLAG) .. ")")
+	return
+end
+
+local BIND = "TurnBind_" .. FLAG -- the On and Off scripts find each other through the flag
+
+local direction = string.upper(tostring(DRT))
+if direction ~= "LEFT" and direction ~= "RIGHT" then
+	warn('Turn Binds: DRT must be "LEFT" or "RIGHT" (DRT = ' .. tostring(DRT) .. ")")
+	return
+end
+if type(PIXELS) ~= "number" or PIXELS <= 0 then
+	warn("Turn Binds: PIXELS must be a number above 0 (PIXELS = " .. tostring(PIXELS) .. ")")
+	return
+end
+
+-- Camera input: positive = turn right, negative = turn left
+local sign = direction == "LEFT" and -1 or 1
+-- Roblox's camera turns about 0.5 degrees for every pixel of mouse movement
+local radiansPerFrame = math.rad(PIXELS * 0.5)
+
+-- Same flag again = replaces the old bind (so you can change DRT or PIXELS and re-run)
+pcall(function()
+	RunService:UnbindFromRenderStep(BIND)
+end)
+
+-- Find the default camera's input module
+local function findCameraInput()
+	local ok, result = pcall(function()
+		local playerScripts = Players.LocalPlayer:WaitForChild("PlayerScripts", 3)
+		local playerModule = playerScripts:WaitForChild("PlayerModule", 3)
+		local cameraModule = playerModule:WaitForChild("CameraModule", 3)
+		return require(cameraModule:WaitForChild("CameraInput", 3))
+	end)
+	if ok and type(result) == "table" and type(result.getRotation) == "function" then
+		return result
+	end
+	return nil
+end
+
+-- Add our turn to the camera's input once per frame (shared by every flag)
+local pending
+local cameraInput = findCameraInput()
+if cameraInput then
+	local hooked = pcall(function()
+		pending = cameraInput.TurnBindsPending
+		if not pending then
+			pending = {}
+			cameraInput.TurnBindsPending = pending
+
+			local originalGetRotation = cameraInput.getRotation
+			cameraInput.getRotation = function(...)
+				local rotation = originalGetRotation(...)
+				if typeof(rotation) ~= "Vector2" then return rotation end
+
+				local extra = Vector2.zero
+				for flag, amount in pairs(pending) do
+					extra += amount
+					pending[flag] = Vector2.zero -- used up, so it only counts once per frame
+				end
+				return rotation + extra
+			end
+		end
+	end)
+	if not hooked then pending = nil end
+end
+
+if pending then
+	-- Refresh our turn every frame, just before the camera reads its input
+	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Input.Value, function()
+		pending[FLAG] = Vector2.new(sign * radiansPerFrame, 0)
+	end)
+else
+	-- This game doesn't use Roblox's default camera, so turn the camera directly instead
+	warn("Turn Binds: the default camera input wasn't found, turning the camera directly instead.")
+	local radiansDirect = -sign * radiansPerFrame
+	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 1, function()
+		local camera = workspace.CurrentCamera
+		if not camera then return end
+
+		local pivot = camera.CFrame.Position
+		if camera.CameraType == Enum.CameraType.Custom then
+			pivot = camera.Focus.Position
+		end
+		camera.CFrame = CFrame.new(pivot) * CFrame.Angles(0, radiansDirect, 0) * CFrame.new(-pivot) * camera.CFrame
+	end)
+end
