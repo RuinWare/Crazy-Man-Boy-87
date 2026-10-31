@@ -4121,16 +4121,33 @@ do
         local wasHeld = leftHeld or rightHeld
         leftHeld = false
         rightHeld = false
-        if wasHeld then
-            runUrl(STOP_URL)
-        end
+        if wasHeld then runUrl(STOP_URL) end
     end
 
-    local function setKey(raw)
-        if type(raw) == "EnumItem" then
-            return raw
-        elseif type(raw) == "string" and raw ~= "None" and raw ~= "" then
-            return Enum.KeyCode[raw]
+    local function tryKey(raw)
+        if type(raw) == "EnumItem" then return raw end
+        if type(raw) == "string" and raw ~= "" and raw ~= "None" and raw ~= "none" then
+            local ok, k = pcall(function() return Enum.KeyCode[raw] end)
+            if ok and k then return k end
+        end
+        return nil
+    end
+
+    local function readFlagKey(flagName)
+        local sources = {}
+        if Rayfield and Rayfield.Flags then sources[#sources + 1] = Rayfield.Flags end
+        if _G.Rayfield and _G.Rayfield.Flags then sources[#sources + 1] = _G.Rayfield.Flags end
+        if getgenv and getgenv().Rayfield and getgenv().Rayfield.Flags then
+            sources[#sources + 1] = getgenv().Rayfield.Flags
+        end
+        if getgenv and getgenv().Flags then sources[#sources + 1] = getgenv().Flags end
+
+        for _, src in ipairs(sources) do
+            local v = src[flagName]
+            if v then
+                local k = tryKey(v)
+                if k then return k end
+            end
         end
         return nil
     end
@@ -4143,54 +4160,85 @@ do
         flag = "TurnBinds_Toggle",
         callback = function(v)
             bindEnabled = v
-            if not v then
-                releaseAll()
-            end
+            if not v then releaseAll() end
         end,
     })
 
     tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
-        holdToInteract = false,
+        holdToInteract = true,
         flag = "TurnBinds_Left",
-        callback = function(raw)
-            local k = setKey(raw)
-            if k then leftKey = k end
+        callback = function(a, b)
+            for _, arg in ipairs({ a, b }) do
+                if type(arg) == "boolean" then
+                    if bindEnabled then
+                        if arg and not leftHeld then
+                            leftHeld = true
+                            runUrl(LEFT_URL)
+                        elseif not arg and leftHeld then
+                            leftHeld = false
+                            if not rightHeld then runUrl(STOP_URL) end
+                        end
+                    end
+                else
+                    local k = tryKey(arg)
+                    if k then leftKey = k end
+                end
+            end
         end,
     })
 
     tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
-        holdToInteract = false,
+        holdToInteract = true,
         flag = "TurnBinds_Right",
-        callback = function(raw)
-            local k = setKey(raw)
-            if k then rightKey = k end
+        callback = function(a, b)
+            for _, arg in ipairs({ a, b }) do
+                if type(arg) == "boolean" then
+                    if bindEnabled then
+                        if arg and not rightHeld then
+                            rightHeld = true
+                            runUrl(RIGHT_URL)
+                        elseif not arg and rightHeld then
+                            rightHeld = false
+                            if not leftHeld then runUrl(STOP_URL) end
+                        end
+                    end
+                else
+                    local k = tryKey(arg)
+                    if k then rightKey = k end
+                end
+            end
         end,
     })
 
     RunService.Heartbeat:Connect(function()
         if not bindEnabled then return end
 
-        local leftDown  = leftKey and UserInputService:IsKeyDown(leftKey) or false
-        local rightDown = rightKey and UserInputService:IsKeyDown(rightKey) or false
+        local lk = readFlagKey("TurnBinds_Left")
+        if lk then leftKey = lk end
+        local rk = readFlagKey("TurnBinds_Right")
+        if rk then rightKey = rk end
 
-        if leftDown and not leftHeld then
+        local lDown = leftKey and UserInputService:IsKeyDown(leftKey) or false
+        local rDown = rightKey and UserInputService:IsKeyDown(rightKey) or false
+
+        if lDown and not leftHeld then
             leftHeld = true
             runUrl(LEFT_URL)
-        elseif not leftDown and leftHeld then
+        elseif not lDown and leftHeld then
             leftHeld = false
-            if not rightDown then runUrl(STOP_URL) end
+            if not rDown then runUrl(STOP_URL) end
         end
 
-        if rightDown and not rightHeld then
+        if rDown and not rightHeld then
             rightHeld = true
             runUrl(RIGHT_URL)
-        elseif not rightDown and rightHeld then
+        elseif not rDown and rightHeld then
             rightHeld = false
-            if not leftDown then runUrl(STOP_URL) end
+            if not lDown then runUrl(STOP_URL) end
         end
     end)
 
