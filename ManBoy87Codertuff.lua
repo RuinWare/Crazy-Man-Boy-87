@@ -4160,16 +4160,16 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
     local leftDelSrc = buildDeleteSource("leftturn_MB")
     local rightDelSrc = buildDeleteSource("rightturn_MB")
 
-    ScriptTab:CreateDivider({ text = "Turn Binds" })
+    tab:CreateDivider({ text = "Turn Binds" })
 
-    ScriptTab:CreateToggle({
+    tab:CreateToggle({
         name = "Turn Binds",
         currentValue = false,
         flag = "TurnBinds_Toggle",
         callback = function(v) turnBindsEnabled = v end,
     })
 
-    ScriptTab:CreateKeybind({
+    tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "LeftBracket",
         holdToInteract = false,
@@ -4177,7 +4177,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         callback = function() end,
     })
 
-    ScriptTab:CreateKeybind({
+    tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "RightBracket",
         holdToInteract = false,
@@ -4185,7 +4185,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         callback = function() end,
     })
 
-    ScriptTab:CreateToggle({
+    tab:CreateToggle({
         name = "Mobile Turn Buttons",
         currentValue = false,
         flag = "TurnBinds_Mobile",
@@ -4202,7 +4202,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         end,
     })
 
-    ScriptTab:CreateSlider({
+    tab:CreateSlider({
         name = "Speed",
         range = {1, 10},
         increment = 0.1,
