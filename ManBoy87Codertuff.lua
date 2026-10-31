@@ -4108,19 +4108,19 @@ do
     _G.RWCallbacks["TurnBinds_Right"] = function(v) rightHeld = v end
 
     local LEFTMBTB_ON = [==[
-loadstring(game:HttpGet(""))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lo"))()
 ]==]
 
     local RIGHTMBTB_ON = [==[
-loadstring(game:HttpGet(""))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Ro"))()
 ]==]
 
     local LEFTTB_OFF = [==[
-loadstring(game:HttpGet(""))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lod"))()
 ]==]
 
     local RIGHTTB_OFF = [==[
-loadstring(game:HttpGet(""))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rod"))()
 ]==]
 
     local function runSource(src)
