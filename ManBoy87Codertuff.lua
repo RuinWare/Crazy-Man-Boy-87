@@ -3970,8 +3970,8 @@ do
     local streakMethod = "Notify"
     local triggered = false
 
-    local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Events"):WaitForChild("UpdateCharacterDataRegistry")
-
+    local UpdateCharacterDataRegistry = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Registry"):WaitForChild("UpdateCharacterDataRegistry")
+	
     local function fireQueue(src)
         if queue_on_teleport then
             if pcall(queue_on_teleport, src) then return true end
