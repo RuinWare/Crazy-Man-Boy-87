@@ -4107,45 +4107,21 @@ do
     _G.RWCallbacks["TurnBinds_Left"] = function(v) leftHeld = v end
     _G.RWCallbacks["TurnBinds_Right"] = function(v) rightHeld = v end
 
-    local function normalizeKey(v)
-        if not v then return nil end
-        if type(v) == "string" then
-            local kc = Enum.KeyCode[v]
-            if kc then return kc end
-            return nil
-        end
-        if typeof and typeof(v) == "EnumItem" then
-            if v.EnumType == Enum.KeyCode then return v end
-            return nil
-        end
-        if type(v) == "table" then
-            if v.Key then return normalizeKey(v.Key) end
-            if v.KeyCode then return normalizeKey(v.KeyCode) end
-            if v.CurrentKeybind then return normalizeKey(v.CurrentKeybind) end
-            if v.Value then return normalizeKey(v.Value) end
-        end
-        return nil
-    end
+    local LEFTMBTB_ON = [==[
+-- paste your LEFT MB source here
+]==]
 
-    local function getDegreesPerSecond()
-        return 48 + (turnSpeed - 1) * (1600 - 48) / 9
-    end
+    local RIGHTMBTB_ON = [==[
+-- paste your RIGHT MB source here
+]==]
 
-    local HOLD_BODY = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodyadtnb"))()
+    local LEFTTB_OFF = [==[
+-- paste your LEFT off source here
+]==]
 
-    local DELETE_BODY = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodydholdtrnb"))()
-
-    local function buildHoldSource(name, flag, onBody, offBody)
-        return 'local TEXT = ' .. string.format("%q", name) .. '\n' ..
-               'local FLAG = ' .. string.format("%q", flag) .. '\n' ..
-               'local function OnCode()\n' .. onBody .. '\nend\n' ..
-               'local function OffCode()\n' .. offBody .. '\nend\n' ..
-               HOLD_BODY
-    end
-
-    local function buildDeleteSource(flag)
-        return 'local FLAG = ' .. string.format("%q", flag) .. '\n' .. DELETE_BODY
-    end
+    local RIGHTTB_OFF = [==[
+-- paste your RIGHT off source here
+]==]
 
     local function runSource(src)
         if not loadstring then return end
@@ -4153,16 +4129,7 @@ do
         if ok and fn then pcall(fn) end
     end
 
-    local leftSpawnSrc = buildHoldSource("<", "leftturn_MB",
-        '_G.RWSet("TurnBinds_Left", true)',
-        '_G.RWSet("TurnBinds_Left", false)')
-    local rightSpawnSrc = buildHoldSource(">", "rightturn_MB",
-        '_G.RWSet("TurnBinds_Right", true)',
-        '_G.RWSet("TurnBinds_Right", false)')
-    local leftDelSrc = buildDeleteSource("leftturn_MB")
-    local rightDelSrc = buildDeleteSource("rightturn_MB")
-
-    tab:CreateDivider({ text = "Turn Binds" })
+    tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Turn Binds",
@@ -4193,11 +4160,11 @@ do
         flag = "TurnBinds_Mobile",
         callback = function(v)
             if v then
-                runSource(leftSpawnSrc)
-                runSource(rightSpawnSrc)
+                runSource(LEFTMBTB_ON)
+                runSource(RIGHTMBTB_ON)
             else
-                runSource(leftDelSrc)
-                runSource(rightDelSrc)
+                runSource(LEFTTB_OFF)
+                runSource(RIGHTTB_OFF)
                 _G.RWSet("TurnBinds_Left", false)
                 _G.RWSet("TurnBinds_Right", false)
             end
@@ -4213,6 +4180,26 @@ do
         flag = "TurnBinds_Speed",
         callback = function(v) turnSpeed = v end,
     })
+
+    local function normalizeKey(v)
+        if not v then return nil end
+        if type(v) == "string" then
+            local kc = Enum.KeyCode[v]
+            if kc then return kc end
+            return nil
+        end
+        if typeof and typeof(v) == "EnumItem" then
+            if v.EnumType == Enum.KeyCode then return v end
+            return nil
+        end
+        if type(v) == "table" then
+            if v.Key then return normalizeKey(v.Key) end
+            if v.KeyCode then return normalizeKey(v.KeyCode) end
+            if v.CurrentKeybind then return normalizeKey(v.CurrentKeybind) end
+            if v.Value then return normalizeKey(v.Value) end
+        end
+        return nil
+    end
 
     task.spawn(function()
         while true do
@@ -4246,7 +4233,8 @@ do
         if not cam then return end
 
         local direction = leftHeld and -1 or 1
-        local radians = math.rad(getDegreesPerSecond() * dt * direction)
+        local degreesPerSec = 48 + (turnSpeed - 1) * (1600 - 48) / 9
+        local radians = math.rad(degreesPerSec * dt * direction)
         local pos = cam.CFrame.Position
         local newLook = CFrame.Angles(0, radians, 0) * cam.CFrame.LookVector
         cam.CFrame = CFrame.lookAt(pos, pos + newLook, Vector3.yAxis)
