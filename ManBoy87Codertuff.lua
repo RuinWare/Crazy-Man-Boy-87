@@ -4126,11 +4126,11 @@ do
     end
 
     local HOLD_BODY = [==[
-
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodyadtnb"))()
 ]==]
 
     local DELETE_BODY = [==[
-
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodydholdtrnb"))()
 ]==]
 
     local function buildHoldSource(name, flag, onBody, offBody)
