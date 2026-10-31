@@ -4115,9 +4115,7 @@ do
         currentValue = false,
         flag = "TurnBinds_Toggle",
         callback = function(v)
-            bindEnabled = v
-            if not v then releaseAll() end
-        end,
+				print("hello")
     })
 
     tab:CreateKeybind({
@@ -4140,7 +4138,7 @@ do
 					-- nothing
     })
 
-			RIGHTTB = TB_RIGHT
+			RIGHTTB = TB_RIGHT.value
 
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
