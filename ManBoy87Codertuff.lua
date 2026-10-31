@@ -1635,8 +1635,8 @@ local cachedTag = nil
 local cachedService = nil
 local cachedCharacter = nil
 
-local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Events"):WaitForChild("UpdateCharacterDataRegistry")
-local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Registry"):WaitForChild("UpdateCharacterDataRegistry")
+local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
 local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
 
 local crouchNames = {
@@ -2057,7 +2057,7 @@ do
     local cachedService = nil
     local cachedCharacter = nil
 
-    local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
     local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
 
     local function getService()
@@ -2305,8 +2305,8 @@ do
     local cachedService = nil
     local cachedCharacter = nil
 
-    local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Events"):WaitForChild("UpdateCharacterDataRegistry")
-    local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+    local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Registry"):WaitForChild("UpdateCharacterDataRegistry")
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
     local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
 
     local function getService()
@@ -2413,7 +2413,7 @@ do
     local cachedService = nil
     local cachedCharacter = nil
 
-    local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
     local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
 
     local function getService()
@@ -2524,7 +2524,7 @@ do
     local cachedService = nil
     local cachedCharacter = nil
 
-    local CharacterTask = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
     local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
 
     local function getService()
