@@ -4095,7 +4095,76 @@ TB
 ============================================================================
 ]]--
 
+do
+    local LEFT_URL   = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb"
+    local RIGHT_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"
+    local DELETE_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb"
 
+    local function runUrl(url)
+        if not loadstring then return end
+        local ok, src = pcall(function() return game:HttpGet(url) end)
+        if not ok or not src then return end
+        local fn = loadstring(src)
+        if fn then pcall(fn) end
+    end
+
+    tab:CreateDivider({ text = "Turn Binds" })
+
+    tab:CreateToggle({
+        name = "Turn Binds",
+        currentValue = false,
+        flag = "TurnBinds_Toggle",
+        callback = function(v)
+            -- placeholder: keybinds are print-only for now
+        end,
+    })
+
+    tab:CreateKeybind({
+        name = "Left:",
+        currentKeybind = "Q",
+        holdToInteract = false,
+        flag = "TurnBinds_Left",
+        callback = function(key)
+            print("[Turn Binds] Left keybind pressed:", key)
+        end,
+    })
+
+    tab:CreateKeybind({
+        name = "Right:",
+        currentKeybind = "E",
+        holdToInteract = false,
+        flag = "TurnBinds_Right",
+        callback = function(key)
+            print("[Turn Binds] Right keybind pressed:", key)
+        end,
+    })
+
+    tab:CreateToggle({
+        name = "Mobile Turn Buttons",
+        currentValue = false,
+        flag = "TurnBinds_Mobile_Toggle",
+        callback = function(v)
+            if v then
+                runUrl(LEFT_URL)
+                task.wait(0.1)
+                runUrl(RIGHT_URL)
+            else
+                runUrl(DELETE_URL)
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Speed",
+        range = {1, 10},
+        increment = 1,
+        currentValue = 5,
+        flag = "TurnBinds_Speed",
+        callback = function(v)
+            -- unused placeholder
+        end,
+    })
+end
 
 --[[
 ============================================================================
