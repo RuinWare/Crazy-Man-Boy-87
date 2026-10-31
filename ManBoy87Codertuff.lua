@@ -4089,6 +4089,580 @@ do
     end
 end
 
+do
+    local turnBindsEnabled = false
+    local turnSpeed = 1
+    local leftHeld = false
+    local rightHeld = false
+    local leftKeyCode = Enum.KeyCode.LeftBracket
+    local rightKeyCode = Enum.KeyCode.RightBracket
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["TurnBinds_Left"] = function(v) leftHeld = v end
+    _G.RWCallbacks["TurnBinds_Right"] = function(v) rightHeld = v end
+
+    local function normalizeKey(v)
+        if not v then return nil end
+        if type(v) == "string" then
+            local kc = Enum.KeyCode[v]
+            if kc then return kc end
+            return nil
+        end
+        if typeof and typeof(v) == "EnumItem" then
+            if v.EnumType == Enum.KeyCode then return v end
+            return nil
+        end
+        if type(v) == "table" then
+            if v.Key then return normalizeKey(v.Key) end
+            if v.KeyCode then return normalizeKey(v.KeyCode) end
+            if v.CurrentKeybind then return normalizeKey(v.CurrentKeybind) end
+            if v.Value then return normalizeKey(v.Value) end
+        end
+        return nil
+    end
+
+    local function getDegreesPerSecond()
+        return 48 + (turnSpeed - 1) * (1600 - 48) / 9
+    end
+
+    local HOLD_BODY = [==[
+local TEXT_SIZE = 18
+local FONT = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Medium)
+local START_SIZE = Vector2.new(130, 130)
+local MIN_SIZE = Vector2.new(100, 100)
+local MAX_SIZE = Vector2.new(520, 520)
+local SPAWN = Vector2.new(0.5, 0.5)
+local CORNER = 0.27
+local MAX_CORNER = 40
+local BG_COLOR = Color3.fromRGB(18, 18, 18)
+local BG_TRANSPARENCY = 0.09
+local GLOW_ASSET = "rbxassetid://138843696730147"
+local GLOW_COLOR = Color3.new(1, 1, 1)
+local GLOW_SPREAD = 70
+local GLOW_BRIGHTNESS = 0.50
+local GLOW_SLICE = 0.4
+local SCREEN_MARGIN = 6
+local TEXT_NUDGE_Y = -0.18
+local BAR_DISTANCE = 5
+local DRAG_FOLLOW_SPEED = 9
+local RESIZE_FOLLOW_SPEED = 26
+local REPEAT_ON_CODE = false
+local REPEAT_DELAY = 0
+local RUN_OFF_CODE_ON_DESTROY = true
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CollectionService = game:GetService("CollectionService")
+
+local TAG = "DraggableBoxGui"
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local WHITE = Color3.new(1, 1, 1)
+local BG_HOVER = BG_COLOR:Lerp(WHITE, 0.06)
+local BG_ON = BG_COLOR:Lerp(WHITE, 0.12)
+local STROKE_IDLE = 0.9
+local BAR_IDLE = 0.55
+local ICON_IDLE = 0.45
+local TEXT_TRANSPARENCY = 0.05
+
+local BAR_SIZE = UDim2.fromOffset(51, 3)
+local BAR_SIZE_ACTIVE = UDim2.fromOffset(61, 4)
+local BAR_HIT = Vector2.new(72, 22)
+local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2
+
+local ICON_R = 15
+local ICON_THICK = 2.5
+local ICON_INSET = 12
+local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
+
+local FLAG_FORBIDDEN = [===['";*()^%$+×÷=/€£¥₩`~\|<>{}[]▪︎○●□■♤♡◇♧☆⊙°•¤《》¡¿,.]===]
+
+local function flagProblem(flag)
+	if type(flag) ~= "string" or flag == "" then return "the flag is empty" end
+	if flag:find("%s") then return "the flag contains a space" end
+	local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+	for _, cp in utf8.codes(FLAG_FORBIDDEN) do banned[cp] = true end
+	for _, cp in utf8.codes(flag) do
+		if banned[cp] then return 'the flag contains a character that is not allowed: "' .. utf8.char(cp) .. '"' end
+	end
+	return nil
+end
+
+local flagOk, problem = pcall(flagProblem, FLAG)
+if not flagOk then problem = "the flag is not valid text" end
+if problem then
+	warn("Not created, " .. problem .. " (FLAG = " .. tostring(FLAG) .. ")")
+	return
+end
+
+local function collectGuis()
+	local list, seen = {}, {}
+	local function add(inst)
+		if inst:IsA("ScreenGui") and not seen[inst] then seen[inst] = true; list[#list + 1] = inst end
+	end
+	for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
+	local function scan(container)
+		if not container then return end
+		local ok, children = pcall(function() return container:GetChildren() end)
+		if not ok then return end
+		for _, child in ipairs(children) do
+			if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
+		end
+	end
+	scan(playerGui)
+	pcall(function() scan(game:GetService("CoreGui")) end)
+	if gethui then pcall(function() scan(gethui()) end) end
+	return list
+end
+
+for _, old in ipairs(collectGuis()) do
+	if old:GetAttribute("Flag") == FLAG then old:Destroy() end
+end
+
+local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789*^%/?#$"
+local rng = Random.new()
+local function randomName(length)
+	local out = {}
+	for i = 1, length do local n = rng:NextInteger(1, #CHARS); out[i] = CHARS:sub(n, n) end
+	return table.concat(out)
+end
+
+local function tween(obj, time, props, style, direction)
+	local t = TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out), props)
+	t:Play()
+	return t
+end
+
+local function make(class, props, parent)
+	local inst = Instance.new(class)
+	for key, value in pairs(props) do inst[key] = value end
+	inst.Parent = parent
+	return inst
+end
+
+local function isPress(input)
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+end
+
+local function p2(input) return Vector2.new(input.Position.X, input.Position.Y) end
+
+local function run(fn)
+	task.spawn(function()
+		local ok, err = pcall(fn)
+		if not ok then warn(err) end
+	end)
+end
+
+local function parentGui(gui)
+	local targets = {}
+	if gethui then local ok, c = pcall(gethui); if ok and c then targets[#targets + 1] = c end end
+	local okCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+	if okCore and coreGui then targets[#targets + 1] = coreGui end
+	targets[#targets + 1] = playerGui
+	for _, target in ipairs(targets) do
+		local ok = pcall(function() gui.Parent = target end)
+		if ok and gui.Parent == target then return end
+	end
+end
+
+local screenGui = make("ScreenGui", {
+	Name = randomName(20), ResetOnSpawn = false, IgnoreGuiInset = true,
+	DisplayOrder = 2147483647, OnTopOfCoreBlur = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, nil)
+screenGui:SetAttribute(TAG, "Hold")
+screenGui:SetAttribute("Flag", FLAG)
+CollectionService:AddTag(screenGui, TAG)
+parentGui(screenGui)
+
+local function viewport()
+	local size = screenGui.AbsoluteSize
+	if size.X < 1 or size.Y < 1 then size = workspace.CurrentCamera.ViewportSize end
+	return size
+end
+
+local function fitSize(size)
+	local v = viewport()
+	return Vector2.new(math.min(size.X, v.X - SCREEN_MARGIN * 2), math.min(size.Y, v.Y - SCREEN_MARGIN * 2 - BAR_BELOW))
+end
+
+local function clampCenter(center, size)
+	local v = viewport()
+	local half = size / 2
+	local minX, minY = half.X + SCREEN_MARGIN, half.Y + SCREEN_MARGIN
+	local maxX = v.X - half.X - SCREEN_MARGIN
+	local maxY = v.Y - half.Y - SCREEN_MARGIN - BAR_BELOW
+	return Vector2.new(math.clamp(center.X, minX, math.max(minX, maxX)), math.clamp(center.Y, minY, math.max(minY, maxY)))
+end
+
+local function cornerFor(size)
+	return math.floor(math.min(CORNER * math.min(size.X, size.Y), MAX_CORNER) + 0.5)
+end
+
+local startSize = fitSize(START_SIZE)
+local v0 = viewport()
+local startCenter = clampCenter(Vector2.new(v0.X * SPAWN.X, v0.Y * SPAWN.Y), startSize)
+
+local holder = make("Frame", {
+	Name = "Holder", AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromOffset(startCenter.X, startCenter.Y),
+	Size = UDim2.fromOffset(startSize.X, startSize.Y), BackgroundTransparency = 1,
+}, screenGui)
+
+local popScale = make("UIScale", { Name = "PopScale", Scale = 0.7 }, holder)
+
+local glow = make("ImageLabel", {
+	Name = "Glow", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.new(1, GLOW_SPREAD * 2, 1, GLOW_SPREAD * 2),
+	BackgroundTransparency = 1, Image = GLOW_ASSET, ImageColor3 = GLOW_COLOR,
+	ImageTransparency = 1, ScaleType = Enum.ScaleType.Stretch, ZIndex = 1,
+}, holder)
+
+task.spawn(function()
+	local deadline = os.clock() + 5
+	while glow.Parent and os.clock() < deadline do
+		local ok, size = pcall(function() return glow.ContentImageSize end)
+		if not ok then return end
+		if size.X > 0 and size.Y > 0 then
+			local sx, sy = size.X * GLOW_SLICE, size.Y * GLOW_SLICE
+			glow.SliceCenter = Rect.new(sx, sy, size.X - sx, size.Y - sy)
+			glow.SliceScale = math.max(GLOW_SPREAD, 1) / sx
+			glow.ScaleType = Enum.ScaleType.Slice
+			return
+		end
+		task.wait(0.05)
+	end
+end)
+
+local function setGlow(strength, time, style)
+	tween(glow, time, { ImageTransparency = 1 - GLOW_BRIGHTNESS * strength }, style)
+end
+
+local box = make("Frame", {
+	Name = "Box", Size = UDim2.fromScale(1, 1), BackgroundColor3 = BG_COLOR,
+	BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 2,
+}, holder)
+local boxCorner = make("UICorner", { CornerRadius = UDim.new(0, cornerFor(startSize)) }, box)
+local stroke = make("UIStroke", { Color = WHITE, Transparency = 1, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, box)
+
+local body = make("TextButton", {
+	Name = "Body", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+	Text = "", AutoButtonColor = false, Selectable = false, ZIndex = 1,
+}, box)
+
+local label = make("TextLabel", {
+	Name = "Label", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, TEXT_NUDGE_Y),
+	Size = UDim2.new(1, -28, 1, -28), BackgroundTransparency = 1, Text = TEXT, TextColor3 = WHITE,
+	TextTransparency = 1, TextSize = TEXT_SIZE, TextScaled = false, TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center,
+	FontFace = FONT, ZIndex = 2,
+}, box)
+
+local dragHit = make("TextButton", {
+	Name = "DragHit", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 1, BAR_DISTANCE),
+	Size = UDim2.fromOffset(BAR_HIT.X, BAR_HIT.Y), BackgroundTransparency = 1,
+	Text = "", AutoButtonColor = false, Selectable = false, ZIndex = 5,
+}, box)
+local bar = make("Frame", {
+	Name = "Bar", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+	Size = BAR_SIZE, BackgroundColor3 = WHITE, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 5,
+}, dragHit)
+make("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
+
+local handle = make("TextButton", {
+	Name = "ResizeHandle", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, 0, 1, 0),
+	Size = UDim2.fromOffset(34, 34), BackgroundTransparency = 1,
+	Text = "", AutoButtonColor = false, Selectable = false, ZIndex = 5,
+}, box)
+
+local iconGroup = make("CanvasGroup", {
+	Name = "Icon", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -ICON_INSET, 1, -ICON_INSET),
+	Size = UDim2.fromOffset(ICON_BOX, ICON_BOX), BackgroundTransparency = 1, GroupTransparency = 1, ZIndex = 5,
+}, handle)
+do
+	local half = ICON_THICK / 2
+	local steps = math.max(8, math.ceil((math.pi / 2 * ICON_R) / (ICON_THICK / 3)))
+	for i = 0, steps do
+		local angle = (math.pi / 2) * (i / steps)
+		local dot = make("Frame", {
+			Name = "Dot", AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(half + ICON_R * math.cos(angle), half + ICON_R * math.sin(angle)),
+			Size = UDim2.fromOffset(ICON_THICK, ICON_THICK), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 5,
+		}, iconGroup)
+		make("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
+	end
+end
+
+local connections = {}
+local dragging, resizing = false, false
+local activeInput, inputStart
+local dragOrigin, resizeOriginSize, resizeTopLeft
+local sizeTarget = startSize
+local posTarget = startCenter
+local sizeCur, posCur = startSize, startCenter
+local lastCorner = cornerFor(startSize)
+
+connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
+	sizeTarget = fitSize(sizeTarget)
+	posTarget = clampCenter(posTarget, sizeTarget)
+	local speed = resizing and RESIZE_FOLLOW_SPEED or DRAG_FOLLOW_SPEED
+	local alpha = 1 - math.exp(-dt * speed)
+	sizeCur = fitSize(sizeCur:Lerp(sizeTarget, alpha))
+	posCur = clampCenter(posCur:Lerp(posTarget, alpha), sizeCur)
+	holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
+	holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
+	local corner = cornerFor(sizeCur)
+	if corner ~= lastCorner then
+		lastCorner = corner
+		boxCorner.CornerRadius = UDim.new(0, corner)
+	end
+end)
+
+dragHit.InputBegan:Connect(function(input)
+	if not isPress(input) or dragging or resizing then return end
+	dragging = true; activeInput = input; inputStart = p2(input); dragOrigin = posTarget
+	tween(bar, 0.2, { BackgroundTransparency = 0.15, Size = BAR_SIZE_ACTIVE })
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			dragging = false
+			tween(bar, 0.3, { BackgroundTransparency = BAR_IDLE, Size = BAR_SIZE })
+		end
+	end)
+end)
+dragHit.MouseEnter:Connect(function() if not dragging then tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end end)
+dragHit.MouseLeave:Connect(function() if not dragging then tween(bar, 0.25, { BackgroundTransparency = BAR_IDLE }) end end)
+
+handle.InputBegan:Connect(function(input)
+	if not isPress(input) or dragging or resizing then return end
+	resizing = true; activeInput = input; inputStart = p2(input)
+	resizeOriginSize = sizeTarget; resizeTopLeft = posTarget - sizeTarget / 2
+	tween(iconGroup, 0.2, { GroupTransparency = 0.05 })
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			resizing = false
+			tween(iconGroup, 0.3, { GroupTransparency = ICON_IDLE })
+		end
+	end)
+end)
+handle.MouseEnter:Connect(function() if not resizing then tween(iconGroup, 0.2, { GroupTransparency = 0.2 }) end end)
+handle.MouseLeave:Connect(function() if not resizing then tween(iconGroup, 0.25, { GroupTransparency = ICON_IDLE }) end end)
+
+connections[#connections + 1] = UserInputService.InputChanged:Connect(function(input)
+	if not (dragging or resizing) then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement and input ~= activeInput then return end
+	local delta = p2(input) - inputStart
+	if dragging then
+		posTarget = clampCenter(dragOrigin + delta, sizeTarget)
+	else
+		local v = viewport()
+		local newSize = Vector2.new(
+			math.clamp(resizeOriginSize.X + delta.X, MIN_SIZE.X, MAX_SIZE.X),
+			math.clamp(resizeOriginSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y)
+		)
+		newSize = Vector2.new(
+			math.min(newSize.X, v.X - SCREEN_MARGIN - resizeTopLeft.X),
+			math.min(newSize.Y, v.Y - SCREEN_MARGIN - BAR_BELOW - resizeTopLeft.Y)
+		)
+		sizeTarget = newSize
+		posTarget = resizeTopLeft + newSize / 2
+	end
+end)
+
+local isHeld = false
+local hovering = false
+local holdToken = 0
+
+local function release()
+	if not isHeld then return end
+	isHeld = false
+	holdToken += 1
+	tween(popScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+	tween(box, 0.25, { BackgroundColor3 = hovering and BG_HOVER or BG_COLOR })
+	tween(stroke, 0.3, { Transparency = STROKE_IDLE, Thickness = 1 }, Enum.EasingStyle.Sine)
+	setGlow(0, 0.25, Enum.EasingStyle.Sine)
+	run(OffCode)
+end
+
+body.InputBegan:Connect(function(input)
+	if not isPress(input) or isHeld then return end
+	isHeld = true
+	holdToken += 1
+	local token = holdToken
+	tween(popScale, 0.12, { Scale = 0.96 })
+	tween(box, 0.2, { BackgroundColor3 = BG_ON })
+	tween(stroke, 0.15, { Transparency = 0.3, Thickness = 2 })
+	setGlow(1, 0.08, Enum.EasingStyle.Quad)
+	task.delay(0.1, function()
+		if token ~= holdToken or not isHeld or not screenGui.Parent then return end
+		setGlow(0.55, 0.3, Enum.EasingStyle.Sine)
+	end)
+	if REPEAT_ON_CODE then
+		task.spawn(function()
+			while isHeld and token == holdToken and screenGui.Parent do
+				local ok, err = pcall(OnCode)
+				if not ok then warn(err) end
+				task.wait(REPEAT_DELAY)
+			end
+		end)
+	else
+		run(OnCode)
+	end
+	input.Changed:Connect(function()
+		local state = input.UserInputState
+		if state == Enum.UserInputState.End or state == Enum.UserInputState.Cancel then
+			if token == holdToken then release() end
+		end
+	end)
+end)
+
+body.MouseEnter:Connect(function() hovering = true; if not isHeld then tween(box, 0.25, { BackgroundColor3 = BG_HOVER }) end end)
+body.MouseLeave:Connect(function() hovering = false; if not isHeld then tween(box, 0.3, { BackgroundColor3 = BG_COLOR }) end end)
+
+screenGui.Destroying:Connect(function()
+	for _, c in ipairs(connections) do c:Disconnect() end
+	table.clear(connections)
+	if isHeld and RUN_OFF_CODE_ON_DESTROY then
+		isHeld = false
+		holdToken += 1
+		run(OffCode)
+	end
+end)
+
+local fades = {
+	{ box, "BackgroundTransparency", BG_TRANSPARENCY },
+	{ stroke, "Transparency", STROKE_IDLE },
+	{ label, "TextTransparency", TEXT_TRANSPARENCY },
+	{ bar, "BackgroundTransparency", BAR_IDLE },
+	{ iconGroup, "GroupTransparency", ICON_IDLE },
+}
+tween(popScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+for _, f in ipairs(fades) do tween(f[1], 0.4, { [f[2]] = f[3] }, Enum.EasingStyle.Quad) end
+]==]
+
+    local DELETE_BODY = [==[
+
+]==]
+
+    local function buildHoldSource(name, flag, onBody, offBody)
+        return 'local TEXT = ' .. string.format("%q", name) .. '\n' ..
+               'local FLAG = ' .. string.format("%q", flag) .. '\n' ..
+               'local function OnCode()\n' .. onBody .. '\nend\n' ..
+               'local function OffCode()\n' .. offBody .. '\nend\n' ..
+               HOLD_BODY
+    end
+
+    local function buildDeleteSource(flag)
+        return 'local FLAG = ' .. string.format("%q", flag) .. '\n' .. DELETE_BODY
+    end
+
+    local function runSource(src)
+        if not loadstring then return end
+        local ok, fn = pcall(loadstring, src)
+        if ok and fn then pcall(fn) end
+    end
+
+    local leftSpawnSrc = buildHoldSource("<", "leftturn_MB",
+        '_G.RWSet("TurnBinds_Left", true)',
+        '_G.RWSet("TurnBinds_Left", false)')
+    local rightSpawnSrc = buildHoldSource(">", "rightturn_MB",
+        '_G.RWSet("TurnBinds_Right", true)',
+        '_G.RWSet("TurnBinds_Right", false)')
+    local leftDelSrc = buildDeleteSource("leftturn_MB")
+    local rightDelSrc = buildDeleteSource("rightturn_MB")
+
+    ScriptTab:CreateDivider({ text = "Turn Binds" })
+
+    ScriptTab:CreateToggle({
+        name = "Turn Binds",
+        currentValue = false,
+        flag = "TurnBinds_Toggle",
+        callback = function(v) turnBindsEnabled = v end,
+    })
+
+    ScriptTab:CreateKeybind({
+        name = "Left:",
+        currentKeybind = "LeftBracket",
+        holdToInteract = false,
+        flag = "TurnBinds_Left_KB",
+        callback = function() end,
+    })
+
+    ScriptTab:CreateKeybind({
+        name = "Right:",
+        currentKeybind = "RightBracket",
+        holdToInteract = false,
+        flag = "TurnBinds_Right_KB",
+        callback = function() end,
+    })
+
+    ScriptTab:CreateToggle({
+        name = "Mobile Turn Buttons",
+        currentValue = false,
+        flag = "TurnBinds_Mobile",
+        callback = function(v)
+            if v then
+                runSource(leftSpawnSrc)
+                runSource(rightSpawnSrc)
+            else
+                runSource(leftDelSrc)
+                runSource(rightDelSrc)
+                _G.RWSet("TurnBinds_Left", false)
+                _G.RWSet("TurnBinds_Right", false)
+            end
+        end,
+    })
+
+    ScriptTab:CreateSlider({
+        name = "Speed",
+        range = {1, 10},
+        increment = 0.1,
+        suffix = "",
+        currentValue = 1,
+        flag = "TurnBinds_Speed",
+        callback = function(v) turnSpeed = v end,
+    })
+
+    task.spawn(function()
+        while true do
+            task.wait(0.3)
+            if Rayfield and Rayfield.Flags then
+                local lkc = normalizeKey(Rayfield.Flags["TurnBinds_Left_KB"])
+                local rkc = normalizeKey(Rayfield.Flags["TurnBinds_Right_KB"])
+                if lkc then leftKeyCode = lkc end
+                if rkc then rightKeyCode = rkc end
+            end
+        end
+    end)
+
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if input.KeyCode == leftKeyCode then leftHeld = true end
+        if input.KeyCode == rightKeyCode then rightHeld = true end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == leftKeyCode then leftHeld = false end
+        if input.KeyCode == rightKeyCode then rightHeld = false end
+    end)
+
+    pcall(function() RunService:UnbindFromRenderStep("TurnBinds_RotateCamera") end)
+    RunService:BindToRenderStep("TurnBinds_RotateCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
+        if not turnBindsEnabled then return end
+        if leftHeld == rightHeld then return end
+
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        local direction = leftHeld and -1 or 1
+        local radians = math.rad(getDegreesPerSecond() * dt * direction)
+        local pos = cam.CFrame.Position
+        local newLook = CFrame.Angles(0, radians, 0) * cam.CFrame.LookVector
+        cam.CFrame = CFrame.lookAt(pos, pos + newLook, Vector3.yAxis)
+    end)
+end
+
 --[[
 ============================================================================
 
