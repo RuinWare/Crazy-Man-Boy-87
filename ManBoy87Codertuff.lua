@@ -4089,6 +4089,12 @@ do
     end
 end
 
+--[[
+============================================================================
+TB
+============================================================================
+]]--
+
 do
     local turnBindsEnabled = false
     local turnSpeed = 1
@@ -4125,13 +4131,9 @@ do
         return 48 + (turnSpeed - 1) * (1600 - 48) / 9
     end
 
-    local HOLD_BODY = [==[
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodyadtnb"))()
-]==]
+    local HOLD_BODY = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodyadtnb"))()
 
-    local DELETE_BODY = [==[
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodydholdtrnb"))()
-]==]
+    local DELETE_BODY = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/bodydholdtrnb"))()
 
     local function buildHoldSource(name, flag, onBody, offBody)
         return 'local TEXT = ' .. string.format("%q", name) .. '\n' ..
