@@ -4108,19 +4108,19 @@ do
     _G.RWCallbacks["TurnBinds_Right"] = function(v) rightHeld = v end
 
     local LEFTMBTB_ON = [==[
--- paste your LEFT MB source here
+loadstring(game:HttpGet(""))()
 ]==]
 
     local RIGHTMBTB_ON = [==[
--- paste your RIGHT MB source here
+loadstring(game:HttpGet(""))()
 ]==]
 
     local LEFTTB_OFF = [==[
--- paste your LEFT off source here
+loadstring(game:HttpGet(""))()
 ]==]
 
     local RIGHTTB_OFF = [==[
--- paste your RIGHT off source here
+loadstring(game:HttpGet(""))()
 ]==]
 
     local function runSource(src)
