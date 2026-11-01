@@ -4096,13 +4096,13 @@ TB
 ]]--
 
 do
-    getgenv().LEFK = ""
+    getgenv().LEFK  = ""
     getgenv().RIGHK = ""
-    _G.LEFK = ""
+    _G.LEFK  = ""
     _G.RIGHK = ""
     getgenv().KTB = 5
-	_G.KTB = 5
-   
+    _G.KTB = 5
+
     tab:CreateDivider({ text = "Turn Binds" })
 
     tab:CreateToggle({
@@ -4111,10 +4111,10 @@ do
         flag = "TurnBinds_Toggle",
         callback = function(v)
             if v then
-					loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
-				 else
-					loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
-			end
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+            else
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
+            end
         end,
     })
 
@@ -4124,15 +4124,14 @@ do
         holdToInteract = true,
         flag = "TurnBinds_Left",
         callback = function(key)
-				_G.LEFK = TurnBinds_Left.value
-				getgenv().LEFK = TurnBinds_left.value
-			end
-			    onChange = [==[
-				_G.LEFK = TurnBinds_Left.value
-				getgenv().LEFK = TurnBinds_left.value
-			]==]
-		end,
-	})
+            _G.LEFK       = TurnBinds_Left.value
+            getgenv().LEFK = TurnBinds_Left.value
+        end,
+        onChange = function()
+            _G.LEFK       = TurnBinds_Left.value
+            getgenv().LEFK = TurnBinds_Left.value
+        end,
+    })
 
     tab:CreateKeybind({
         name = "Right:",
@@ -4140,14 +4139,13 @@ do
         holdToInteract = true,
         flag = "TurnBinds_Right",
         callback = function(key)
-				_G.RIGHK = TurnBinds_Right.value
-				getgenv().RIGHK = TurnBinds_Right.value
-			end
-			    onChange = [==[
-				_G.RIGHK = TurnBinds_Right.value
-				getgenv().RIGHK = TurnBinds_Right.value
-			]==]
-    end,
+            _G.RIGHK        = TurnBinds_Right.value
+            getgenv().RIGHK = TurnBinds_Right.value
+        end,
+        onChange = function()
+            _G.RIGHK        = TurnBinds_Right.value
+            getgenv().RIGHK = TurnBinds_Right.value
+        end,
     })
 
     tab:CreateToggle({
