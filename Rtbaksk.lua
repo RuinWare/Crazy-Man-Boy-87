@@ -3,10 +3,10 @@
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-local FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
-local LEFT_KEY = LEFK          -- hold to turn the camera LEFT  (e.g. "Q", "LeftShift", "Z")
-local RIGHT_KEY = RIGHK         -- hold to turn the camera RIGHT (e.g. "E", "RightShift", "C")
-local PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
+FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
+LEFT_KEY = LEFK          -- hold to turn the camera LEFT  (e.g. "Q", "LeftShift", "Z")
+RIGHT_KEY = RIGHK         -- hold to turn the camera RIGHT (e.g. "E", "RightShift", "C")
+PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
 
 -- ============================================================
 -- DO NOT EDIT BELOW THIS LINE
