@@ -4132,15 +4132,10 @@ do
         currentKeybind = "None",
         holdToInteract = true,
         flag = "TurnBinds_Left",
-        callback = function(a, b)
-            for _, raw in ipairs({ a, b }) do
-                local k = normalizeKey(raw)
-                if k ~= "" then
-                    getgenv().LEFK = k
-                    _G.LEFK = k
-                    return
-                end
-			onChanged = [==[
+        callback = function(key)
+				runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua")
+			  end
+				onChanged = [==[
 task.wait(0.1)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
 ]==]
@@ -4153,37 +4148,16 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         currentKeybind = "None",
         holdToInteract = true,
         flag = "TurnBinds_Right",
-        callback = function(a, b)
-            for _, raw in ipairs({ a, b }) do
-                local k = normalizeKey(raw)
-                if k ~= "" then
-                    getgenv().RIGHK = k
-                    _G.RIGHK = k
-                    return
+        callback = function(key)
+				runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua")
                 end
 					onChanged = [==[
 task.wait(0.1)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
-]==]
+			]==]
             end
         end,
     })
-
-    RunService.Heartbeat:Connect(function()
-        local lk = readObjValue(leftKbObj)
-        if lk == "" then lk = readFlagValue("TurnBinds_Left") end
-        if lk ~= "" and lk ~= getgenv().LEFK then
-            getgenv().LEFK = lk
-            _G.LEFK = lk
-        end
-
-        local rk = readObjValue(rightKbObj)
-        if rk == "" then rk = readFlagValue("TurnBinds_Right") end
-        if rk ~= "" and rk ~= getgenv().RIGHK then
-            getgenv().RIGHK = rk
-            _G.RIGHK = rk
-        end
-    end)
 
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
