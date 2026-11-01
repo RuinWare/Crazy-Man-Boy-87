@@ -4110,7 +4110,7 @@ do
         currentValue = false,
         flag = "TurnBinds_Toggle",
         callback = function(v)
-            if v then loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))() else https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua end
+            if v then loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))() else loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))() end
         end,
     })
 
