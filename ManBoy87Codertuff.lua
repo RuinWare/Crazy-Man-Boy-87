@@ -4120,7 +4120,7 @@ _G.LEFK = TB_Left.value
 			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnboff"))()
     })
 
-    tab:CreateKeybind({
+    LEFK = tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
         holdToInteract = false,
@@ -4133,7 +4133,7 @@ _G.LEFK = TB_Left.value
 				end,
     })
 			
-    tab:CreateKeybind({
+    RIGHK = tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
         holdToInteract = false,
