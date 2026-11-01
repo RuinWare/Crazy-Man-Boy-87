@@ -4112,53 +4112,6 @@ do
     _G.LEFK = ""
     _G.RIGHK = ""
 
-    local leftKbObj, rightKbObj
-
-    local function normalizeKey(v)
-        if v == nil then return "" end
-        if type(v) == "EnumItem" then return v.Name end
-        if type(v) == "string" then
-            local t = v:gsub("^%s+", ""):gsub("%s+$", "")
-            if t == "" or t == "None" or t == "none" then return "" end
-            return t
-        end
-        return ""
-    end
-
-    local function readObjValue(obj)
-        if not obj then return "" end
-        local candidates = { "Value", "CurrentKeybind", "CurrentKey", "Keybind", "Key" }
-        for _, field in ipairs(candidates) do
-            local ok, val = pcall(function() return obj[field] end)
-            if ok and val ~= nil then
-                local n = normalizeKey(val)
-                if n ~= "" then return n end
-            end
-        end
-        return ""
-    end
-
-    local function readFlagValue(flagName)
-        local sources = {}
-        if Rayfield and Rayfield.Flags then sources[#sources + 1] = Rayfield.Flags end
-        if _G.Rayfield and _G.Rayfield.Flags then sources[#sources + 1] = _G.Rayfield.Flags end
-        if getgenv and getgenv().Rayfield and getgenv().Rayfield.Flags then
-            sources[#sources + 1] = getgenv().Rayfield.Flags
-        end
-        for _, src in ipairs(sources) do
-            local v = src[flagName]
-            if v ~= nil then
-                local n = normalizeKey(v)
-                if n ~= "" then return n end
-                if type(v) == "table" then
-                    local t = readObjValue(v)
-                    if t ~= "" then return t end
-                end
-            end
-        end
-        return ""
-    end
-
     tab:CreateDivider({ text = "Turn Binds" })
 
     tab:CreateToggle({
@@ -4208,6 +4161,10 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
                     _G.RIGHK = k
                     return
                 end
+					onChanged = [==[
+task.wait(0.1)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+]==]
             end
         end,
     })
