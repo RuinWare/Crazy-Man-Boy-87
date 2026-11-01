@@ -1,4 +1,7 @@
-	local SHARED_PATHS = {
+RIGHK = TB_Right.value
+LEFK = TB_Left.value
+
+local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
@@ -4112,9 +4115,7 @@ do
               loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
 				else
 			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnboff"))()
-				end
-			end,
-	})
+    })
 
     tab:CreateKeybind({
         name = "Left:",
@@ -4128,8 +4129,6 @@ do
 						LEFK = newkey
 				end,
     })
-
-LEFK = TB_Left.value
 			
     tab:CreateKeybind({
         name = "Right:",
@@ -4143,8 +4142,6 @@ LEFK = TB_Left.value
 						RIGHK = newkey
 				end,
 })
-
-RIGHK = TB_Right.value
 		
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
@@ -4156,7 +4153,7 @@ RIGHK = TB_Right.value
                 task.wait(0.1)
                 loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"))()
             else
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb"))()
             end
         end,
     })
@@ -4172,7 +4169,7 @@ RIGHK = TB_Right.value
             _G.KTB = v
         end,
     })
-end
+		end
 
 --[[
 ============================================================================
