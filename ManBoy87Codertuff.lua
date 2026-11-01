@@ -1,4 +1,7 @@
-    local SHARED_PATHS = {
+_G.LEFTKEY = LEFK
+_G.RIGHTKEY = RIGHK
+
+local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
