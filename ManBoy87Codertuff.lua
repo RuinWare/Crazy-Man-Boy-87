@@ -4096,15 +4096,36 @@ TB
 ]]--
 
 do
-	
-	     getgenv().KTB = 1
-         _G.KTB = 1
+    local ON_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"
+    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"
 
-	     getgenv().LEFK = ""
-	     _G.LEFK = ""
+    local function runUrl(url)
+        if not loadstring then return end
+        local ok, src = pcall(function() return game:HttpGet(url) end)
+        if not ok or not src then return end
+        local fn = loadstring(src)
+        if fn then pcall(fn) end
+    end
 
-	     getgenv().RIGHK = ""
-	     _G.RIGHK = ""
+    getgenv().LEFK = ""
+    getgenv().RIGHK = ""
+    _G.LEFK = ""
+    _G.RIGHK = ""
+    getgenv().KTB = 1
+	_G.KTB = 1
+    local leftWidget, rightWidget
+
+    local function valueToString(v)
+        if v == nil then return nil end
+        if type(v) == "EnumItem" then return v.Name end
+        if type(v) == "string" then
+            local t = v:match("^%s*(.-)%s*$")
+            if t == "" or t == "None" or t == "none" or t == "NONE" then return nil end
+            return t
+        end
+        if type(v) == "number" then return tostring(v) end
+        return nil
+    end
 
     tab:CreateDivider({ text = "Turn Binds" })
 
@@ -4113,47 +4134,67 @@ do
         currentValue = false,
         flag = "TurnBinds_Toggle",
         callback = function(v)
-            if v then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
-            else
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
-            end
+            if v then runUrl(ON_URL) else runUrl(OFF_URL) end
         end,
     })
 
-    tab:CreateKeybind({
+    leftWidget = tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
         holdToInteract = true,
-        flag = "TB_LEFT",
-        callback = function(key)
-				getgenv().LEFK = "(key)"
-		        _G.LEFK = "(key)"
-        	end,
-	            onChanged = [==[
-		getgenv().LEFK = "(TB_LEFT.value)"
-		_G.LEFK = "(TB_LEFT.value)"
-	]==]
+        flag = "TurnBinds_Left",
+        callback = function(a, b)
+            for _, raw in ipairs({ a, b }) do
+                local str = valueToString(raw)
+                if str then
+                    getgenv().LEFK = str
+                    _G.LEFK = str
+                    return
+                end
             end
         end,
     })
 
-    tab:CreateKeybind({
+    rightWidget = tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
         holdToInteract = true,
-        flag = "TB_RIGHT",
-        callback = function(key)
-				getgenv().RIGHK = "(key)"
-		        _G.RIGHK = "(key)"
-        	end,
-	onChanged = [==[
-		getgenv().RIGHK = "(TB_RIGHT.value)"
-		_G.RIGHK = "(TB_RIGHT.value)"
-	]==]
+        flag = "TurnBinds_Right",
+        callback = function(a, b)
+            for _, raw in ipairs({ a, b }) do
+                local str = valueToString(raw)
+                if str then
+                    getgenv().RIGHK = str
+                    _G.RIGHK = str
+                    return
+                end
             end
         end,
     })
+
+    RunService.Heartbeat:Connect(function()
+        if leftWidget then
+            local ok, v = pcall(function() return leftWidget.Value end)
+            if ok and v ~= nil then
+                local str = valueToString(v)
+                if str and getgenv().LEFK ~= str then
+                    getgenv().LEFK = str
+                    _G.LEFK = str
+                end
+            end
+        end
+
+        if rightWidget then
+            local ok, v = pcall(function() return rightWidget.Value end)
+            if ok and v ~= nil then
+                local str = valueToString(v)
+                if str and getgenv().RIGHK ~= str then
+                    getgenv().RIGHK = str
+                    _G.RIGHK = str
+                end
+            end
+        end
+    end)
 
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
@@ -4161,20 +4202,20 @@ do
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb")
                 task.wait(0.1)
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
             else
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
             end
         end,
     })
 
     tab:CreateSlider({
         name = "Speed",
-        range = {1, 10},
+        range = {0.3, 20},
         increment = 1,
-        currentValue = 5,
+        currentValue = 1,
         flag = "TurnBinds_Speed",
         callback = function(v)
             getgenv().KTB = v
