@@ -4107,10 +4107,8 @@ do
         if fn then pcall(fn) end
     end
 
-    getgenv().LEFK = ""
-    getgenv().RIGHK = ""
-    _G.LEFK = ""
-    _G.RIGHK = ""
+	     getgenv().KTB = 1
+         _G.KTB = 1
 
     tab:CreateDivider({ text = "Turn Binds" })
 
@@ -4131,7 +4129,7 @@ do
         name = "Left:",
         currentKeybind = "None",
         holdToInteract = true,
-        flag = "TurnBinds_Left",
+        flag = "TB_LEFT",
         callback = function(key)
 				runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua")
 			  end
@@ -4147,7 +4145,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         name = "Right:",
         currentKeybind = "None",
         holdToInteract = true,
-        flag = "TurnBinds_Right",
+        flag = "TB_RIGHT",
         callback = function(key)
 				runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua")
                 end
