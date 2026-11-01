@@ -4110,7 +4110,11 @@ do
         currentValue = false,
         flag = "TurnBinds_Toggle",
         callback = function(v)
-            if v then loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))() else loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))() end
+            if v then
+					loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+				 else
+					loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
+			end
         end,
     })
 
@@ -4127,6 +4131,7 @@ do
 				_G.LEFK = TurnBinds_Left.value
 				getgenv().LEFK = TurnBinds_left.value
 			]==]
+		    end
 		end,
 	})
 
@@ -4143,7 +4148,8 @@ do
 				_G.RIGHK = TurnBinds_Right.value
 				getgenv().RIGHK = TurnBinds_Right.value
 			]==]
-		end,
+         end
+    end,
     })
 
     tab:CreateToggle({
