@@ -4100,13 +4100,6 @@ do
     getgenv().KTB = 5
     _G.KTB = 5
 
-    local function runUrl(url)
-        if not loadstring then return end
-        local ok, src = pcall(function() return game:HttpGet(url) end)
-        if not ok or not src then return end
-        local fn = loadstring(src)
-        if fn then pcall(fn) end
-    end
 
     tab:CreateDivider({ text = "Turn Binds" })
 
@@ -4114,41 +4107,53 @@ do
         name = "Turn Binds",
         currentValue = false,
         flag = "TurnBinds_Toggle",
-        callback = function(v)
-				print("hello")
+        callback = function(state)
+            if state then
+
+
+				else
+			
     })
 
     tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
-        holdToInteract = true,
-        flag = "TB_LEFT",
+        holdToInteract = false,
+        flag = "TB_Left",
         callback = function(key)
-				-- nothing
+						LEF = key
+			    end,
+				onChanged = function(newkey)
+						LEF = newkey
+				end,
     })
 
-		LEFTTB = TB_LEFT.value
-		
+		LEF = TB_Left.value
+			
     tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
-        holdToInteract = true,
-        flag = "TB_RIGHT",
+        holdToInteract = false,
+        flag = "TB_Right",
         callback = function(key)
-					-- nothing
-    })
+					RIGH = key
+			    end,
+				onChanged = function(newkey)
+						RIGH = newkey
+				end,
+})
 
-			RIGHTTB = TB_RIGHT.value
-
+		RIGH = TB_Right.value
+		
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
         currentValue = false,
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb")
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb"))()
                 task.wait(0.1)
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"))()
             else
                 runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
             end
