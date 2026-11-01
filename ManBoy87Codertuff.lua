@@ -4129,7 +4129,7 @@ do
         callback = function(key)
 				getgenv().LEFK = "key"
 		        _G.LEFK = "key"
-        	end
+        	end,
 	            onChanged = [==[
 		getgenv().LEFK = "TB_LEFT.value"
 		_G.LEFK = "TB_LEFT.value"
@@ -4146,7 +4146,7 @@ do
         callback = function(key)
 				getgenv().RIGHK = "key"
 		        _G.RIGHK = "key"
-        	end
+        	end,
 	onChanged = [==[
 		getgenv().RIGHK = "TB_RIGHT.value"
 		_G.RIGHK = "TB_RIGHT.value"
