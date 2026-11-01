@@ -4186,7 +4186,8 @@ do
                     getgenv().LEFK = k
                     _G.LEFK = k
                     return
-                end
+                end,
+					onChanged = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
             end
         end,
     })
