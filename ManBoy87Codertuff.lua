@@ -4123,7 +4123,7 @@ do
         flag = "TB_Left",
         callback = function(key)
 						LEFK = key
-			    end,
+			    end
 				onChanged = function(newkey)
 						LEFK = newkey
 				end,
