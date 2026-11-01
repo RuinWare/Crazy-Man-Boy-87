@@ -4138,7 +4138,7 @@ do
         flag = "TB_Right",
         callback = function(key)
 					RIGHK = key
-			    end,
+			    end
 				onChanged = function(newkey)
 						RIGHK = newkey
 				end,
