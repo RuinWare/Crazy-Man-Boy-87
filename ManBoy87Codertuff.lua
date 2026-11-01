@@ -4109,10 +4109,10 @@ do
         flag = "TurnBinds_Toggle",
         callback = function(state)
             if state then
-              loadstring(game:HttpGet(""))()
+              loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
 
 				else
-			loadstring(game:HttpGet(""))()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnboff"))()
     })
 
     tab:CreateKeybind({
