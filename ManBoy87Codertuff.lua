@@ -4096,17 +4096,9 @@ TB
 ]]--
 
 do
-
     getgenv().KTB = 5
     _G.KTB = 5
 
-    getgenv().RIGHK = TB_Right.value
-    getgenv().LEFK = TB_Left.value
-
-_G.RIGHK = TB_Right.value
-_G.LEFK = TB_Left.value
-
-	
     tab:CreateDivider({ text = "Turn Binds" })
 
     tab:CreateToggle({
@@ -4115,39 +4107,37 @@ _G.LEFK = TB_Left.value
         flag = "TurnBinds_Toggle",
         callback = function(state)
             if state then
-              loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
-				else
-			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
-		end
-	end,			
-})
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+            else
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
+            end
+        end,
+    })
 
-    LEFK = tab:CreateKeybind({
+    tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
         holdToInteract = false,
         flag = "TB_Left",
-        callback = function(key)
-						LEFK = key
-			    end,
-				onChanged = function(newkey)
-						LEFK = newkey
-				end,
+        callback  = function(key)    LEFK = key    end,
+        onChanged = function(newkey) LEFK = newkey end,
     })
-			
-    RIGHK = tab:CreateKeybind({
+
+    tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
         holdToInteract = false,
         flag = "TB_Right",
-        callback = function(key)
-					RIGHK = key
-			    end,
-				onChanged = function(newkey)
-						RIGHK = newkey
-				end,
-})
-		
+        callback  = function(key)    RIGHK = key    end,
+        onChanged = function(newkey) RIGHK = newkey end,
+    })
+
+    -- now safe: keybinds exist
+    getgenv().LEFK  = TB_Left  and TB_Left.value  or getgenv().LEFK
+    getgenv().RIGHK = TB_Right and TB_Right.value or getgenv().RIGHK
+    _G.LEFK  = getgenv().LEFK
+    _G.RIGHK = getgenv().RIGHK
+
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
         currentValue = false,
@@ -4174,7 +4164,7 @@ _G.LEFK = TB_Left.value
             _G.KTB = v
         end,
     })
-		end
+end
 
 --[[
 ============================================================================
