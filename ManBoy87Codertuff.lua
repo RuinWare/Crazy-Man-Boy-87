@@ -4096,10 +4096,10 @@ TB
 ]]--
 
 do
-    getgenv().LEFK  = ""
-    getgenv().RIGHK = ""
-    _G.LEFK  = ""
-    _G.RIGHK = ""
+    getgenv().LEFK  = none
+    getgenv().RIGHK = none
+    _G.LEFK  = none
+    _G.RIGHK = none
     getgenv().KTB = 5
     _G.KTB = 5
 
@@ -4124,7 +4124,7 @@ do
         holdToInteract = true,
         flag = "TurnBinds_Left",
         callback = function(key)
-            _G.LEFK       = TurnBinds_Left.value
+            _G.LEFK = TurnBinds_Left.value
             getgenv().LEFK = TurnBinds_Left.value
         end,
         onChange = function()
