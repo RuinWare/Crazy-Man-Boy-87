@@ -4129,7 +4129,7 @@ do
 				end,
     })
 
-		LEFK = TB_Left.value
+local LEFK = TB_Left.value
 			
     tab:CreateKeybind({
         name = "Right:",
@@ -4144,7 +4144,7 @@ do
 				end,
 })
 
-		RIGHK = TB_Right.value
+local RIGHK = TB_Right.value
 		
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
