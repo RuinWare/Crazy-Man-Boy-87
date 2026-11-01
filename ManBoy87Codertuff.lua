@@ -4118,35 +4118,37 @@ do
         end,
     })
 
-    tab:CreateKeybind({
-        name = "Left:",
-        currentKeybind = "None",
-        holdToInteract = true,
-        flag = "TurnBinds_Left",
-        callback = function(key)
-            _G.LEFK = TurnBinds_Left.value
-            getgenv().LEFK = TurnBinds_Left.value
-        end,
-        onChange = function()
-            _G.LEFK       = TurnBinds_Left.value
-            getgenv().LEFK = TurnBinds_Left.value
-        end,
-    })
+-- Capture the returned element objects
+local LeftKeybind = tab:CreateKeybind({
+    name = "Left:",
+    currentKeybind = "None",
+    holdToInteract = true,
+    flag = "TurnBinds_Left",
+    callback = function(key)
+        -- LeftKeybind.value holds the current bound key
+        _G.LEFK       = LeftKeybind.value
+        getgenv().LEFK = LeftKeybind.value
+    end,
+    onChange = function()
+        _G.LEFK       = LeftKeybind.value
+        getgenv().LEFK = LeftKeybind.value
+    end,
+})
 
-    tab:CreateKeybind({
-        name = "Right:",
-        currentKeybind = "None",
-        holdToInteract = true,
-        flag = "TurnBinds_Right",
-        callback = function(key)
-            _G.RIGHK        = TurnBinds_Right.value
-            getgenv().RIGHK = TurnBinds_Right.value
-        end,
-        onChange = function()
-            _G.RIGHK        = TurnBinds_Right.value
-            getgenv().RIGHK = TurnBinds_Right.value
-        end,
-    })
+local RightKeybind = tab:CreateKeybind({
+    name = "Right:",
+    currentKeybind = "None",
+    holdToInteract = true,
+    flag = "TurnBinds_Right",
+    callback = function(key)
+        _G.RIGHK        = RightKeybind.value
+        getgenv().RIGHK = RightKeybind.value
+    end,
+    onChange = function()
+        _G.RIGHK        = RightKeybind.value
+        getgenv().RIGHK = RightKeybind.value
+    end,
+})
 
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
