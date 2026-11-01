@@ -4127,12 +4127,12 @@ do
         holdToInteract = true,
         flag = "TB_LEFT",
         callback = function(key)
-				getgenv().LEFK = "key"
-		        _G.LEFK = "key"
+				getgenv().LEFK = "(key)"
+		        _G.LEFK = "(key)"
         	end,
 	            onChanged = [==[
-		getgenv().LEFK = "TB_LEFT.value"
-		_G.LEFK = "TB_LEFT.value"
+		getgenv().LEFK = "(TB_LEFT.value)"
+		_G.LEFK = "(TB_LEFT.value)"
 	]==]
             end
         end,
@@ -4144,12 +4144,12 @@ do
         holdToInteract = true,
         flag = "TB_RIGHT",
         callback = function(key)
-				getgenv().RIGHK = "key"
-		        _G.RIGHK = "key"
+				getgenv().RIGHK = "(key)"
+		        _G.RIGHK = "(key)"
         	end,
 	onChanged = [==[
-		getgenv().RIGHK = "TB_RIGHT.value"
-		_G.RIGHK = "TB_RIGHT.value"
+		getgenv().RIGHK = "(TB_RIGHT.value)"
+		_G.RIGHK = "(TB_RIGHT.value)"
 	]==]
             end
         end,
