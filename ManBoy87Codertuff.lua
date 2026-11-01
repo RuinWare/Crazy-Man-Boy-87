@@ -4096,19 +4096,15 @@ TB
 ]]--
 
 do
-    local ON_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"
-    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"
-
-    local function runUrl(url)
-        if not loadstring then return end
-        local ok, src = pcall(function() return game:HttpGet(url) end)
-        if not ok or not src then return end
-        local fn = loadstring(src)
-        if fn then pcall(fn) end
-    end
-
+	
 	     getgenv().KTB = 1
          _G.KTB = 1
+
+	     getgenv().LEFK = ""
+	     _G.LEFK = ""
+
+	     getgenv().RIGHK = ""
+	     _G.RIGHK = ""
 
     tab:CreateDivider({ text = "Turn Binds" })
 
@@ -4118,9 +4114,9 @@ do
         flag = "TurnBinds_Toggle",
         callback = function(v)
             if v then
-                runUrl(ON_URL)
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
             else
-                runUrl(OFF_URL)
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
             end
         end,
     })
@@ -4131,12 +4127,13 @@ do
         holdToInteract = true,
         flag = "TB_LEFT",
         callback = function(key)
-				runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua")
-			  end
-				onChanged = [==[
-task.wait(0.1)
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
-]==]
+				getgenv().LEFK = "key"
+		        _G.LEFK = "key"
+        	end
+	            onChanged = [==[
+		getgenv().LEFK = "TB_LEFT.value"
+		_G.LEFK = "TB_LEFT.value"
+	]==]
             end
         end,
     })
@@ -4147,12 +4144,13 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         holdToInteract = true,
         flag = "TB_RIGHT",
         callback = function(key)
-				runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua")
-                end
-					onChanged = [==[
-task.wait(0.1)
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
-			]==]
+				getgenv().RIGHK = "key"
+		        _G.RIGHK = "key"
+        	end
+	onChanged = [==[
+		getgenv().RIGHK = "TB_RIGHT.value"
+		_G.RIGHK = "TB_RIGHT.value"
+	]==]
             end
         end,
     })
@@ -4163,11 +4161,11 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb")
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb"))()
                 task.wait(0.1)
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"))()
             else
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb"))()
             end
         end,
     })
