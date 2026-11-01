@@ -4110,10 +4110,11 @@ do
         callback = function(state)
             if state then
               loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
-
 				else
 			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnboff"))()
-    })
+				end
+			end,
+	})
 
     tab:CreateKeybind({
         name = "Left:",
