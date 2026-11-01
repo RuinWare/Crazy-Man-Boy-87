@@ -4112,30 +4112,51 @@ do
     _G.LEFK = ""
     _G.RIGHK = ""
 
-    local function normalizeKey(raw)
-        if type(raw) == "EnumItem" then return raw.Name end
-        if type(raw) == "string" then
-            local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
-            if trimmed == "" or trimmed == "None" or trimmed == "none" then return "" end
-            return trimmed
+    local leftKbObj, rightKbObj
+
+    local function normalizeKey(v)
+        if v == nil then return "" end
+        if type(v) == "EnumItem" then return v.Name end
+        if type(v) == "string" then
+            local t = v:gsub("^%s+", ""):gsub("%s+$", "")
+            if t == "" or t == "None" or t == "none" then return "" end
+            return t
         end
         return ""
     end
 
-    local function readFlagKey(flagName)
+    local function readObjValue(obj)
+        if not obj then return "" end
+        local candidates = { "Value", "CurrentKeybind", "CurrentKey", "Keybind", "Key" }
+        for _, field in ipairs(candidates) do
+            local ok, val = pcall(function() return obj[field] end)
+            if ok and val ~= nil then
+                local n = normalizeKey(val)
+                if n ~= "" then return n end
+            end
+        end
+        return ""
+    end
+
+    local function readFlagValue(flagName)
         local sources = {}
         if Rayfield and Rayfield.Flags then sources[#sources + 1] = Rayfield.Flags end
         if _G.Rayfield and _G.Rayfield.Flags then sources[#sources + 1] = _G.Rayfield.Flags end
         if getgenv and getgenv().Rayfield and getgenv().Rayfield.Flags then
             sources[#sources + 1] = getgenv().Rayfield.Flags
         end
-        if getgenv and getgenv().Flags then sources[#sources + 1] = getgenv().Flags end
-
         for _, src in ipairs(sources) do
             local v = src[flagName]
-            if v ~= nil then return normalizeKey(v) end
+            if v ~= nil then
+                local n = normalizeKey(v)
+                if n ~= "" then return n end
+                if type(v) == "table" then
+                    local t = readObjValue(v)
+                    if t ~= "" then return t end
+                end
+            end
         end
-        return nil
+        return ""
     end
 
     tab:CreateDivider({ text = "Turn Binds" })
@@ -4153,42 +4174,51 @@ do
         end,
     })
 
-    tab:CreateKeybind({
+    leftKbObj = tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
         holdToInteract = true,
         flag = "TurnBinds_Left",
-        callback = function(raw)
-            local k = normalizeKey(raw)
-            if k ~= "" then
-                getgenv().LEFK = k
-                _G.LEFK = k
+        callback = function(a, b)
+            for _, raw in ipairs({ a, b }) do
+                local k = normalizeKey(raw)
+                if k ~= "" then
+                    getgenv().LEFK = k
+                    _G.LEFK = k
+                    return
+                end
             end
         end,
     })
 
-    tab:CreateKeybind({
+    rightKbObj = tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
         holdToInteract = true,
         flag = "TurnBinds_Right",
-        callback = function(raw)
-            local k = normalizeKey(raw)
-            if k ~= "" then
-                getgenv().RIGHK = k
-                _G.RIGHK = k
+        callback = function(a, b)
+            for _, raw in ipairs({ a, b }) do
+                local k = normalizeKey(raw)
+                if k ~= "" then
+                    getgenv().RIGHK = k
+                    _G.RIGHK = k
+                    return
+                end
             end
         end,
     })
 
     RunService.Heartbeat:Connect(function()
-        local lk = readFlagKey("TurnBinds_Left")
-        if lk and lk ~= "" then
+        local lk = readObjValue(leftKbObj)
+        if lk == "" then lk = readFlagValue("TurnBinds_Left") end
+        if lk ~= "" and lk ~= getgenv().LEFK then
             getgenv().LEFK = lk
             _G.LEFK = lk
         end
-        local rk = readFlagKey("TurnBinds_Right")
-        if rk and rk ~= "" then
+
+        local rk = readObjValue(rightKbObj)
+        if rk == "" then rk = readFlagValue("TurnBinds_Right") end
+        if rk ~= "" and rk ~= getgenv().RIGHK then
             getgenv().RIGHK = rk
             _G.RIGHK = rk
         end
