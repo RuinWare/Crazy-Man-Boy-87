@@ -4096,8 +4096,47 @@ TB
 ]]--
 
 do
-    getgenv().KTB = 5
-    _G.KTB = 5
+    local ON_URL  = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"
+    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"
+
+    local function runUrl(url)
+        if not loadstring then return end
+        local ok, src = pcall(function() return game:HttpGet(url) end)
+        if not ok or not src then return end
+        local fn = loadstring(src)
+        if fn then pcall(fn) end
+    end
+
+    getgenv().LEFK = ""
+    getgenv().RIGHK = ""
+    _G.LEFK = ""
+    _G.RIGHK = ""
+
+    local function normalizeKey(raw)
+        if type(raw) == "EnumItem" then return raw.Name end
+        if type(raw) == "string" then
+            local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
+            if trimmed == "" or trimmed == "None" or trimmed == "none" then return "" end
+            return trimmed
+        end
+        return ""
+    end
+
+    local function readFlagKey(flagName)
+        local sources = {}
+        if Rayfield and Rayfield.Flags then sources[#sources + 1] = Rayfield.Flags end
+        if _G.Rayfield and _G.Rayfield.Flags then sources[#sources + 1] = _G.Rayfield.Flags end
+        if getgenv and getgenv().Rayfield and getgenv().Rayfield.Flags then
+            sources[#sources + 1] = getgenv().Rayfield.Flags
+        end
+        if getgenv and getgenv().Flags then sources[#sources + 1] = getgenv().Flags end
+
+        for _, src in ipairs(sources) do
+            local v = src[flagName]
+            if v ~= nil then return normalizeKey(v) end
+        end
+        return nil
+    end
 
     tab:CreateDivider({ text = "Turn Binds" })
 
@@ -4105,11 +4144,11 @@ do
         name = "Turn Binds",
         currentValue = false,
         flag = "TurnBinds_Toggle",
-        callback = function(state)
-            if state then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+        callback = function(v)
+            if v then
+                runUrl(ON_URL)
             else
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
+                runUrl(OFF_URL)
             end
         end,
     })
@@ -4117,26 +4156,43 @@ do
     tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
-        holdToInteract = false,
-        flag = "TB_Left",
-        callback  = function(key)    LEFK = key    end,
-        onChanged = function(newkey) LEFK = newkey end,
+        holdToInteract = true,
+        flag = "TurnBinds_Left",
+        callback = function(raw)
+            local k = normalizeKey(raw)
+            if k ~= "" then
+                getgenv().LEFK = k
+                _G.LEFK = k
+            end
+        end,
     })
 
     tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
-        holdToInteract = false,
-        flag = "TB_Right",
-        callback  = function(key)    RIGHK = key    end,
-        onChanged = function(newkey) RIGHK = newkey end,
+        holdToInteract = true,
+        flag = "TurnBinds_Right",
+        callback = function(raw)
+            local k = normalizeKey(raw)
+            if k ~= "" then
+                getgenv().RIGHK = k
+                _G.RIGHK = k
+            end
+        end,
     })
 
-    -- now safe: keybinds exist
-    getgenv().LEFK  = TB_Left  and TB_Left.value  or getgenv().LEFK
-    getgenv().RIGHK = TB_Right and TB_Right.value or getgenv().RIGHK
-    _G.LEFK  = getgenv().LEFK
-    _G.RIGHK = getgenv().RIGHK
+    RunService.Heartbeat:Connect(function()
+        local lk = readFlagKey("TurnBinds_Left")
+        if lk and lk ~= "" then
+            getgenv().LEFK = lk
+            _G.LEFK = lk
+        end
+        local rk = readFlagKey("TurnBinds_Right")
+        if rk and rk ~= "" then
+            getgenv().RIGHK = rk
+            _G.RIGHK = rk
+        end
+    end)
 
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
@@ -4144,11 +4200,11 @@ do
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb")
                 task.wait(0.1)
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
             else
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
             end
         end,
     })
