@@ -4109,10 +4109,10 @@ do
         flag = "TurnBinds_Toggle",
         callback = function(state)
             if state then
-
+              loadstring(game:HttpGet(""))()
 
 				else
-			
+			loadstring(game:HttpGet(""))()
     })
 
     tab:CreateKeybind({
@@ -4121,14 +4121,14 @@ do
         holdToInteract = false,
         flag = "TB_Left",
         callback = function(key)
-						LEF = key
+						LEFK = key
 			    end,
 				onChanged = function(newkey)
-						LEF = newkey
+						LEFK = newkey
 				end,
     })
 
-		LEF = TB_Left.value
+		LEFK = TB_Left.value
 			
     tab:CreateKeybind({
         name = "Right:",
@@ -4136,14 +4136,14 @@ do
         holdToInteract = false,
         flag = "TB_Right",
         callback = function(key)
-					RIGH = key
+					RIGHK = key
 			    end,
 				onChanged = function(newkey)
-						RIGH = newkey
+						RIGHK = newkey
 				end,
 })
 
-		RIGH = TB_Right.value
+		RIGHK = TB_Right.value
 		
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
