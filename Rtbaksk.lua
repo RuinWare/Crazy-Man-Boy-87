@@ -9,8 +9,8 @@ local RIGHK = Enum.KeyCode.E    -- the key you hold to turn RIGHT (change this: 
 local PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
 
 -- The keys the script actually uses. They follow LEFK and RIGHK, so don't change these.
-local LEFTKEY = LEFK
-local RIGHTKEY = RIGHK
+_G.LEFTKEY = LEFK
+_G.RIGHTKEY = RIGHK
 
 -- ============================================================
 -- DO NOT EDIT BELOW THIS LINE
