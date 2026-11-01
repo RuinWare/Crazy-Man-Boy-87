@@ -4187,7 +4187,10 @@ do
                     _G.LEFK = k
                     return
                 end,
-					onChanged = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+					onChanged = [==[
+task.wait(0.1)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+]==]
             end
         end,
     })
