@@ -4123,7 +4123,7 @@ do
         flag = "TB_Left",
         callback = function(key)
 						LEFK = key
-			    end
+			    end,
 				onChanged = function(newkey)
 						LEFK = newkey
 				end,
@@ -4138,7 +4138,7 @@ local LEFK = TB_Left.value
         flag = "TB_Right",
         callback = function(key)
 					RIGHK = key
-			    end
+			    end,
 				onChanged = function(newkey)
 						RIGHK = newkey
 				end,
