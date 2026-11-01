@@ -4122,7 +4122,7 @@ do
     })
 
 -- Capture the returned element objects
-local LeftKeybind = tab:CreateKeybind({
+_G.LeftKeybind = tab:CreateKeybind({
     name = "Left:",
     currentKeybind = "None",
     holdToInteract = true,
@@ -4138,7 +4138,7 @@ local LeftKeybind = tab:CreateKeybind({
     end,
 })
 
-local RightKeybind = tab:CreateKeybind({
+_G.RightKeybind = tab:CreateKeybind({
     name = "Right:",
     currentKeybind = "None",
     holdToInteract = true,
