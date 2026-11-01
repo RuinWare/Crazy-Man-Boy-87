@@ -4118,7 +4118,9 @@ _G.LEFK = TB_Left.value
               loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
 				else
 			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
-    })
+		end
+	end,			
+})
 
     LEFK = tab:CreateKeybind({
         name = "Left:",
