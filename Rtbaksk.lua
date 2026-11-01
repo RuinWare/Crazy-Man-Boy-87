@@ -3,10 +3,10 @@
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-local FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
-local LEFK = Enum.KeyCode.Q     -- the key you hold to turn LEFT  (change this: Enum.KeyCode.Q, Enum.KeyCode.LeftShift, "q" ...)
-local RIGHK = Enum.KeyCode.E    -- the key you hold to turn RIGHT (change this: Enum.KeyCode.E, Enum.KeyCode.RightShift, "e" ...)
-local PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
+FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
+_G.LEFK = LEFK     -- the key you hold to turn LEFT  (change this: Enum.KeyCode.Q, Enum.KeyCode.LeftShift, "q" ...)
+_G.RIGHK = RIGHK    -- the key you hold to turn RIGHT (change this: Enum.KeyCode.E, Enum.KeyCode.RightShift, "e" ...)
+PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
 
 -- The keys the script actually uses. They follow LEFK and RIGHK, so don't change these.
 _G.LEFTKEY = LEFK
