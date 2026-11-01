@@ -1,6 +1,3 @@
-RIGHK = TB_Right.value
-LEFK = TB_Left.value
-
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
@@ -4103,7 +4100,13 @@ do
     getgenv().KTB = 5
     _G.KTB = 5
 
+    getgenv().RIGHK = TB_Right.value
+    getgenv().LEFK = TB_Left.value
 
+_G.RIGHK = TB_Right.value
+_G.LEFK = TB_Left.value
+
+	
     tab:CreateDivider({ text = "Turn Binds" })
 
     tab:CreateToggle({
