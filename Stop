@@ -1,0 +1,99 @@
+-- Turn Binds Off
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+local FLAG = "LEF"      -- the flag of the turn bind to stop (same as in Turn Binds On)
+
+-- ============================================================
+-- DO NOT EDIT BELOW THIS LINE
+-- ============================================================
+-- Stops the turn bind with this flag. The turning stops right away and the camera
+-- goes back to completely normal control (PC and mobile).
+
+local RunService = game:GetService("RunService")
+
+-- Flag rules: no spaces and none of these characters
+local FLAG_FORBIDDEN = [===['";*()^%$+×÷=/€£¥₩`~\|<>{}[]▪︎○●□■♤♡◇♧☆⊙°•¤《》¡¿,.]===]
+
+local function flagProblem(flag)
+	if type(flag) ~= "string" or flag == "" then
+		return "the flag is empty"
+	end
+	if flag:find("%s") then
+		return "the flag contains a space"
+	end
+	local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+	for _, cp in utf8.codes(FLAG_FORBIDDEN) do
+		banned[cp] = true
+	end
+	for _, cp in utf8.codes(flag) do
+		if banned[cp] then
+			return 'the flag contains a character that is not allowed: "' .. utf8.char(cp) .. '"'
+		end
+	end
+	return nil
+end
+
+local flagOk, problem = pcall(flagProblem, FLAG)
+if not flagOk then problem = "the flag is not valid text" end
+if problem then
+	warn("Turn Binds: " .. problem .. " (FLAG = " .. tostring(FLAG) .. ")")
+	return
+end
+
+local BIND = "TurnBind_" .. FLAG -- the On and Off scripts find each other through the flag
+
+pcall(function()
+	RunService:UnbindFromRenderStep(BIND)
+end)
+
+-- Turn Binds Off
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+local FLAG = "RIGH"      -- the flag of the turn bind to stop (same as in Turn Binds On)
+
+-- ============================================================
+-- DO NOT EDIT BELOW THIS LINE
+-- ============================================================
+-- Stops the turn bind with this flag. The turning stops right away and the camera
+-- goes back to completely normal control (PC and mobile).
+
+local RunService = game:GetService("RunService")
+
+-- Flag rules: no spaces and none of these characters
+local FLAG_FORBIDDEN = [===['";*()^%$+×÷=/€£¥₩`~\|<>{}[]▪︎○●□■♤♡◇♧☆⊙°•¤《》¡¿,.]===]
+
+local function flagProblem(flag)
+	if type(flag) ~= "string" or flag == "" then
+		return "the flag is empty"
+	end
+	if flag:find("%s") then
+		return "the flag contains a space"
+	end
+	local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+	for _, cp in utf8.codes(FLAG_FORBIDDEN) do
+		banned[cp] = true
+	end
+	for _, cp in utf8.codes(flag) do
+		if banned[cp] then
+			return 'the flag contains a character that is not allowed: "' .. utf8.char(cp) .. '"'
+		end
+	end
+	return nil
+end
+
+local flagOk, problem = pcall(flagProblem, FLAG)
+if not flagOk then problem = "the flag is not valid text" end
+if problem then
+	warn("Turn Binds: " .. problem .. " (FLAG = " .. tostring(FLAG) .. ")")
+	return
+end
+
+local BIND = "TurnBind_" .. FLAG -- the On and Off scripts find each other through the flag
+
+pcall(function()
+	RunService:UnbindFromRenderStep(BIND)
+end)
