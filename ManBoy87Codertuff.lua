@@ -4125,7 +4125,7 @@ do
         end,
     })
 
-    leftKbObj = tab:CreateKeybind({
+    tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
         holdToInteract = true,
@@ -4141,7 +4141,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Bo
         end,
     })
 
-    rightKbObj = tab:CreateKeybind({
+    tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
         holdToInteract = true,
