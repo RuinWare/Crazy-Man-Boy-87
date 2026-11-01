@@ -4111,20 +4111,32 @@ do
     getgenv().RIGHK = ""
     _G.LEFK = ""
     _G.RIGHK = ""
-    getgenv().KTB = 1
-	_G.KTB = 1
-    local leftWidget, rightWidget
-
-    local function valueToString(v)
+    getgenv().KTB = 5
+    local function toKeyString(v)
         if v == nil then return nil end
         if type(v) == "EnumItem" then return v.Name end
         if type(v) == "string" then
-            local t = v:match("^%s*(.-)%s*$")
-            if t == "" or t == "None" or t == "none" or t == "NONE" then return nil end
-            return t
+            if v == "" or v == "None" or v == "none" or v == "NONE" then return nil end
+            return v
         end
-        if type(v) == "number" then return tostring(v) end
         return nil
+    end
+
+    local function readFlagValue(flagName)
+        local flags = nil
+        if Rayfield and Rayfield.Flags then flags = Rayfield.Flags end
+        if not flags and _G.Rayfield and _G.Rayfield.Flags then flags = _G.Rayfield.Flags end
+        if not flags and getgenv and getgenv().Rayfield and getgenv().Rayfield.Flags then
+            flags = getgenv().Rayfield.Flags
+        end
+        if not flags or not flags[flagName] then return nil end
+        local entry = flags[flagName]
+        local ok, v = pcall(function() return entry.Value end)
+        if ok and v ~= nil then
+            local s = toKeyString(v)
+            if s then return s end
+        end
+        return toKeyString(entry)
     end
 
     tab:CreateDivider({ text = "Turn Binds" })
@@ -4138,61 +4150,33 @@ do
         end,
     })
 
-    leftWidget = tab:CreateKeybind({
+    tab:CreateKeybind({
         name = "Left:",
         currentKeybind = "None",
         holdToInteract = true,
         flag = "TurnBinds_Left",
-        callback = function(a, b)
-            for _, raw in ipairs({ a, b }) do
-                local str = valueToString(raw)
-                if str then
-                    getgenv().LEFK = str
-                    _G.LEFK = str
-                    return
-                end
-            end
-        end,
+        callback = function() end,
     })
 
-    rightWidget = tab:CreateKeybind({
+    tab:CreateKeybind({
         name = "Right:",
         currentKeybind = "None",
         holdToInteract = true,
         flag = "TurnBinds_Right",
-        callback = function(a, b)
-            for _, raw in ipairs({ a, b }) do
-                local str = valueToString(raw)
-                if str then
-                    getgenv().RIGHK = str
-                    _G.RIGHK = str
-                    return
-                end
-            end
-        end,
+        callback = function() end,
     })
 
     RunService.Heartbeat:Connect(function()
-        if leftWidget then
-            local ok, v = pcall(function() return leftWidget.Value end)
-            if ok and v ~= nil then
-                local str = valueToString(v)
-                if str and getgenv().LEFK ~= str then
-                    getgenv().LEFK = str
-                    _G.LEFK = str
-                end
-            end
+        local lk = readFlagValue("TurnBinds_Left")
+        if lk and lk ~= getgenv().LEFK then
+            getgenv().LEFK = lk
+            _G.LEFK = lk
         end
 
-        if rightWidget then
-            local ok, v = pcall(function() return rightWidget.Value end)
-            if ok and v ~= nil then
-                local str = valueToString(v)
-                if str and getgenv().RIGHK ~= str then
-                    getgenv().RIGHK = str
-                    _G.RIGHK = str
-                end
-            end
+        local rk = readFlagValue("TurnBinds_Right")
+        if rk and rk ~= getgenv().RIGHK then
+            getgenv().RIGHK = rk
+            _G.RIGHK = rk
         end
     end)
 
@@ -4215,7 +4199,7 @@ do
         name = "Speed",
         range = {0.3, 20},
         increment = 1,
-        currentValue = 1,
+        currentValue = 5,
         flag = "TurnBinds_Speed",
         callback = function(v)
             getgenv().KTB = v
