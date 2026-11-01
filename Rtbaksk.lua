@@ -4,8 +4,8 @@
 -- SETTINGS
 -- ============================================================
 FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
-LEFT_KEY = TB_LEFT.value          -- hold to turn the camera LEFT  (e.g. "Q", "LeftShift", "Z")
-RIGHT_KEY = TB_RIGHT.value         -- hold to turn the camera RIGHT (e.g. "E", "RightShift", "C")
+LEFT_KEY = LEFK          -- hold to turn the camera LEFT  (e.g. "Q", "LeftShift", "Z")
+RIGHT_KEY = RIGHK         -- hold to turn the camera RIGHT (e.g. "E", "RightShift", "C")
 PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
 
 -- ============================================================
