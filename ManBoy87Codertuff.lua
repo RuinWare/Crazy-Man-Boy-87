@@ -4131,7 +4131,6 @@ do
 				_G.LEFK = TurnBinds_Left.value
 				getgenv().LEFK = TurnBinds_left.value
 			]==]
-		    end
 		end,
 	})
 
@@ -4148,7 +4147,6 @@ do
 				_G.RIGHK = TurnBinds_Right.value
 				getgenv().RIGHK = TurnBinds_Right.value
 			]==]
-         end
     end,
     })
 
