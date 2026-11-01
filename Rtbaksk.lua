@@ -4,13 +4,19 @@
 -- SETTINGS
 -- ============================================================
 FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
-_G.LEFK = LeftKeybind.value     -- the key you hold to turn LEFT  (change this: Enum.KeyCode.Q, Enum.KeyCode.LeftShift, "q" ...)
-_G.RIGHK = RightKeybind.value   -- the key you hold to turn RIGHT (change this: Enum.KeyCode.E, Enum.KeyCode.RightShift, "e" ...)
-PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
+FLAG = "TurnKeys"
 
--- The keys the script actually uses. They follow LEFK and RIGHK, so don't change these.
-_G.LEFTKEY = LeftKeybind.value
-_G.RIGHTKEY = RightKeybind.value
+-- Pull the current bind off the Rayfield keybind objects (stored by the main script).
+-- Rayfield exposes the bind as `.CurrentKeybind`, NOT `.value`.
+local kbL = getgenv().LeftKeybind
+local kbR = getgenv().RightKeybind
+
+LEFK  = kbL and kbL.CurrentKeybind
+RIGHK = kbR and kbR.CurrentKeybind
+PIXELS = getgenv().KTB or 5
+
+LEFTKEY  = LEFK
+RIGHTKEY = RIGHK
 
 -- ============================================================
 -- DO NOT EDIT BELOW THIS LINE
