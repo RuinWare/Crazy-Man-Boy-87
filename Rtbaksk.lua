@@ -4,13 +4,13 @@
 -- SETTINGS
 -- ============================================================
 FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
-_G.LEFK = LeftKeyBind.value     -- the key you hold to turn LEFT  (change this: Enum.KeyCode.Q, Enum.KeyCode.LeftShift, "q" ...)
-_G.RIGHK = RightKeyBind.value   -- the key you hold to turn RIGHT (change this: Enum.KeyCode.E, Enum.KeyCode.RightShift, "e" ...)
+_G.LEFK = LeftKeybind.value     -- the key you hold to turn LEFT  (change this: Enum.KeyCode.Q, Enum.KeyCode.LeftShift, "q" ...)
+_G.RIGHK = RightKeybind.value   -- the key you hold to turn RIGHT (change this: Enum.KeyCode.E, Enum.KeyCode.RightShift, "e" ...)
 PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
 
 -- The keys the script actually uses. They follow LEFK and RIGHK, so don't change these.
-_G.LEFTKEY = LeftKeyBind.value
-_G.RIGHTKEY = RightKeyBind.value
+_G.LEFTKEY = LeftKeybind.value
+_G.RIGHTKEY = RightKeybind.value
 
 -- ============================================================
 -- DO NOT EDIT BELOW THIS LINE
