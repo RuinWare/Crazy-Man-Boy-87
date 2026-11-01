@@ -3,10 +3,14 @@
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
-LEFT_KEY = "(LEFK)"          -- hold to turn the camera LEFT  (e.g. "Q", "LeftShift", "Z")
-RIGHT_KEY = "(RIGHK)"         -- hold to turn the camera RIGHT (e.g. "E", "RightShift", "C")
-PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
+local FLAG = "TurnKeys"       -- name of this key setup (the Off script needs the same flag)
+local LEFK = Enum.KeyCode.Q     -- the key you hold to turn LEFT  (change this: Enum.KeyCode.Q, Enum.KeyCode.LeftShift, "q" ...)
+local RIGHK = Enum.KeyCode.E    -- the key you hold to turn RIGHT (change this: Enum.KeyCode.E, Enum.KeyCode.RightShift, "e" ...)
+local PIXELS = KTB              -- how far a mouse would move every frame, in pixels (decimals work too, like 0.5)
+
+-- The keys the script actually uses. They follow LEFK and RIGHK, so don't change these.
+local LEFTKEY = LEFK
+local RIGHTKEY = RIGHK
 
 -- ============================================================
 -- DO NOT EDIT BELOW THIS LINE
@@ -59,21 +63,32 @@ end))
 
 local player = Players.LocalPlayer
 
-local function getKey(name)
-	local ok, key = pcall(function() return Enum.KeyCode[tostring(name)] end)
-	if ok and key and key ~= Enum.KeyCode.Unknown then return key end
+local function getKey(value)
+	if typeof(value) == "EnumItem" then
+		if value.EnumType == Enum.KeyCode and value ~= Enum.KeyCode.Unknown then
+			return value
+		end
+		return nil
+	end
+	-- a key name also works, in any letter case ("Q", "q", "LeftShift" ...)
+	local wanted = string.lower(tostring(value))
+	for _, item in ipairs(Enum.KeyCode:GetEnumItems()) do
+		if item ~= Enum.KeyCode.Unknown and string.lower(item.Name) == wanted then
+			return item
+		end
+	end
 	return nil
 end
 
-local leftKey = getKey(LEFT_KEY)
-local rightKey = getKey(RIGHT_KEY)
-if not leftKey or not rightKey then
-	warn('Turn Binds Keys: LEFT_KEY and RIGHT_KEY must be real key names like "Q", "E" or "LeftShift" (LEFT_KEY = '
-		.. tostring(LEFT_KEY) .. ", RIGHT_KEY = " .. tostring(RIGHT_KEY) .. ")")
+LEFTKEY = getKey(LEFTKEY)
+RIGHTKEY = getKey(RIGHTKEY)
+if not LEFTKEY or not RIGHTKEY then
+	warn("Turn Binds Keys: LEFK and RIGHK must be keys like Enum.KeyCode.Q or Enum.KeyCode.LeftShift (LEFK = "
+		.. tostring(LEFK) .. ", RIGHK = " .. tostring(RIGHK) .. ")")
 	return
 end
-if leftKey == rightKey then
-	warn("Turn Binds Keys: LEFT_KEY and RIGHT_KEY need to be different keys.")
+if LEFTKEY == RIGHTKEY then
+	warn("Turn Binds Keys: LEFK and RIGHK need to be different keys.")
 	return
 end
 if type(PIXELS) ~= "number" or PIXELS <= 0 then
@@ -158,17 +173,17 @@ end
 -- Keys
 connections[#connections + 1] = UserInputService.InputBegan:Connect(function(input)
 	if UserInputService:GetFocusedTextBox() then return end
-	if input.KeyCode == leftKey then
+	if input.KeyCode == LEFTKEY then
 		leftHeld = true
-	elseif input.KeyCode == rightKey then
+	elseif input.KeyCode == RIGHTKEY then
 		rightHeld = true
 	end
 end)
 
 connections[#connections + 1] = UserInputService.InputEnded:Connect(function(input)
-	if input.KeyCode == leftKey then
+	if input.KeyCode == LEFTKEY then
 		leftHeld = false
-	elseif input.KeyCode == rightKey then
+	elseif input.KeyCode == RIGHTKEY then
 		rightHeld = false
 	else
 		return
