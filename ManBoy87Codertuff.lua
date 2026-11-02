@@ -4096,12 +4096,57 @@ TB
 ]]--
 
 do
-    getgenv().LEFK  = ""
-    getgenv().RIGHK = ""
-    _G.LEFK  = ""
-    _G.RIGHK = ""
-    getgenv().KTB = 5
-    _G.KTB = 5
+    -- ============================================
+    -- EDIT THESE URLS
+    -- ============================================
+    local OFF_URL = ""  -- runs when Turn Binds toggle turns OFF
+
+    -- One URL per dropdown option. Leave empty ("") to disable that option.
+    local OPTION_URLS = {
+        ["A + D"]          = "",
+        ["Arrow Keys"]     = "",
+        ["F + H"]          = "",
+        ["Q + E"]          = "",
+        ["N + M"]          = "",
+        ["1 + 2"]          = "",
+        ["D + A"]          = "",
+        ["Rev Arrow Keys"] = "",
+    }
+    -- ============================================
+
+	getgenv().KTB = 5
+	_G.KTB = 5
+
+    local bindEnabled = false
+    local currentOption = "A + D"
+    local runningOption = nil
+
+    local function runUrl(url)
+        if not url or url == "" then return end
+        if not loadstring then return end
+        local ok, src = pcall(function() return game:HttpGet(url) end)
+        if not ok or not src then return end
+        local fn = loadstring(src)
+        if fn then pcall(fn) end
+    end
+
+    local function stopCurrent()
+        if runningOption then
+            runUrl(OFF_URL)
+            runningOption = nil
+        end
+    end
+
+    local function startCurrent()
+        if not bindEnabled then return end
+        if runningOption == currentOption then return end
+        stopCurrent()
+        local url = OPTION_URLS[currentOption]
+        if url and url ~= "" then
+            runUrl(url)
+            runningOption = currentOption
+        end
+    end
 
     tab:CreateDivider({ text = "Turn Binds" })
 
@@ -4110,34 +4155,30 @@ do
         currentValue = false,
         flag = "TurnBinds_Toggle",
         callback = function(v)
+            bindEnabled = v
             if v then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rtbaksk.lua"))()
+                startCurrent()
             else
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Turnbof.lua"))()
+                stopCurrent()
+                runUrl(OFF_URL)
             end
         end,
     })
 
-    -- Use the `key` argument — it *is* the new bind. Never read .value.
-    getgenv().LeftKeybind = tab:CreateKeybind({
-        name = "Left:",
-        currentKeybind = "None",
-        holdToInteract = true,
-        flag = "TurnBinds_Left",
-        callback = function(key)
-            _G.LEFK        = key
-            getgenv().LEFK = key
-        end,
-    })
-
-    getgenv().RightKeybind = tab:CreateKeybind({
-        name = "Right:",
-        currentKeybind = "None",
-        holdToInteract = true,
-        flag = "TurnBinds_Right",
-        callback = function(key)
-            _G.RIGHK        = key
-            getgenv().RIGHK = key
+    tab:CreateDropdown({
+        name = "Keys",
+        options = { "A + D", "Arrow Keys", "F + H", "Q + E", "N + M", "1 + 2", "D + A", "Rev Arrow Keys" },
+        currentOption = { "A + D" },
+        multiSelect = false,
+        flag = "TurnBinds_Keys",
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if not pick or pick == currentOption then return end
+            currentOption = pick
+            if bindEnabled then
+                stopCurrent()
+                startCurrent()
+            end
         end,
     })
 
@@ -4147,18 +4188,18 @@ do
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb")
                 task.wait(0.1)
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
             else
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb"))()
+                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
             end
         end,
     })
 
     tab:CreateSlider({
         name = "Speed",
-        range = {0.3, 20},
+        range = {1, 10},
         increment = 1,
         currentValue = 5,
         flag = "TurnBinds_Speed",
