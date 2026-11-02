@@ -4190,7 +4190,7 @@ do
             if v then
                 runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Left-Turn-Binds-Mobile")
                 task.wait(0.1)
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
+                runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Right-Turn-Binds-Mobile")
             else
                 runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
             end
