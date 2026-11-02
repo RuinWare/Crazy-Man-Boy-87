@@ -4423,7 +4423,7 @@ end
 
 do
     local BUTTON_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-Body"
-    local DELETE_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Button-delete"
+    local DELETE_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-Delete"
 
     local BUTTON_BODY = game:HttpGet(BUTTON_URL)
     local DELETE_BODY = game:HttpGet(DELETE_URL)
