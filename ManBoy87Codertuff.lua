@@ -4192,7 +4192,7 @@ do
                 task.wait(0.1)
                 runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Right-Turn-Binds-Mobile")
             else
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Deletetbmb")
+                runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Delete-Turn-Binds-Mobile")
             end
         end,
     })
