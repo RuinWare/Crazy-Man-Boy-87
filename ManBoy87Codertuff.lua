@@ -4188,7 +4188,7 @@ do
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
-                runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Lefttb")
+                runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Left-Turn-Binds-Mobile")
                 task.wait(0.1)
                 runUrl("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rightb")
             else
