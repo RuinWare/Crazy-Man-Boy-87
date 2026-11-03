@@ -3090,7 +3090,7 @@ local SYSTEM = "CustomShiftlockSystem" -- detection system is running
 
 if player:GetAttribute(SYSTEM) then return end -- already running
 
-local event = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+local Event = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
 
 local systemOn = true
 local active = false
@@ -3276,7 +3276,7 @@ local SYSTEM = "CustomShiftlockBackSystem"
 
 if player:GetAttribute(SYSTEM) then return end
 
-local event = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CharacterTask")
+local Event = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
 
 local systemOn = true
 local active = false
