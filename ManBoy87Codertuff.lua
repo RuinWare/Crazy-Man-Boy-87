@@ -4008,7 +4008,7 @@ local function sendNotify()
 
     -- 1. Try Rayfield (Capitalized keys are required for Gen2)
     local success = pcall(function()
-        Rayfield:Notify(payload)
+        window:Notify(payload)
     end)
 
     -- 2. If that fails (due to hook restrictions), use native Roblox notification
