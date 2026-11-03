@@ -4296,7 +4296,7 @@ do
 tab:CreateToggle({
     name = "Only Trigger In Air",
     flag = "OIAAS_AS",
-    value = false,
+    currentValue = false,
     callback = function(value)
 		getgenv().OIAAS = value
 		_G.OIAAS = value
