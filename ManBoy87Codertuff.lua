@@ -4099,7 +4099,7 @@ do
     -- ============================================
     -- EDIT THESE URLS
     -- ============================================
-    local OFF_URL = ""  -- runs when Turn Binds toggle turns OFF
+    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Delete-TB-pc"  -- runs when Turn Binds toggle turns OFF
 
     -- One URL per dropdown option. Leave empty ("") to disable that option.
     local OPTION_URLS = {
