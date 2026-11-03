@@ -4103,14 +4103,14 @@ do
 
     -- One URL per dropdown option. Leave empty ("") to disable that option.
     local OPTION_URLS = {
-        ["A + D"]          = "",
-        ["Arrow Keys"]     = "",
-        ["F + H"]          = "",
-        ["Q + E"]          = "",
-        ["N + M"]          = "",
-        ["1 + 2"]          = "",
-        ["D + A"]          = "",
-        ["Rev Arrow Keys"] = "",
+        ["A + D"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-AD",
+        ["Arrow Keys"]     = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-ARROWKEYS",
+        ["F + H"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-FH",
+        ["Q + E"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-QE",
+        ["N + M"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-NM",
+        ["1 + 2"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-12",
+        ["D + A"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-DA",
+        ["Rev Arrow Keys"] = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-RARROWKEYS",
     }
     -- ============================================
 
