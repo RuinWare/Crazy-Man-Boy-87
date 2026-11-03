@@ -4000,20 +4000,11 @@ do
     end
 
     local function sendNotify()
-        local payload = {
+        window:notify({
             title = "STREAK AT RISK!",
             content = "You have been downed, leave the game to save your streak.",
             duration = 8,
         }
-        local ok = pcall(function() window:Notify(payload) end)
-        if ok then return end
-        ok = pcall(function() Rayfield:Notify(payload) end)
-        if ok then return end
-        pcall(function()
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "STREAK AT RISK!",
-                Text = "You have been downed, leave the game to save your streak.",
-                Duration = 8,
             })
         end)
     end
