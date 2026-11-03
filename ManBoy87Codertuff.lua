@@ -4212,6 +4212,62 @@ end
 
 --[[
 ============================================================================
+AUTO STRAFE
+============================================================================
+]]--
+
+do
+    -- ========================================
+    -- EDIT THESE URLs
+    -- ========================================
+    local ON_URL  = "https://example.com/auto-strafe-on.lua"
+    local OFF_URL = "https://example.com/auto-strafe-off.lua"
+    -- ========================================
+
+    local autoStrafeEnabled = false
+
+    local function runURL(url)
+        if not url or url == "" then return end
+        local ok = pcall(function()
+            local src = game:HttpGet(url)
+            if loadstring then
+                loadstring(src)()
+            elseif getgenv and getgenv().loadstring then
+                getgenv().loadstring(src)()
+            end
+        end)
+        return ok
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Auto Strafe",
+        currentValue = false,
+        flag = "AutoStrafe_Toggle",
+        callback = function(v)
+            autoStrafeEnabled = v
+            if v then
+                runURL(ON_URL)
+            else
+                runURL(OFF_URL)
+            end
+        end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["AutoStrafe"] = function(v)
+        autoStrafeEnabled = v
+        if v then
+            runURL(ON_URL)
+        else
+            runURL(OFF_URL)
+        end
+    end
+end
+
+--[[
+============================================================================
 
 V     I     S     U     A     L     S          (     T     A     B     )
 
