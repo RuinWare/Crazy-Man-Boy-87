@@ -3206,7 +3206,7 @@ local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
 	local method = getnamecallmethod()
 
-	if systemOn and self == event and method == "FireServer" then
+	if systemOn and self == Event and method == "FireServer" then
 		local action, value = ...
 		if action == "Emote" and type(value) == "number" then
 			if value == 0 then
@@ -3392,7 +3392,7 @@ local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
 	local method = getnamecallmethod()
 
-	if systemOn and self == event and method == "FireServer" then
+	if systemOn and self == Event and method == "FireServer" then
 		local action, value = ...
 		if action == "Emote" and type(value) == "number" then
 			if value == 0 then
