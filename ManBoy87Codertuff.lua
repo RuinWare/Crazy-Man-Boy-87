@@ -4220,10 +4220,14 @@ do
     -- ========================================
     -- EDIT THESE URLs
     -- ========================================
-    local ON_URL  = "https://example.com/auto-strafe-on.lua"
-    local OFF_URL = "https://example.com/auto-strafe-off.lua"
+    local ON_URL  = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Auto-strafe-on"
+    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Auto-strafe-off"
     -- ========================================
 
+	getgenv().KAS = 5
+	_G.KAS = 5
+	getgenv().JSDZ = 0.1
+	_G.JSDZ = 0.1
     local autoStrafeEnabled = false
 
     local function runURL(url)
@@ -4264,6 +4268,30 @@ do
             runURL(OFF_URL)
         end
     end
+
+    tab:CreateSlider({
+        name = "Speed",
+        range = {1, 10},
+        increment = 1,
+        currentValue = 5,
+        flag = "AutoStrafe_Speed",
+        callback = function(v)
+            getgenv().KAS = v
+            _G.KAS = v
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Joystick Deadzone",
+        range = {0, 1},
+        increment = 0.1,
+        currentValue = 0.1,
+        flag = "Joystickdz_as",
+        callback = function(v)
+            getgenv().JSDZ = v
+            _G.JSDZ = v
+        end,
+    })
 end
 
 --[[
