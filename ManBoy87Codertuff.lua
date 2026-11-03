@@ -4001,12 +4001,10 @@ do
 
     local function sendNotify()
         window:notify({
-            title = "STREAK AT RISK!",
+            title = "Auto Streak Saver",
             content = "You have been downed, leave the game to save your streak.",
             duration = 8,
-        }
-            })
-        end)
+       })
     end
 
     local function triggerStreakSaver()
