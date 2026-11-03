@@ -4292,6 +4292,20 @@ do
             _G.JSDZ = v
         end,
     })
+
+tab:CreateToggle({
+    name = "Only Trigger In Air",
+    flag = "OIAAS_AS",
+    value = false,
+    callback = function(v)
+        if v then
+		        	getgenv().OIAAS = true
+			        _G.OIAAS = true
+				else
+			        getgenv().OIAAS = false
+					_G.OIAAS = false
+    end,
+})
 end
 
 --[[
