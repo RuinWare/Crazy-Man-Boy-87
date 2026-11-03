@@ -4290,7 +4290,6 @@ do
         callback = function(v)
             getgenv().JSDZ = v
             _G.JSDZ = v
-			end
 		end,
     })
 
@@ -4301,6 +4300,7 @@ tab:CreateToggle({
     callback = function(value)
 		getgenv().OIAAS = value
 		_G.OIAAS = value
+		end
     end,
     })
 end
