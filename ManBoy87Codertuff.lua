@@ -4290,7 +4290,8 @@ do
         callback = function(v)
             getgenv().JSDZ = v
             _G.JSDZ = v
-        end,
+			end
+		end,
     })
 
 tab:CreateToggle({
