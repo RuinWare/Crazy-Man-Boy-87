@@ -4000,7 +4000,7 @@ do
     end
 
     local function sendNotify()
-        window:notify({
+        window:Notify({
             title = "Auto Streak Saver",
             content = "You have been downed, leave the game to save your streak.",
             duration = 8,
