@@ -3999,12 +3999,27 @@ do
         end
     end
 
-    local function sendNotify()
-        window:Notify({
-            title = "Auto Streak Saver",
-            content = "You have been downed, leave the game to save your streak.",
-            duration = 8,
-       })
+local function sendNotify()
+    local payload = {
+        Title = "STREAK AT RISK!",
+        Content = "You have been downed, leave the game to save your streak.",
+        Duration = 8,
+    }
+
+    -- 1. Try Rayfield (Capitalized keys are required for Gen2)
+    local success = pcall(function()
+        Rayfield:Notify(payload)
+    end)
+
+    -- 2. If that fails (due to hook restrictions), use native Roblox notification
+    if not success then
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = payload.Title,
+                Text = payload.Content,
+                Duration = payload.Duration,
+            })
+        end)
     end
 
     local function triggerStreakSaver()
