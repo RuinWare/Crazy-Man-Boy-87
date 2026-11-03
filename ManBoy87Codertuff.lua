@@ -4021,6 +4021,7 @@ local function sendNotify()
             })
         end)
     end
+	end
 
     local function triggerStreakSaver()
         if triggered then return end
