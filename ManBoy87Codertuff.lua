@@ -4019,8 +4019,8 @@ local function sendNotify()
                 Text = payload.Content,
                 Duration = payload.Duration,
             })
-        end)
-    end
+            end)
+        end
 	end
 
     local function triggerStreakSaver()
