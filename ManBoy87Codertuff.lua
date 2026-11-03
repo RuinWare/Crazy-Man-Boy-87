@@ -3999,14 +3999,13 @@ do
         end
     end
 
-local function sendNotify() = [==[ 
-    window:Notify({
-        title = "Auto Streak Saver",
-        content = "You have been downed, leave the game to save your streak.",
-        duration = 8,
-    })
-]==]
-end
+    local function sendNotify()
+        window:notify({
+            title = "Auto Streak Saver",
+            content = "You have been downed, leave the game to save your streak.",
+            duration = 8,
+       })
+    end
 
     local function triggerStreakSaver()
         if triggered then return end
