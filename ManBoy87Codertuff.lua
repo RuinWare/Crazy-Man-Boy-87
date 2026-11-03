@@ -297,7 +297,7 @@ E     D     I     T     S
 
 	tab:CreateInput({
 		name = "Current Emote",
-                icon = 75272415197329,
+                icon = 130515857256476,
 		placeholder = "e.g. Smug Dance",
 		callback = function(text)
 			local found = findEmote(text)
@@ -327,7 +327,7 @@ E     D     I     T     S
 
 	tab:CreateInput({
 		name = "Variant",
-                icon = 138273988376377,
+                icon = 96729358707744,
 		placeholder = "1",
 		numeric = true,
 		callback = function(text)
@@ -341,7 +341,7 @@ E     D     I     T     S
 
 	local EmoteDropdown = tab:CreateDropdown({
 		name = "Emote List",
-                icon = 119388489350677,
+                icon = 94713520185581,
 		options = buildEmoteList(),
 		multiSelect = false,
 		callback = function(selected)
@@ -352,7 +352,7 @@ E     D     I     T     S
 
 	tab:CreateButton({
 		name = "Change Emotes",
-        icon = 96709237281649,
+        icon = 105433648935304,
 		callback = function()
 			local target = state.Current
 			if not target then
