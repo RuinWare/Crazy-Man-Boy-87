@@ -1920,6 +1920,7 @@ do
 
     tab:CreateToggle({
         name = "Pixel Surf",
+		icon = 76201258239230,
         currentValue = false,
         flag = "PixelSurf_Toggle",
         callback = function(v)
@@ -3654,6 +3655,7 @@ do
 
     tab:CreateToggle({
         name = "Character Spin",
+		icon = 105033161351299,
         currentValue = false,
         flag = "CharacterSpin_Toggle",
         callback = function(v)
@@ -3671,6 +3673,7 @@ _G.RWCallbacks["CharacterSpin"] = function(v) spinEnabled = v; if not v then spi
 
     tab:CreateDropdown({
         name = "Rotation",
+		icon = 110016491347992,
         options = { "Clockwise", "Counterclockwise" },
         currentOption = { "Clockwise" },
         multiSelect = false,
@@ -3682,6 +3685,7 @@ _G.RWCallbacks["CharacterSpin"] = function(v) spinEnabled = v; if not v then spi
 
     tab:CreateSlider({
         name = "Spin Speed",
+		icon = 79297485010070,
         range = {0.1, 10},
         increment = 0.1,
         suffix = " RPS",
@@ -4024,11 +4028,13 @@ do
 
     tab:CreateButton({
         name = "Lag Switch",
+		icon = 122975828478366,
         callback = triggerLag,
     })
 
     tab:CreateSlider({
         name = "Lag Duration",
+		icon = 136077598178846,
         range = {0.1, 5},
         increment = 0.1,
         suffix = "s",
@@ -4755,6 +4761,7 @@ end
 
         ScriptTab:CreateToggle({
             name = featureName,
+			icon = 111553543036308,
             flag = "MBToggle_" .. cbName,
             currentValue = false,
             callback = function(v)
@@ -4777,6 +4784,7 @@ end
 
     ScriptTab:CreateButton({
         name = "Reset Mobile Button Positions",
+		icon = ,
         callback = function()
             local Players = game:GetService("Players")
             local CollectionService = game:GetService("CollectionService")
@@ -4871,6 +4879,7 @@ do
         local featureName, cbName, ftype = f[1], f[2], f[3] or "toggle"
         ScriptTab:CreateKeybind({
             name = featureName,
+			icon = 88092308369759,
             currentKeybind = "None",
             holdToInteract = false,
             flag = "KB_" .. cbName,
