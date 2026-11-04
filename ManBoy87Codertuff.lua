@@ -1856,6 +1856,93 @@ _G.RWCallbacks["YLock"] = function(v) yLockEnabled = v; toggleYLock(v) end
 
 --[[
 ============================================================================
+PX SURF
+============================================================================
+]]--
+
+do
+    -- ========================================
+    -- EDIT THESE URLs
+    -- ========================================
+    local ON_URL  = "https://example.com/pixel-surf-on.lua"
+    local OFF_URL = "https://example.com/pixel-surf-off.lua"
+    -- ========================================
+
+    local pixelSurfEnabled = false
+    local pixelSurfActive = false
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+    local function runURL(url)
+        if not url or url == "" then return end
+        pcall(function()
+            local src = game:HttpGet(url)
+            if loadstring then loadstring(src)() end
+        end)
+    end
+
+    local function isTouchingWall(char, root)
+        rayParams.FilterDescendantsInstances = {char}
+        local origin = root.Position
+        for i = 0, 7 do
+            local angle = (math.pi / 4) * i
+            local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+            local result = workspace:Raycast(origin, dir * 1.5, rayParams)
+            if result then
+                return true
+            end
+        end
+        return false
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not pixelSurfEnabled then return end
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+
+        local airborne = hum.FloorMaterial == Enum.Material.Air
+        local shouldActivate = airborne and isTouchingWall(char, root)
+
+        if shouldActivate and not pixelSurfActive then
+            pixelSurfActive = true
+            runURL(ON_URL)
+        elseif not shouldActivate and pixelSurfActive then
+            pixelSurfActive = false
+            runURL(OFF_URL)
+        end
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Pixel Surf",
+        currentValue = false,
+        flag = "PixelSurf_Toggle",
+        callback = function(v)
+            pixelSurfEnabled = v
+            if not v and pixelSurfActive then
+                pixelSurfActive = false
+                runURL(OFF_URL)
+            end
+        end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["PixelSurf"] = function(v)
+        pixelSurfEnabled = v
+        if not v and pixelSurfActive then
+            pixelSurfActive = false
+            runURL(OFF_URL)
+        end
+    end
+end
+
+--[[
+============================================================================
 F JUMP
 ============================================================================
 ]]--
@@ -4526,8 +4613,8 @@ do
     -- Host these WITHOUT the TEXT/FLAG/OnCode/OffCode/RunCode lines.
     -- Body starts at:  local TEXT_SIZE = 18
     -- ========================================
-    local TOGGLE_MB_URL = "https://example.com/toggle-mb-body.lua"
-    local BUTTON_MB_URL = "https://example.com/button-mb-body.lua"
+    local TOGGLE_MB_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-Body-toggle"
+    local BUTTON_MB_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-body-bhtton"
     -- ========================================
 
     local toggleCache, buttonCache
