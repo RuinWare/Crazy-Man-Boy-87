@@ -4784,7 +4784,7 @@ end
 
     ScriptTab:CreateButton({
         name = "Reset Mobile Button Positions",
-		icon = ,
+		icon = 122975828478366,
         callback = function()
             local Players = game:GetService("Players")
             local CollectionService = game:GetService("CollectionService")
@@ -4868,6 +4868,7 @@ do
 
     ScriptTab:CreateButton({
         name = "Reset All Keybind States",
+		icon = 122975828478366,
         callback = function()
             for k in pairs(kbStates) do
                 kbStates[k] = false
