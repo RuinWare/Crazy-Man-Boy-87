@@ -4521,63 +4521,146 @@ do
 end
 
 do
-    local BUTTON_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-Body"
-    local DELETE_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-Delete"
+    -- ========================================
+    -- EDIT THESE URLS
+    -- Host these WITHOUT the TEXT/FLAG/OnCode/OffCode/RunCode lines.
+    -- Body starts at:  local TEXT_SIZE = 18
+    -- ========================================
+    local TOGGLE_MB_URL = "https://example.com/toggle-mb-body.lua"
+    local BUTTON_MB_URL = "https://example.com/button-mb-body.lua"
+    -- ========================================
 
-    local BUTTON_BODY = game:HttpGet(BUTTON_URL)
-    local DELETE_BODY = game:HttpGet(DELETE_URL)
+    local toggleCache, buttonCache
 
-    local function buildButtonSource(name, flag, onBody, offBody)
-        return 'local TEXT = ' .. string.format("%q", name) .. '\n' ..
-               'local FLAG = ' .. string.format("%q", flag) .. '\n' ..
-               'local function OnCode()\n' .. onBody .. '\nend\n' ..
-               'local function OffCode()\n' .. offBody .. '\nend\n' ..
-               BUTTON_BODY
+    local function getURL(url)
+        local ok, src = pcall(game.HttpGet, game, url)
+        if ok and type(src) == "string" then return src end
+        return nil
     end
+
+    local function buildToggleSource(name, flag, cbName)
+        if not toggleCache then toggleCache = getURL(TOGGLE_MB_URL) end
+        if not toggleCache then return nil end
+        local header = 'local TEXT = ' .. string.format("%q", name) .. '\n'
+            .. 'local FLAG = ' .. string.format("%q", flag) .. '\n'
+            .. 'local function OnCode()\n'
+            .. '_G.RWSet(' .. string.format("%q", cbName) .. ', true)\n'
+            .. 'end\n'
+            .. 'local function OffCode()\n'
+            .. '_G.RWSet(' .. string.format("%q", cbName) .. ', false)\n'
+            .. 'end\n'
+        return header .. toggleCache
+    end
+
+    local function buildButtonSource(name, flag, cbName)
+        if not buttonCache then buttonCache = getURL(BUTTON_MB_URL) end
+        if not buttonCache then return nil end
+        local header = 'local TEXT = ' .. string.format("%q", name) .. '\n'
+            .. 'local FLAG = ' .. string.format("%q", flag) .. '\n'
+            .. 'local function RunCode()\n'
+            .. 'if _G.RWCallbacks and _G.RWCallbacks[' .. string.format("%q", cbName) .. '] then\n'
+            .. '_G.RWCallbacks[' .. string.format("%q", cbName) .. ']()\n'
+            .. 'end\n'
+            .. 'end\n'
+        return header .. buttonCache
+    end
+
+    local DELETE_BODY = [==[
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
+local TAG = "DraggableBoxGui"
+local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+local function collectGuis()
+	local list, seen = {}, {}
+	local function add(inst)
+		if inst:IsA("ScreenGui") and not seen[inst] then
+			seen[inst] = true
+			list[#list + 1] = inst
+		end
+	end
+	for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
+	local function scan(container)
+		if not container then return end
+		local ok, children = pcall(function() return container:GetChildren() end)
+		if not ok then return end
+		for _, child in ipairs(children) do
+			if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
+		end
+	end
+	scan(playerGui)
+	pcall(function() scan(game:GetService("CoreGui")) end)
+	if gethui then pcall(function() scan(gethui()) end) end
+	return list
+end
+local FADE_TIME = 0.12
+local SHRINK_TIME = 0.15
+local function fade(obj, time, props, style, direction)
+	TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out), props):Play()
+end
+local function remove(gui)
+	local scale = gui:FindFirstChild("PopScale", true)
+	if not scale then gui:Destroy() return end
+	fade(scale, SHRINK_TIME, { Scale = 0.75 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	for _, d in ipairs(gui:GetDescendants()) do
+		if d:IsA("UIStroke") then fade(d, FADE_TIME, { Transparency = 1 })
+		elseif d:IsA("GuiObject") then
+			fade(d, FADE_TIME, { BackgroundTransparency = 1 })
+			if d:IsA("TextLabel") or d:IsA("TextButton") then fade(d, FADE_TIME, { TextTransparency = 1 })
+			elseif d:IsA("ImageLabel") then fade(d, FADE_TIME, { ImageTransparency = 1 })
+			elseif d:IsA("CanvasGroup") then fade(d, FADE_TIME, { GroupTransparency = 1 }) end
+		end
+	end
+	task.delay(SHRINK_TIME + 0.02, function() if gui.Parent then gui:Destroy() end end)
+end
+for _, gui in ipairs(collectGuis()) do
+	if gui:GetAttribute("Flag") == FLAG then remove(gui) end
+end
+]==]
 
     local function buildDeleteSource(flag)
         return 'local FLAG = ' .. string.format("%q", flag) .. '\n' .. DELETE_BODY
     end
 
     local function runSource(src)
+        if not src then return end
         if not loadstring then return end
         local ok, fn = pcall(loadstring, src)
         if ok and fn then pcall(fn) end
     end
 
     local FEATURES = {
-        { "Auto Jump",                       "MB_AutoJump",        "AutoJump" },
-        { "Legit Jump",                      "MB_LegitJump",       "LegitJump" },
-        { "Hold Jump",                       "MB_HoldJump",        "HoldJump" },
-        { "Easy Bounce",                     "MB_EasyBounce",      "EasyBounce" },
-        { "Hard Bounce",                     "MB_HardBounce",      "HardBounce" },
-        { "Legit Bounce",                    "MB_LegitBounce",     "LegitBounce" },
-        { "Inf Slide",                       "MB_InfSlide",        "InfSlide" },
-        { "Y Lock",                          "MB_YLock",           "YLock" },
-        { "Frontal Jump",                    "MB_FrontalJump",     "FrontalJump" },
-        { "Backward Jump",                   "MB_BackwardJump",    "BackwardJump" },
-        { "Speed Changer",                   "MB_SpeedChanger",    "SpeedChanger" },
-        { "TP Walk",                         "MB_TPWalk",          "TPWalk" },
-        { "Instant Acceleration",            "MB_InstantAccel",    "InstantAccel" },
-        { "Friction Changer",                "MB_FrictionChanger", "FrictionChanger" },
-        { "Air Strafe Acceleration Changer", "MB_AirStrafe",       "AirStrafe" },
-        { "Jump Cap Changer",                "MB_JumpCap",         "JumpCap" },
-        { "Gravity Changer",                 "MB_GravityChanger",  "GravityChanger" },
-        { "Jump Height Changer",             "MB_JumpHeight",      "JumpHeight" },
-        { "Emote Run",                       "MB_EmoteRun",        "EmoteRun" },
-        { "Character Spin",                  "MB_CharacterSpin",   "CharacterSpin" },
-        { "Player Rotation Changer",         "MB_PlayerRotate",    "PlayerRotate" },
-        { "Fly",                             "MB_Fly",             "Fly" },
-        { "Down Fly",                        "MB_DownFly",         "DownFly" },
+        { "Auto Jump",                       "MB_AutoJump",        "AutoJump",        "toggle" },
+        { "Legit Jump",                      "MB_LegitJump",       "LegitJump",       "toggle" },
+        { "Hold Jump",                       "MB_HoldJump",        "HoldJump",        "toggle" },
+        { "Easy Bounce",                     "MB_EasyBounce",      "EasyBounce",      "toggle" },
+        { "Hard Bounce",                     "MB_HardBounce",      "HardBounce",      "toggle" },
+        { "Legit Bounce",                    "MB_LegitBounce",     "LegitBounce",     "toggle" },
+        { "Inf Slide",                       "MB_InfSlide",        "InfSlide",        "toggle" },
+        { "Y Lock",                          "MB_YLock",           "YLock",           "toggle" },
+        { "Frontal Jump",                    "MB_FrontalJump",     "FrontalJump",     "toggle" },
+        { "Backward Jump",                   "MB_BackwardJump",    "BackwardJump",    "toggle" },
+        { "Speed Changer",                   "MB_SpeedChanger",    "SpeedChanger",    "toggle" },
+        { "TP Walk",                         "MB_TPWalk",          "TPWalk",          "toggle" },
+        { "Instant Acceleration",            "MB_InstantAccel",    "InstantAccel",    "toggle" },
+        { "Friction Changer",                "MB_FrictionChanger", "FrictionChanger", "toggle" },
+        { "Air Strafe Acceleration Changer", "MB_AirStrafe",       "AirStrafe",       "toggle" },
+        { "Jump Cap Changer",                "MB_JumpCap",         "JumpCap",         "toggle" },
+        { "Gravity Changer",                 "MB_GravityChanger",  "GravityChanger",  "toggle" },
+        { "Jump Height Changer",             "MB_JumpHeight",      "JumpHeight",      "toggle" },
+        { "Emote Run",                       "MB_EmoteRun",        "EmoteRun",        "toggle" },
+        { "Character Spin",                  "MB_CharacterSpin",   "CharacterSpin",   "toggle" },
+        { "Player Rotation Changer",         "MB_PlayerRotate",    "PlayerRotate",    "toggle" },
+        { "Fly",                             "MB_Fly",             "Fly",             "toggle" },
+        { "Down Fly",                        "MB_DownFly",         "DownFly",         "toggle" },
+        { "Pixel Surf",                      "MB_PixelSurf",       "PixelSurf",       "toggle" },
+        { "Lag Switch",                      "MB_LagSwitch",       "LagSwitch",       "button" },
     }
 
     ScriptTab:CreateDivider({ text = "Mobile Buttons" })
 
     for _, f in ipairs(FEATURES) do
-        local featureName, flag, cbName = f[1], f[2], f[3]
-        local onBody = '_G.RWSet("' .. cbName .. '", true)'
-        local offBody = '_G.RWSet("' .. cbName .. '", false)'
-        local buttonSrc = buildButtonSource(featureName, flag, onBody, offBody)
+        local featureName, flag, cbName, ftype = f[1], f[2], f[3], f[4]
         local deleteSrc = buildDeleteSource(flag)
 
         ScriptTab:CreateToggle({
@@ -4586,42 +4669,101 @@ do
             currentValue = false,
             callback = function(v)
                 if v then
-                    runSource(buttonSrc)
+                    local src
+                    if ftype == "button" then
+                        src = buildButtonSource(featureName, flag, cbName)
+                    else
+                        src = buildToggleSource(featureName, flag, cbName)
+                    end
+                    runSource(src)
                 else
                     runSource(deleteSrc)
                 end
             end,
         })
     end
+
+    ScriptTab:CreateDivider()
+
+    ScriptTab:CreateButton({
+        name = "Reset Mobile Button Positions",
+        callback = function()
+            local Players = game:GetService("Players")
+            local CollectionService = game:GetService("CollectionService")
+            local HttpService = game:GetService("HttpService")
+            local SAVE_FILE = "MobileButtons_Positions.json"
+            local TAG = "DraggableBoxGui"
+            local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+
+            local canUseFiles = type(writefile) == "function"
+            local memoryStore = _G
+            pcall(function()
+                if getgenv then memoryStore = getgenv() end
+            end)
+
+            if canUseFiles then
+                pcall(function()
+                    writefile(SAVE_FILE, HttpService:JSONEncode({ version = 1, positions = {} }))
+                end)
+            end
+            memoryStore.MobileButtonPositions = nil
+
+            local list, seen = {}, {}
+            local function add(inst)
+                if inst:IsA("ScreenGui") and not seen[inst] then
+                    seen[inst] = true
+                    list[#list + 1] = inst
+                end
+            end
+            for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
+            local function scan(container)
+                if not container then return end
+                local ok, children = pcall(function() return container:GetChildren() end)
+                if not ok then return end
+                for _, child in ipairs(children) do
+                    if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
+                end
+            end
+            scan(playerGui)
+            pcall(function() scan(game:GetService("CoreGui")) end)
+            if gethui then pcall(function() scan(gethui()) end) end
+
+            for _, gui in ipairs(list) do
+                gui:SetAttribute("ResetPosition", os.clock())
+            end
+        end,
+    })
 end
 
 do
     ScriptTab:CreateDivider({ text = "Keybinds" })
 
     local FEATURES = {
-        { "Auto Jump",                       "AutoJump" },
-        { "Legit Jump",                      "LegitJump" },
-        { "Hold Jump",                       "HoldJump" },
-        { "Easy Bounce",                     "EasyBounce" },
-        { "Hard Bounce",                     "HardBounce" },
-        { "Legit Bounce",                    "LegitBounce" },
-        { "Inf Slide",                       "InfSlide" },
-        { "Y Lock",                          "YLock" },
-        { "Frontal Jump",                    "FrontalJump" },
-        { "Backward Jump",                   "BackwardJump" },
-        { "Speed Changer",                   "SpeedChanger" },
-        { "TP Walk",                         "TPWalk" },
-        { "Instant Acceleration",            "InstantAccel" },
-        { "Friction Changer",                "FrictionChanger" },
-        { "Air Strafe Acceleration Changer", "AirStrafe" },
-        { "Jump Cap Changer",                "JumpCap" },
-        { "Gravity Changer",                 "GravityChanger" },
-        { "Jump Height Changer",             "JumpHeight" },
-        { "Emote Run",                       "EmoteRun" },
-        { "Character Spin",                  "CharacterSpin" },
-        { "Player Rotation Changer",         "PlayerRotate" },
-        { "Fly",                             "Fly" },
-        { "Down Fly",                        "DownFly" },
+        { "Auto Jump",                       "AutoJump",        "toggle" },
+        { "Legit Jump",                      "LegitJump",       "toggle" },
+        { "Hold Jump",                       "HoldJump",        "toggle" },
+        { "Easy Bounce",                     "EasyBounce",      "toggle" },
+        { "Hard Bounce",                     "HardBounce",      "toggle" },
+        { "Legit Bounce",                    "LegitBounce",     "toggle" },
+        { "Inf Slide",                       "InfSlide",        "toggle" },
+        { "Y Lock",                          "YLock",           "toggle" },
+        { "Frontal Jump",                    "FrontalJump",     "toggle" },
+        { "Backward Jump",                   "BackwardJump",    "toggle" },
+        { "Speed Changer",                   "SpeedChanger",    "toggle" },
+        { "TP Walk",                         "TPWalk",          "toggle" },
+        { "Instant Acceleration",            "InstantAccel",    "toggle" },
+        { "Friction Changer",                "FrictionChanger", "toggle" },
+        { "Air Strafe Acceleration Changer", "AirStrafe",       "toggle" },
+        { "Jump Cap Changer",                "JumpCap",         "toggle" },
+        { "Gravity Changer",                 "GravityChanger",  "toggle" },
+        { "Jump Height Changer",             "JumpHeight",      "toggle" },
+        { "Emote Run",                       "EmoteRun",        "toggle" },
+        { "Character Spin",                  "CharacterSpin",   "toggle" },
+        { "Player Rotation Changer",         "PlayerRotate",    "toggle" },
+        { "Fly",                             "Fly",             "toggle" },
+        { "Down Fly",                        "DownFly",         "toggle" },
+        { "Lag Switch",                      "LagSwitch",       "button" },
+        { "Pixel Surf",                      "PixelSurf",       "toggle" },
     }
 
     local kbStates = {}
@@ -4636,15 +4778,21 @@ do
     })
 
     for _, f in ipairs(FEATURES) do
-        local featureName, cbName = f[1], f[2]
+        local featureName, cbName, ftype = f[1], f[2], f[3] or "toggle"
         ScriptTab:CreateKeybind({
             name = featureName,
             currentKeybind = "None",
             holdToInteract = false,
             flag = "KB_" .. cbName,
             callback = function()
-                kbStates[cbName] = not (kbStates[cbName] or false)
-                _G.RWSet(cbName, kbStates[cbName])
+                if ftype == "toggle" then
+                    kbStates[cbName] = not (kbStates[cbName] or false)
+                    _G.RWSet(cbName, kbStates[cbName])
+                elseif ftype == "button" then
+                    if _G.RWCallbacks and _G.RWCallbacks[cbName] then
+                        _G.RWCallbacks[cbName]()
+                    end
+                end
             end,
         })
     end
