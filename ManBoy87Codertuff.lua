@@ -4013,29 +4013,32 @@ LAG SWITCH
 ]]--
 
 do
-    local lagDuration = 0.5
+    local lagDuration = 1
+
+    local function triggerLag()
+        local start = tick()
+        while tick() - start < lagDuration do end
+    end
 
     tab:CreateDivider()
 
     tab:CreateButton({
         name = "Lag Switch",
-		icon = 122975828478366,
-        callback = function()
-            local start = tick()
-            while tick() - start < lagDuration do end
-        end,
+        callback = triggerLag,
     })
 
     tab:CreateSlider({
         name = "Lag Duration",
-		icon = 136077598178846,
         range = {0.1, 5},
         increment = 0.1,
         suffix = "s",
-        currentValue = 0.5,
+        currentValue = 1,
         flag = "LagSwitch_Slider",
         callback = function(v) lagDuration = v end,
     })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["LagSwitch"] = triggerLag
 end
 
 --[[
