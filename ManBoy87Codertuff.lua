@@ -1864,8 +1864,8 @@ do
     -- ========================================
     -- EDIT THESE URLs
     -- ========================================
-    local ON_URL  = "https://example.com/pixel-surf-on.lua"
-    local OFF_URL = "https://example.com/pixel-surf-off.lua"
+    local ON_URL  = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Pixelsurfon"
+    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Pxlsof"
     -- ========================================
 
     local pixelSurfEnabled = false
