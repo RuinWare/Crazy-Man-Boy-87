@@ -3612,9 +3612,9 @@ tab:CreateToggle({
     currentValue = false,
     callback = function(v)
         if v then
-          loadstring(game:HttpGet(""))()
+          loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Edashon"))()
         else
-          loadstring(game:HttpGet(""))()
+          loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Edashoff"))()
        end
     end,
 })
