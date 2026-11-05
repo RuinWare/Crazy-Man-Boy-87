@@ -1,72 +1,164 @@
-local DeepDarkBlue = {
-    -- Window & shape
-    CornerRoundness     = UDim.new(0, 8),
-    WindowColor         = ColorSequence.new(Color3.fromRGB(10, 15, 30), Color3.fromRGB(8, 12, 24)),
-    ShadowColor         = Color3.fromRGB(2, 4, 10),
-    LiveAnimation       = false,  -- set true if you want a drifting window gradient
-    PillCornerRadius    = UDim.new(0, 6),
+local DarkGrayTheme = {
+    -- Window & Shape (Fixed roundness to be softer/default)
+    CornerRoundness     = UDim.new(0, 10), -- Soft default corners
+    WindowColor         = ColorSequence.new(Color3.fromRGB(24, 24, 27), Color3.fromRGB(18, 18, 20)),
+    ShadowColor         = Color3.fromRGB(0, 0, 0),
+    LiveAnimation       = false,
+    PillCornerRadius    = UDim.new(0, 8),
     ElementCornerRadius = UDim.new(0, 6),
-    SurfaceStroke       = Color3.fromRGB(35, 55, 90),
+    SurfaceStroke       = Color3.fromRGB(55, 55, 60),
 
-    -- Text & fonts
+    -- Text & Fonts
     TitleFont           = Font.fromEnum(Enum.Font.GothamBold),
     Font                = Font.fromEnum(Enum.Font.Gotham),
-    ContentColor        = Color3.fromRGB(200, 210, 230),
-    TitlingColor        = Color3.fromRGB(220, 235, 255),
+    ContentColor        = Color3.fromRGB(230, 230, 235), -- Soft white/gray text
+    TitlingColor        = Color3.fromRGB(255, 255, 255), -- Pure white title
     ElementTextHoverColor = Color3.fromRGB(255, 255, 255),
-    ActionColor         = Color3.fromRGB(140, 180, 240),
+    ActionColor         = Color3.fromRGB(200, 200, 205),
 
-    -- Tabs
-    TabColor            = Color3.fromRGB(180, 200, 230),
-    TabBackground       = ColorSequence.new(Color3.fromRGB(18, 28, 52), Color3.fromRGB(12, 20, 40)),
-    TabStroke           = ColorSequence.new(Color3.fromRGB(50, 80, 130), Color3.fromRGB(35, 60, 100)),
-    TabBackgroundSelected = ColorSequence.new(Color3.fromRGB(30, 50, 90), Color3.fromRGB(20, 35, 70)),
+    -- Tabs (Matching the dark header in the image)
+    TabColor            = Color3.fromRGB(140, 140, 145),
+    TabBackground       = ColorSequence.new(Color3.fromRGB(28, 28, 32), Color3.fromRGB(22, 22, 25)),
+    TabStroke           = ColorSequence.new(Color3.fromRGB(50, 50, 55), Color3.fromRGB(40, 40, 45)),
+    TabBackgroundSelected = ColorSequence.new(Color3.fromRGB(45, 45, 50), Color3.fromRGB(35, 35, 40)),
     SelectedTabTextColor = Color3.fromRGB(255, 255, 255),
 
-    -- Elements
-    ElementStroke       = Color3.fromRGB(40, 65, 105),
-    ElementGradient     = ColorSequence.new(Color3.fromRGB(15, 25, 45), Color3.fromRGB(10, 18, 35)),
-    ElementStrokeGradient = ColorSequence.new(Color3.fromRGB(60, 100, 160), Color3.fromRGB(40, 70, 120)),
+    -- Elements (Slightly lighter gray than the background)
+    ElementStroke       = Color3.fromRGB(65, 65, 70),
+    ElementGradient     = ColorSequence.new(Color3.fromRGB(38, 38, 42), Color3.fromRGB(30, 30, 34)),
+    ElementStrokeGradient = ColorSequence.new(Color3.fromRGB(75, 75, 80), Color3.fromRGB(55, 55, 60)),
     ElementTransparency = 0,
     ElementStrokeTransparency = 0,
-    ElementStrokeHover  = Color3.fromRGB(80, 140, 220),
+    ElementStrokeHover  = Color3.fromRGB(120, 120, 125),
     ElementStrokeHoverTransparency = 0,
-    StatBackground      = Color3.fromRGB(18, 30, 55),
+    StatBackground      = Color3.fromRGB(25, 25, 28),
 
-    -- Controls (toggles, sliders, popups)
-    AccentColor         = Color3.fromRGB(0, 140, 255),
-    AccentStroke        = Color3.fromRGB(60, 170, 255),
-    AccentGlow          = 0.6,
-    SliderBackground    = Color3.fromRGB(20, 35, 60),
-    SliderBackgroundHover = Color3.fromRGB(25, 45, 75),
-    SliderProgress      = ColorSequence.new(Color3.fromRGB(0, 140, 255), Color3.fromRGB(0, 100, 220)),
-    SliderStroke        = Color3.fromRGB(45, 80, 130),
-    SliderHandle        = Color3.fromRGB(0, 160, 255),
-    ToggleTrack         = Color3.fromRGB(22, 38, 65),
+    -- Controls (White accents to match the image's toggles)
+    AccentColor         = Color3.fromRGB(255, 255, 255), -- White toggles/sliders
+    AccentStroke        = Color3.fromRGB(200, 200, 200),
+    AccentGlow          = 0,
+    SliderBackground    = Color3.fromRGB(20, 20, 22),
+    SliderBackgroundHover = Color3.fromRGB(30, 30, 34),
+    SliderProgress      = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
+    SliderStroke        = Color3.fromRGB(60, 60, 65),
+    SliderHandle        = Color3.fromRGB(255, 255, 255),
+    
+    -- Toggles
+    ToggleTrack         = Color3.fromRGB(35, 35, 40),
     ToggleTrackTransparency = 0,
-    ToggleKnobOff       = Color3.fromRGB(60, 80, 120),
+    ToggleKnobOff       = Color3.fromRGB(120, 120, 125), -- Gray when off
     ToggleKnobOffTransparency = 0,
     DarkToggleOverlay   = false,
-    DropdownHighlight   = Color3.fromRGB(0, 120, 220),
-
-    -- Fields & buttons
-    FieldBackground     = Color3.fromRGB(12, 22, 42),
+    
+    -- Dropdowns & Fields
+    DropdownHighlight   = Color3.fromRGB(60, 60, 65),
+    FieldBackground     = Color3.fromRGB(20, 20, 22),
     FieldTransparency   = 0,
-    FieldGlow           = Color3.fromRGB(0, 80, 160),
-    PlaceholderColor    = Color3.fromRGB(100, 120, 160),
-    NeutralButton       = Color3.fromRGB(30, 50, 85),
-    NeutralButtonHover  = Color3.fromRGB(40, 65, 110),
-    NeutralButtonStroke = Color3.fromRGB(50, 80, 130),
+    FieldGlow           = Color3.fromRGB(80, 80, 85),
+    PlaceholderColor    = Color3.fromRGB(120, 120, 125),
+    
+    -- Buttons
+    NeutralButton       = Color3.fromRGB(45, 45, 50),
+    NeutralButtonHover  = Color3.fromRGB(60, 60, 65),
+    NeutralButtonStroke = Color3.fromRGB(80, 80, 85),
     ErrorColor          = Color3.fromRGB(200, 50, 60),
     ErrorStrokeColor    = Color3.fromRGB(255, 80, 90),
 }
 
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
-
 -- Apply it when creating the window:
 local window = Rayfield:CreateWindow({
-    name = "Example Hub",
-    subtitle = "Rayfield Gen2",
-    sidebarLayout = true,
-    theme = DeepDarkBlue,
+    name    = "Evaware Client", -- Matched name from the image
+    theme   = DarkGrayTheme,
 })
+
+local tab = window:CreateTab({ name = "Combat", icon = 93364949241311 })
+
+tab:CreateButton({
+    name = "Reset character",
+    callback = function()
+        game.Players.LocalPlayer.Character:BreakJoints()
+    end,
+})
+
+local sprint = tab:CreateToggle({
+    name = "Auto Sprint",
+    flag = "AutoSprint",
+    value = true,
+    callback = function(value)
+        print("Auto Sprint:", value)
+    end,
+})
+
+sprint:Set(false)
+
+tab:CreateSlider({
+    name = "Field of view",
+    range = { 70, 120 },
+    increment = 1,
+    value = 90,
+    suffix = "°",
+    callback = function(value)
+        workspace.CurrentCamera.FieldOfView = value
+    end,
+})
+
+tab:CreateDropdown({
+    name = "Modules",
+    multiSelect = true,
+    options = { "Aimbot", "ESP", "Fly", "Noclip" },
+    value = { "ESP" },
+    callback = function(selected)
+        print(selected)  -- { "ESP" }
+    end,
+})
+
+tab:CreateInput({
+    name = "Max players",
+    numeric = true,
+    value = "16",
+    placeholder = "Enter a number",
+    callback = function(text)
+        print("Committed:", text)
+    end,
+})
+
+tab:CreateKeybind({
+    name = "Sprint",
+    value = Enum.KeyCode.LeftShift,
+    callback = function(key)
+        print("Pressed", key)
+    end,
+})
+
+tab:CreateColorPicker({
+    name = "Highlight",
+    color = Color3.fromRGB(96, 205, 255),
+    callback = function(color, alpha)
+        print(color, alpha)
+    end,
+})
+
+local revenue = tab:CreateStat({
+    name = "Revenue",
+    prefix = "$",
+    value = 12400,
+})
+
+revenue:Set(revenue.value + 500)
+
+local download = tab:CreateProgress({
+    name = "Download",
+    range = { 0, 100 },
+    value = 35,
+})
+
+download:Set(80)
+
+tab:CreateText({
+    name = "Read this first",
+    text = "Either half can be left out, and the card closes up around what is left.",
+})
+
+tab:CreateDivider()
+tab:CreateDivider({ text = "or" })
+tab:CreateDivider({ line = false, spacing = 20 })  -- room, no rule
