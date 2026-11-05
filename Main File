@@ -3595,6 +3595,52 @@ end
 
 --[[
 ============================================================================
+auto edash
+============================================================================
+]]--
+
+_G.ESPEEDDASH = 30
+getgenv().ESPEEDDASH = 30
+_G.ANGLEEDASH = 8
+getgenv().ANGLEEDASH = 8
+
+tab:CreateToggle({
+    name = "Auto E-Dash",
+    flag = "AutoEdash",
+    currentValue = false,
+    callback = function(v)
+        if v then
+          loadstring(game:HttpGet(""))()
+        else
+          loadstring(game:HttpGet(""))()
+       end
+    end,
+})
+
+tab:CreateSlider({
+    name = "Smoothness",
+    range = { 0, 100 },
+    increment = 1,
+    currentValue = 30,
+    suffix = "",
+    callback = function(value)
+        ESPEEDDASH = value
+    end,
+})
+
+tab:CreateSlider({
+    name = "Minimum Angle Required To Trigger",
+    range = { 3, 70 },
+    increment = 1,
+    currentValue = 8,
+    suffix = "°",
+    callback = function(value)
+        ANGLEEDASH = value
+    end,
+})
+
+--[[
+============================================================================
 cs
 ============================================================================
 ]]--
