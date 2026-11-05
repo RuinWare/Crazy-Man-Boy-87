@@ -781,7 +781,7 @@ end
 
 -- K AND H
 local function buildExtras(VisTab, window)
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Korbloxandheadless))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Korbloxandheadless"))()
 end
 --[[
 ============================================================================
