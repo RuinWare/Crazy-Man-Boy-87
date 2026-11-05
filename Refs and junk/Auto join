@@ -1,4 +1,4 @@
-local URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/ManBoy87Codertuff.lua"
+local URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Main%20File"
 local ok, err = pcall(function()
     local src = game:HttpGet(URL)
     print("=== fetched:", #src, "bytes")
