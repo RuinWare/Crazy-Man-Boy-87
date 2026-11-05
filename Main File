@@ -3599,6 +3599,8 @@ auto edash
 ============================================================================
 ]]--
 
+_G.EDASHSTUDS = 2
+getgenv().EDASHSTUDS = 2
 _G.ESPEEDDASH = 30
 getgenv().ESPEEDDASH = 30
 _G.ANGLEEDASH = 8
@@ -3636,6 +3638,17 @@ tab:CreateSlider({
     suffix = "°",
     callback = function(value)
         ANGLEEDASH = value
+    end,
+})
+
+tab:CreateSlider({
+    name = "Range of Triggering",
+    range = { 0, 5 },
+    increment = 1,
+    currentValue = 2,
+    suffix = "Studs",
+    callback = function(value)
+        EDASHSTUDS = value
     end,
 })
 
