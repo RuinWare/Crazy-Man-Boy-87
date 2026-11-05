@@ -66,7 +66,7 @@ local DarkGrayTheme = {
 }
 
 -- Apply it when creating the window:
-local window = Rayfield:CreateWindow({
+Rayfield:CreateWindow({
     name = "Example Hub",
     subtitle = "Rayfield Gen2",
     sidebarLayout = true,
