@@ -1,70 +1,49 @@
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
 -- theme
-local DarkDarkTheme = {
-    -- Window & Shape (Maxed roundness)
-    CornerRoundness     = UDim.new(0, 12),
-    WindowColor         = ColorSequence.new(Color3.fromRGB(12, 12, 14), Color3.fromRGB(8, 8, 10)),
+local Theme = {
+    -- Colors matching the image
+    WindowColor         = ColorSequence.new(Color3.fromRGB(28, 28, 30), Color3.fromRGB(22, 22, 24)),
     ShadowColor         = Color3.fromRGB(0, 0, 0),
-    LiveAnimation       = false,
-    PillCornerRadius    = UDim.new(1, 0), -- Fully rounded toggles
-    ElementCornerRadius = UDim.new(0, 10), -- Softer buttons/sliders
-    SurfaceStroke       = Color3.fromRGB(35, 35, 40),
+    SurfaceStroke       = Color3.fromRGB(60, 60, 65),
 
-    -- Text & Fonts
+    -- Text
     TitleFont           = Font.fromEnum(Enum.Font.GothamBold),
     Font                = Font.fromEnum(Enum.Font.Gotham),
-    ContentColor        = Color3.fromRGB(210, 210, 215), 
-    TitlingColor        = Color3.fromRGB(255, 255, 255), 
+    ContentColor        = Color3.fromRGB(220, 220, 225),
+    TitlingColor        = Color3.fromRGB(255, 255, 255),
     ElementTextHoverColor = Color3.fromRGB(255, 255, 255),
-    ActionColor         = Color3.fromRGB(170, 170, 175),
+    ActionColor         = Color3.fromRGB(180, 180, 185),
 
     -- Tabs
-    TabColor            = Color3.fromRGB(110, 110, 115),
-    TabBackground       = ColorSequence.new(Color3.fromRGB(15, 15, 18), Color3.fromRGB(10, 10, 12)),
-    TabStroke           = ColorSequence.new(Color3.fromRGB(35, 35, 40), Color3.fromRGB(25, 25, 30)),
-    TabBackgroundSelected = ColorSequence.new(Color3.fromRGB(28, 28, 33), Color3.fromRGB(20, 20, 24)),
+    TabColor            = Color3.fromRGB(150, 150, 155),
+    TabBackground       = ColorSequence.new(Color3.fromRGB(32, 32, 35), Color3.fromRGB(25, 25, 28)),
+    TabStroke           = ColorSequence.new(Color3.fromRGB(55, 55, 60), Color3.fromRGB(40, 40, 45)),
+    TabBackgroundSelected = ColorSequence.new(Color3.fromRGB(50, 50, 55), Color3.fromRGB(40, 40, 45)),
     SelectedTabTextColor = Color3.fromRGB(255, 255, 255),
 
-    -- Elements
-    ElementStroke       = Color3.fromRGB(40, 40, 45),
-    ElementGradient     = ColorSequence.new(Color3.fromRGB(22, 22, 26), Color3.fromRGB(16, 16, 20)),
-    ElementStrokeGradient = ColorSequence.new(Color3.fromRGB(45, 45, 50), Color3.fromRGB(35, 35, 40)),
-    ElementTransparency = 0,
-    ElementStrokeTransparency = 0,
-    ElementStrokeHover  = Color3.fromRGB(90, 90, 95),
-    ElementStrokeHoverTransparency = 0,
-    StatBackground      = Color3.fromRGB(12, 12, 14),
+    -- Elements (The dark gray boxes)
+    ElementStroke       = Color3.fromRGB(65, 65, 70),
+    ElementGradient     = ColorSequence.new(Color3.fromRGB(38, 38, 42), Color3.fromRGB(30, 30, 34)),
+    ElementStrokeGradient = ColorSequence.new(Color3.fromRGB(80, 80, 85), Color3.fromRGB(60, 60, 65)),
+    StatBackground      = Color3.fromRGB(28, 28, 30),
 
-    -- Controls (White accents for contrast)
-    AccentColor         = Color3.fromRGB(255, 255, 255),
-    AccentStroke        = Color3.fromRGB(200, 200, 200),
-    AccentGlow          = 0,
-    SliderBackground    = Color3.fromRGB(10, 10, 12),
-    SliderBackgroundHover = Color3.fromRGB(20, 20, 24),
-    SliderProgress      = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200)),
-    SliderStroke        = Color3.fromRGB(40, 40, 45),
+    -- Your Requests: Green Toggles & Off-White Sliders
+    AccentColor         = Color3.fromRGB(40, 200, 80), -- Green for toggles ON
+    ToggleTrack         = Color3.fromRGB(60, 60, 65),  -- Gray for toggles OFF
+    ToggleKnobOff       = Color3.fromRGB(160, 160, 165),
+    
+    SliderBackground    = Color3.fromRGB(240, 240, 245), -- Off-white slider BG
+    SliderProgress      = ColorSequence.new(Color3.fromRGB(40, 200, 80)), -- Green slider progress
     SliderHandle        = Color3.fromRGB(255, 255, 255),
+    SliderStroke        = Color3.fromRGB(200, 200, 205),
 
-    -- Toggles
-    ToggleTrack         = Color3.fromRGB(20, 20, 24),
-    ToggleTrackTransparency = 0,
-    ToggleKnobOff       = Color3.fromRGB(90, 90, 95),
-    ToggleKnobOffTransparency = 0,
-    DarkToggleOverlay   = false,
-
-    -- Dropdowns & Fields
-    DropdownHighlight   = Color3.fromRGB(45, 45, 50),
-    FieldBackground     = Color3.fromRGB(10, 10, 12),
-    FieldTransparency   = 0,
-    FieldGlow           = Color3.fromRGB(50, 50, 55),
-    PlaceholderColor    = Color3.fromRGB(90, 90, 95),
-
-    -- Buttons
-    NeutralButton       = Color3.fromRGB(25, 25, 30),
-    NeutralButtonHover  = Color3.fromRGB(40, 40, 45),
-    NeutralButtonStroke = Color3.fromRGB(55, 55, 60),
-    ErrorColor          = Color3.fromRGB(200, 50, 60),
-    ErrorStrokeColor    = Color3.fromRGB(255, 80, 90),
+    -- Misc
+    DropdownHighlight   = Color3.fromRGB(60, 60, 65),
+    FieldBackground     = Color3.fromRGB(25, 25, 28),
+    PlaceholderColor    = Color3.fromRGB(130, 130, 135),
+    NeutralButton       = Color3.fromRGB(45, 45, 50),
+    NeutralButtonHover  = Color3.fromRGB(60, 60, 65),
+    ErrorColor          = Color3.fromRGB(220, 60, 60),
 }
 -- Apply it when creating the window:
 local window = Rayfield:CreateWindow({
