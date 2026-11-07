@@ -1,4 +1,4 @@
-_G.SHARED_PATHS = {
+local SHARED_PATHS = {
 game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Sharedpaths")
 }
 
