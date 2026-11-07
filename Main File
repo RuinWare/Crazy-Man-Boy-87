@@ -1,8 +1,35 @@
-local SHARED_PATHS = {
-game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Sharedpaths")
-}
+_G.SHARED_PATHS = loadPaths("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Sharedpaths")
+local SHARED_PATHS = _G.SHARED_PATHS
 
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
+
+local function loadPaths(url)
+    local src = game:HttpGet(url)
+
+    -- 1) file already returns a table:   return {...}   or   return { ... }
+    local fn = loadstring(src)
+    if fn then
+        local ok, res = pcall(fn)
+        if ok and type(res) == "table" then return res end
+    end
+
+    -- 2) file is a bare table literal:   { {...}, {...} }
+    fn = loadstring("return " .. src)
+    if fn then
+        local ok, res = pcall(fn)
+        if ok and type(res) == "table" then return res end
+    end
+
+    -- 3) file is bare rows (no outer braces):   {"a"}, {"b"},
+    fn = loadstring("return {" .. src .. "}")
+    if fn then
+        local ok, res = pcall(fn)
+        if ok and type(res) == "table" then return res end
+    end
+
+    warn("[RuinWare] Failed to parse path file: " .. url)
+    return {}
+end
 
 _G.RWCallbacks = _G.RWCallbacks or {}
 _G.RWSet = function(name, value)
@@ -377,9 +404,7 @@ C     O     S     M     E     T     I     C          L     O     G     I     C
 local function buildCosmeticChanger(tab, window)
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-	local COSMETIC_PATHS = {
-game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Cospaths")
-	}
+local COSMETIC_PATHS = loadPaths("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Cospaths")
 
 	local _snapshots    = {}
 	local _displayNames = {}
