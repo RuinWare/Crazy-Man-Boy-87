@@ -3496,7 +3496,7 @@ end))
 ]==]
 
     local SRC_BWD_OFF = [==[
-loadstring(game:HttpGet(""))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Bw_off"))()
 ]==]
 
     local function runSource(src)
@@ -4692,7 +4692,7 @@ do
     end
 
     local DELETE_BODY = [==[
-loadstring(game:HttpGet(""))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Body-delete-thing"))()
 ]==]
 
     local function buildDeleteSource(flag)
