@@ -1,35 +1,58 @@
-_G.SHARED_PATHS = loadPaths("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Sharedpaths")
-local SHARED_PATHS = _G.SHARED_PATHS
+local SHARED_PATHS = {
+		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Cats","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Animals","Emotes"},
+		{"Items","ItemPacks","Gamepass","Legacy","StPatricks2023","Emotes"},
+		{"Items","ItemPacks","Gamepass","Legacy","Military","Emotes"},
+		{"Items","ItemPacks","Gamepass","2026","RelicEmotesNew","Emotes"},
+		{"Items","ItemPacks","Gamepass","2026","PoseidonSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","2026","BeeSet","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","Thanksgiving2025","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","OldRoblox","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","NewYears2024","Emotes"},
+		{"Items","ItemPacks","EventsDailyShop","LunarNewYear","Emotes"},
+		{"Items","ItemPacks","Events","2026","Valentines2026","Emotes"},
+		{"Items","ItemPacks","Events","2026","StPatricks2026","Emotes"},
+		{"Items","ItemPacks","Events","2026","Spring2026","Emotes"},
+		{"Items","ItemPacks","Events","2026","SUMMER26","Emotes"},
+		{"Items","ItemPacks","Events","2026","HLWN2026","Emotes"},
+		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","DailyShop"},
+		{"Items","ItemPacks","Events","2025","XMAS25","Emotes","Battlepass"},
+		{"Items","ItemPacks","Events","2025","Valentines2025","Emotes"},
+		{"Items","ItemPacks","Events","2025","Summer2025","Emotes"},
+		{"Items","ItemPacks","Events","2025","StPatricks2025","Emotes"},
+		{"Items","ItemPacks","Events","2025","Hlwn2025","Emotes"},
+		{"Items","ItemPacks","Events","2024","Xmas2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","Valentines2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","StPatricks2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","Hlwn2024","Emotes"},
+		{"Items","ItemPacks","Events","2024","Halloween2024","Emotes"},
+		{"Items","ItemPacks","Events","2023","Hlwn2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Halloween2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Xmas2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Valentines2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","StPatricks2023","Emotes"},
+		{"Items","ItemPacks","Events","2023","Summer2023","Emotes"},
+		{"Items","ItemPacks","Events","2022","Hlwn2022","Emotes"},
+		{"Items","ItemPacks","Events","2022","Halloween2022","Emotes"},
+		{"Items","ItemPacks","Events","2022","Xmas2022","Emotes"},
+		{"Items","ItemPacks","Events","2022","Valentines2022","Emotes"},
+		{"Items","ItemPacks","Collab","ST","Emotes"},
+		{"Items","ItemPacks","Base","Special","Emotes"},
+		{"Items","ItemPacks","Base","NewShop","Emotes"},
+		{"Items","ItemPacks","Base","LevelShop","Emotes"},
+		{"Items","ItemPacks","Base","DailyShop","Emotes"},
+		{"Items","BaseItems","Emotes"},
+		{"Items","ItemPacks","Integration","M3GAN","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Gems","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","MusicEmotesPack1","Emotes"},
+		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
+}
 
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
-
-local function loadPaths(url)
-    local src = game:HttpGet(url)
-
-    -- 1) file already returns a table:   return {...}   or   return { ... }
-    local fn = loadstring(src)
-    if fn then
-        local ok, res = pcall(fn)
-        if ok and type(res) == "table" then return res end
-    end
-
-    -- 2) file is a bare table literal:   { {...}, {...} }
-    fn = loadstring("return " .. src)
-    if fn then
-        local ok, res = pcall(fn)
-        if ok and type(res) == "table" then return res end
-    end
-
-    -- 3) file is bare rows (no outer braces):   {"a"}, {"b"},
-    fn = loadstring("return {" .. src .. "}")
-    if fn then
-        local ok, res = pcall(fn)
-        if ok and type(res) == "table" then return res end
-    end
-
-    warn("[RuinWare] Failed to parse path file: " .. url)
-    return {}
-end
 
 _G.RWCallbacks = _G.RWCallbacks or {}
 _G.RWSet = function(name, value)
@@ -404,7 +427,58 @@ C     O     S     M     E     T     I     C          L     O     G     I     C
 local function buildCosmeticChanger(tab, window)
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local COSMETIC_PATHS = loadPaths("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Cospaths")
+	local COSMETIC_PATHS = {
+		{"Items","ItemPacks","Gamepass","Legacy","StPatricks2023","Cosmetics"},
+		{"Items","ItemPacks","Base","Admin","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Legacy","Military","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","2026","PoseidonSet","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","2026","BeeSet","Cosmetics"},
+		{"Items","ItemPacks","EventsDailyShop","OldRoblox","Cosmetics"},
+		{"Items","ItemPacks","EventsDailyShop","NewYears2024","Cosmetics"},
+		{"Items","ItemPacks","EventsDailyShop","LunarNewYear","Cosmetics"},
+		{"Items","ItemPacks","EventsDailyShop","Easter","Cosmetics"},
+		{"Items","ItemPacks","EventsDailyShop","Birthday25","Cosmetics"},
+		{"Items","ItemPacks","EventsDailyShop","Anniversary26","Cosmetics"},
+		{"Items","ItemPacks","Collab","TowerBlitz","Cosmetics"},
+		{"Items","ItemPacks","Base","UpperLevel","Cosmetics"},
+		{"Items","ItemPacks","Base","Special","Cosmetics"},
+		{"Items","ItemPacks","Base","ForsakenCollabUpdate","Cosmetics"},
+		{"Items","ItemPacks","Base","DailyShop","Cosmetics","UnusualNew2"},
+		{"Items","ItemPacks","Base","DailyShop","Cosmetics","UnusualNew"},
+		{"Items","ItemPacks","Base","DailyShop","Cosmetics","Unusual"},
+		{"Items","ItemPacks","Base","DailyShop","Cosmetics","Normal"},
+		{"Items","ItemPacks","Base","DailyShop","Cosmetics","Character"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Animals","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Unorganized","RetroCosmeticsSet","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Unorganized","LunarNewYearSet","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Gems","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Future","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Cosmetics"},
+		{"Items","ItemPacks","Gamepass","Unorganized","Cats","Cosmetics"},
+		{"Items","ItemPacks","Events","2026","HLWN2026","Cosmetics"},
+		{"Items","ItemPacks","Events","2024","Halloween2024","Cosmetics"},
+		{"Items","ItemPacks","Events","2024","Halloween2024","Cosmetics","HLWN24EXCLUSIVE"},
+		{"Items","ItemPacks","Events","2023","Valentines2023","Cosmetics"},
+		{"Items","ItemPacks","Events","2023","Christmas2023","Cosmetics"},
+		{"Items","ItemPacks","Events","2022","Xmas2022","Cosmetics"},
+		{"Items","ItemPacks","Events","2022","Xmas2022","Cosmetics","XMASExclusive"},
+		{"Items","ItemPacks","Events","2022","Xmas2022","Cosmetics","XMasGamepass"},
+		{"Items","ItemPacks","Events","2022","Halloween2022","Cosmetics"},
+		{"Items","ItemPacks","Events","2022","Halloween2022","Cosmetics","HalloweenExclusive"},
+		{"Items","ItemPacks","Events","2026","Valentines2026","Cosmetics"},
+		{"Items","ItemPacks","Events","2026","StPatricks2026","Cosmetics"},
+		{"Items","ItemPacks","Events","2026","Spring2026","Cosmetics"},
+		{"Items","ItemPacks","Events","2026","SUMMER26","Cosmetics"},
+		{"Items","ItemPacks","Events","2025","XMAS25","Cosmetics"},
+		{"Items","ItemPacks","Events","2025","Valentines2025","Cosmetics"},
+		{"Items","ItemPacks","Events","2025","Summer2025","Cosmetics"},
+		{"Items","ItemPacks","Events","2025","StPatricks2025","Cosmetics"},
+		{"Items","ItemPacks","Events","2025","Hlwn2025","Cosmetics"},
+		{"Items","ItemPacks","Events","2024","Xmas2024","Cosmetics"},
+		{"Items","ItemPacks","Events","2024","Valentines2024","Cosmetics"},
+		{"Items","ItemPacks","Events","2024","StPatricks2024","Cosmetics"},
+	}
 
 	local _snapshots    = {}
 	local _displayNames = {}
@@ -3422,36 +3496,7 @@ end))
 ]==]
 
     local SRC_BWD_OFF = [==[
--- LocalScript: ShiftlockBackOff
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local player = Players.LocalPlayer
-local NAME = "CustomShiftlockBack"
-local SYSTEM = "CustomShiftlockBackSystem"
-
-player:SetAttribute(SYSTEM, false)
-player:SetAttribute(NAME, false)
-pcall(function()
-	RunService:UnbindFromRenderStep(NAME)
-end)
-
-local char = player.Character
-if not char then return end
-
-local root = char:FindFirstChild("HumanoidRootPart")
-if root then
-	local align = root:FindFirstChild(NAME)
-	if align then align:Destroy() end
-	local att = root:FindFirstChild(NAME .. "Attachment")
-	if att then att:Destroy() end
-end
-
-local hum = char:FindFirstChildOfClass("Humanoid")
-if hum then
-	hum.AutoRotate = true
-end
+loadstring(game:HttpGet(""))()
 ]==]
 
     local function runSource(src)
@@ -4647,56 +4692,7 @@ do
     end
 
     local DELETE_BODY = [==[
-local Players = game:GetService("Players")
-local CollectionService = game:GetService("CollectionService")
-local TweenService = game:GetService("TweenService")
-local TAG = "DraggableBoxGui"
-local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-local function collectGuis()
-	local list, seen = {}, {}
-	local function add(inst)
-		if inst:IsA("ScreenGui") and not seen[inst] then
-			seen[inst] = true
-			list[#list + 1] = inst
-		end
-	end
-	for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
-	local function scan(container)
-		if not container then return end
-		local ok, children = pcall(function() return container:GetChildren() end)
-		if not ok then return end
-		for _, child in ipairs(children) do
-			if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
-		end
-	end
-	scan(playerGui)
-	pcall(function() scan(game:GetService("CoreGui")) end)
-	if gethui then pcall(function() scan(gethui()) end) end
-	return list
-end
-local FADE_TIME = 0.12
-local SHRINK_TIME = 0.15
-local function fade(obj, time, props, style, direction)
-	TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out), props):Play()
-end
-local function remove(gui)
-	local scale = gui:FindFirstChild("PopScale", true)
-	if not scale then gui:Destroy() return end
-	fade(scale, SHRINK_TIME, { Scale = 0.75 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	for _, d in ipairs(gui:GetDescendants()) do
-		if d:IsA("UIStroke") then fade(d, FADE_TIME, { Transparency = 1 })
-		elseif d:IsA("GuiObject") then
-			fade(d, FADE_TIME, { BackgroundTransparency = 1 })
-			if d:IsA("TextLabel") or d:IsA("TextButton") then fade(d, FADE_TIME, { TextTransparency = 1 })
-			elseif d:IsA("ImageLabel") then fade(d, FADE_TIME, { ImageTransparency = 1 })
-			elseif d:IsA("CanvasGroup") then fade(d, FADE_TIME, { GroupTransparency = 1 }) end
-		end
-	end
-	task.delay(SHRINK_TIME + 0.02, function() if gui.Parent then gui:Destroy() end end)
-end
-for _, gui in ipairs(collectGuis()) do
-	if gui:GetAttribute("Flag") == FLAG then remove(gui) end
-end
+loadstring(game:HttpGet(""))()
 ]==]
 
     local function buildDeleteSource(flag)
@@ -4926,7 +4922,3 @@ do
     addTabNav(ScriptTab, "Map",            "Credits")
     addTabNav(CreTab,    "Script Settings", nil)
 end
-
--- ==================
--- S C R I P T    E N D
--- ==================
