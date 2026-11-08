@@ -1,10 +1,3 @@
---!nonstrict
--- ============================================================================
--- Standalone Rayfield Gen 2 Pill / Chrome
--- ============================================================================
--- Returns a Pill class. Supports dragging, click callbacks, and fade animations.
--- ============================================================================
-
 local Players          = game:GetService("Players")
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -40,12 +33,12 @@ local DEFAULT_FONT_FAMILY = "rbxasset://fonts/families/GothamSSm.json"
 local function makeFont(weight) return Font.new(DEFAULT_FONT_FAMILY, weight) end
 
 local defaultTheme = {
-    WindowColor               = Color3.fromRGB(22, 22, 24),
+    WindowColor               = Color3.fromRGB(20, 20, 22), -- Darker to match image
     SurfaceStroke             = Color3.fromRGB(60, 60, 65),
     TitlingColor              = Color3.fromRGB(255, 255, 255),
-    ContentColor              = Color3.fromRGB(180, 180, 185),
+    ContentColor              = Color3.fromRGB(170, 170, 175),
     Font                      = makeFont(Enum.FontWeight.Medium),
-    TitleFont                 = makeFont(Enum.FontWeight.SemiBold),
+    TitleFont                 = makeFont(Enum.FontWeight.Bold),
 }
 
 local Style = {}
@@ -91,13 +84,13 @@ function Pill.new(properties)
         window       = Style.new(properties.theme),
         title        = properties.title or properties.Title or "Rayfield",
         subtitle     = properties.subtitle or properties.Subtitle or "Tap to show",
-        icon         = properties.icon or properties.Icon or "rbxassetid://10734895456", -- Hamburger menu icon
+        icon         = properties.icon or properties.Icon or "rbxassetid://10734895456",
         onShow       = properties.onShow or properties.OnShow,
         onHide       = properties.onHide or properties.OnHide,
         onClick      = properties.onClick or properties.OnClick,
         visible      = false,
         animating    = false,
-        _position    = UDim2.new(0.5, 0, 0.85, 0), -- Default position (bottom center)
+        _position    = UDim2.new(0.5, 0, 0.85, 0), -- Default bottom-center
     }, Pill)
 
     self:_build()
@@ -117,12 +110,29 @@ function Pill:_build()
         Parent            = variables.guiContainer,
     })
 
+    -- 1. Shadow (Matches the soft black drop shadow in your image)
+    self.shadow = window:Create("ImageLabel", {
+        Name = "Shadow",
+        Image = "rbxassetid://1316045217",
+        ImageColor3 = Color3.new(0, 0, 0),
+        ImageTransparency = 1,
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = Rect.new(10, 10, 118, 118),
+        Size = UDim2.new(1, 30, 1, 30),
+        Position = UDim2.new(0.5, 0, 0.5, 8),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundTransparency = 1,
+        Visible = false,
+        Parent = self.screenGui,
+    })
+
+    -- 2. Main Pill Frame (320x90 is perfectly proportioned like the image)
     self.main = window:Create("Frame", {
         Name                 = "Pill",
         BackgroundColor3     = Color3.fromRGB(255, 255, 255),
         AnchorPoint          = Vector2.new(0.5, 0.5),
         Position             = self._position,
-        Size                 = UDim2.fromOffset(180, 54),
+        Size                 = UDim2.fromOffset(320, 90),
         Active               = true,
         BorderSizePixel      = 0,
         BackgroundTransparency = 1,
@@ -136,37 +146,53 @@ function Pill:_build()
         Parent   = self.main,
     }, { Color = { "WindowColor", functions.toColorSequence } })
 
+    -- Perfect pill shape (UDim.new(1,0) gives fully rounded capsule ends)
     window:Create("UICorner", {
         Parent = self.main,
-    }, { CornerRadius = UDim.new(1, 0) }) -- Pill shape
+    }, { CornerRadius = UDim.new(1, 0) })
 
     self.stroke = window:Create("UIStroke", {
         Transparency = 1,
         Parent       = self.main,
     }, { Color = "SurfaceStroke" })
 
+    -- 3. Circular Icon Background
+    self.iconBg = window:Create("Frame", {
+        Name                 = "IconBackground",
+        AnchorPoint          = Vector2.new(0, 0.5),
+        Position             = UDim2.new(0, 20, 0.5, 0),
+        Size                 = UDim2.fromOffset(52, 52),
+        BackgroundColor3     = Color3.fromRGB(35, 35, 38),
+        BackgroundTransparency = 1,
+        BorderSizePixel      = 0,
+        Parent               = self.main,
+    })
+    window:Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = self.iconBg })
+
+    -- 4. The actual Icon Image
     self.iconLabel = window:Create("ImageLabel", {
         Name                 = "Icon",
-        AnchorPoint          = Vector2.new(0, 0.5),
-        Position             = UDim2.new(0, 16, 0.5, 0),
-        Size                 = UDim2.fromOffset(24, 24),
+        AnchorPoint          = Vector2.new(0.5, 0.5),
+        Position             = UDim2.fromScale(0.5, 0.5),
+        Size                 = UDim2.fromOffset(28, 28),
         BackgroundTransparency = 1,
         Image                = self.icon,
         ImageTransparency    = 1,
-        Parent               = self.main,
+        Parent               = self.iconBg,
     }, { ImageColor3 = "TitlingColor" })
 
+    -- 5. Text Container
     local textContainer = window:Create("Frame", {
         Name                 = "TextContainer",
         AnchorPoint          = Vector2.new(0, 0.5),
-        Position             = UDim2.new(0, 50, 0.5, 0),
-        Size                 = UDim2.new(1, -60, 0, 32),
+        Position             = UDim2.new(0, 88, 0.5, 0),
+        Size                 = UDim2.new(1, -110, 0, 52),
         BackgroundTransparency = 1,
         Parent               = self.main,
     })
 
     window:Create("UIListLayout", {
-        Padding           = UDim.new(0, 1),
+        Padding           = UDim.new(0, 2),
         VerticalAlignment = Enum.VerticalAlignment.Center,
         SortOrder         = Enum.SortOrder.LayoutOrder,
         Parent            = textContainer,
@@ -175,9 +201,9 @@ function Pill:_build()
     self.titleLabel = window:Create("TextLabel", {
         Name                 = "Title",
         Text                 = self.title,
-        Size                 = UDim2.new(1, 0, 0, 16),
+        Size                 = UDim2.new(1, 0, 0, 26),
         BackgroundTransparency = 1,
-        TextSize             = 16,
+        TextSize             = 24,
         TextXAlignment       = Enum.TextXAlignment.Left,
         LayoutOrder          = 1,
         TextTransparency     = 1,
@@ -187,15 +213,16 @@ function Pill:_build()
     self.subtitleLabel = window:Create("TextLabel", {
         Name                 = "Subtitle",
         Text                 = self.subtitle,
-        Size                 = UDim2.new(1, 0, 0, 14),
+        Size                 = UDim2.new(1, 0, 0, 20),
         BackgroundTransparency = 1,
-        TextSize             = 14,
+        TextSize             = 20,
         TextXAlignment       = Enum.TextXAlignment.Left,
         LayoutOrder          = 2,
         TextTransparency     = 1,
         Parent               = textContainer,
     }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
+    -- 6. Hover & Click Catcher
     self.interact = window:Create("TextButton", {
         Name                 = "Interact",
         BackgroundTransparency = 1,
@@ -205,6 +232,19 @@ function Pill:_build()
         Visible              = false,
         Parent               = self.main,
     })
+
+    -- Hover Effect (Brightens the pill slightly when hovered)
+    self.interact.MouseEnter:Connect(function()
+        if not self.visible or self.animating then return end
+        TweenService:Create(self.iconBg, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(45, 45, 48) }):Play()
+        TweenService:Create(self.main, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(230, 230, 230) }):Play() -- slightly lightens gradient
+    end)
+
+    self.interact.MouseLeave:Connect(function()
+        if not self.visible then return end
+        TweenService:Create(self.iconBg, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(35, 35, 38) }):Play()
+        TweenService:Create(self.main, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+    end)
 
     self:_bindDrag()
 end
@@ -237,11 +277,10 @@ function Pill:_bindDrag()
         dragging = false
 
         if moved then
-            self._position = self.main.Position -- Save new drag position
+            self._position = self.main.Position -- Save new position
             return
         end
 
-        -- If it wasn't dragged, it's a click
         if self.onClick then task.spawn(self.onClick) end
     end)
 
@@ -273,15 +312,19 @@ function Pill:Show()
     self.animating = true
     
     self.main.Visible = true
+    self.shadow.Visible = true
     self.interact.Visible = true
 
     local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
+    -- Tween all elements in
     variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 0 }):Play()
-    variables.tweenService:Create(self.stroke, fadeInfo, { Transparency = 0.9 }):Play()
+    variables.tweenService:Create(self.shadow, fadeInfo, { ImageTransparency = 0.4 }):Play()
+    variables.tweenService:Create(self.stroke, fadeInfo, { Transparency = 0.8 }):Play()
+    variables.tweenService:Create(self.iconBg, fadeInfo, { BackgroundTransparency = 0 }):Play()
     variables.tweenService:Create(self.iconLabel, fadeInfo, { ImageTransparency = 0 }):Play()
     variables.tweenService:Create(self.titleLabel, fadeInfo, { TextTransparency = 0 }):Play()
-    variables.tweenService:Create(self.subtitleLabel, fadeInfo, { TextTransparency = 0.5 }):Play()
+    variables.tweenService:Create(self.subtitleLabel, fadeInfo, { TextTransparency = 0.2 }):Play()
 
     task.delay(fadeInfo.Time, function()
         self.animating = false
@@ -297,8 +340,11 @@ function Pill:Hide()
 
     local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
+    -- Tween all elements out
     variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    variables.tweenService:Create(self.shadow, fadeInfo, { ImageTransparency = 1 }):Play()
     variables.tweenService:Create(self.stroke, fadeInfo, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.iconBg, fadeInfo, { BackgroundTransparency = 1 }):Play()
     variables.tweenService:Create(self.iconLabel, fadeInfo, { ImageTransparency = 1 }):Play()
     variables.tweenService:Create(self.titleLabel, fadeInfo, { TextTransparency = 1 }):Play()
     variables.tweenService:Create(self.subtitleLabel, fadeInfo, { TextTransparency = 1 }):Play()
@@ -307,6 +353,7 @@ function Pill:Hide()
         self.animating = false
         if not self.visible then
             self.main.Visible = false
+            self.shadow.Visible = false
             self.interact.Visible = false
         end
     end)
