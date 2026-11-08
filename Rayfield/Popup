@@ -1,12 +1,3 @@
---!nonstrict
--- ============================================================================
--- Standalone Rayfield Popup (Exact Match)
--- ============================================================================
--- Paste this into a LocalScript (StarterPlayerScripts / StarterGui / 
--- ReplicatedFirst), press Play, and the demo popup will appear.
--- ============================================================================
-
--- ==== Services ====
 local Players          = game:GetService("Players")
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -16,7 +7,6 @@ local TextService      = game:GetService("TextService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
--- ==== Inline "utility" replacements ====
 local variables = {
     guiContainer     = PlayerGui,
     tweenService     = TweenService,
@@ -24,26 +14,10 @@ local variables = {
     httpService      = HttpService,
 }
 
-local constants = {
-    displayOrder = {
-        popup = 2147483647,
-    },
-}
-
-local locale = {
-    t = function(s) return tostring(s or "") end,
-    resolve = function(s) return tostring(s or "") end,
-}
-
-local log = {
-    warn  = function(...) warn(...) end,
-    print = function(...) print(...) end,
-}
-
-local hapticEngine = {
-    click  = function() end,
-    notify = function() end,
-}
+local constants = { displayOrder = { popup = 100 } }
+local locale = { t = function(s) return tostring(s or "") end, resolve = function(s) return tostring(s or "") end }
+local log = { warn = function(...) warn(...) end, print = function(...) print(...) end }
+local hapticEngine = { click = function() end, notify = function() end }
 
 local function contrastText(color)
     local lum = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
@@ -51,9 +25,7 @@ local function contrastText(color)
 end
 
 local function toColorSequence(color)
-    if typeof(color) == "ColorSequence" then
-        return color
-    end
+    if typeof(color) == "ColorSequence" then return color end
     return ColorSequence.new({
         ColorSequenceKeypoint.new(0, color),
         ColorSequenceKeypoint.new(1, color:Lerp(Color3.new(0, 0, 0), 0.15)),
@@ -62,28 +34,18 @@ end
 
 local function textHeight(font, size, text, width)
     text = tostring(text or "")
-    if text == "" then
-        return math.ceil(size * 1.2)
-    end
-    -- Use Gotham Medium for measuring since it matches the Rayfield default
+    if text == "" then return math.ceil(size * 1.2) end
     local ok, result = pcall(function()
         return TextService:GetTextSize(text, size, Enum.Font.GothamMedium, Vector2.new(math.max(1, width), 100000))
     end)
-    if ok and result then
-        return math.ceil(result.Y)
-    end
+    if ok and result then return math.ceil(result.Y) end
     local charsPerLine = math.max(1, math.floor(width / (size * 0.55)))
     local lines = math.ceil(#text / charsPerLine)
     return math.ceil(lines * size * 1.25)
 end
 
-local functions = {
-    contrastText    = contrastText,
-    toColorSequence = toColorSequence,
-    textHeight      = textHeight,
-}
+local functions = { contrastText = contrastText, toColorSequence = toColorSequence, textHeight = textHeight }
 
--- ==== Popup module ====
 local Popup = {}
 Popup.__index = Popup
 Popup.__type = "Popup"
@@ -128,16 +90,11 @@ local backdropShown = 0.5
 local stack          = {}
 local consumedEscape = nil
 
--- ==== Theme & Style Shims ====
 local DEFAULT_FONT_FAMILY = "rbxasset://fonts/families/GothamSSm.json"
+local function makeFont(weight) return Font.new(DEFAULT_FONT_FAMILY, weight) end
 
-local function makeFont(weight)
-    return Font.new(DEFAULT_FONT_FAMILY, weight)
-end
-
--- Exactly matches the Rayfield default dark theme
 local defaultTheme = {
-    WindowColor               = Color3.fromRGB(22, 22, 24), -- #161618
+    WindowColor               = Color3.fromRGB(22, 22, 24),
     CornerRoundness           = UDim.new(0, 16),
     SurfaceStroke             = Color3.fromRGB(60, 60, 65),
     ShadowColor               = Color3.fromRGB(0, 0, 0),
@@ -145,9 +102,9 @@ local defaultTheme = {
     ContentColor              = Color3.fromRGB(180, 180, 185),
     AccentColor               = Color3.fromRGB(0, 170, 255),
     AccentStroke              = Color3.fromRGB(0, 200, 255),
-    ErrorColor                = Color3.fromRGB(197, 43, 43), -- #C52B2B
+    ErrorColor                = Color3.fromRGB(197, 43, 43),
     ErrorStrokeColor          = Color3.fromRGB(220, 60, 60),
-    NeutralButton             = Color3.fromRGB(44, 44, 48), -- #2C2C30
+    NeutralButton             = Color3.fromRGB(44, 44, 48),
     NeutralButtonHover        = Color3.fromRGB(55, 55, 60),
     NeutralButtonStroke       = Color3.fromRGB(60, 60, 65),
     ElementStrokeTransparency = 0.8,
@@ -163,23 +120,18 @@ function Style.new(themeOverrides)
     local self = setmetatable({ theme = {} }, Style)
     for k, v in defaultTheme do self.theme[k] = v end
     if type(themeOverrides) == "table" then
-        for k, v in themeOverrides do
-            if v ~= nil then self.theme[k] = v end
-        end
+        for k, v in themeOverrides do if v ~= nil then self.theme[k] = v end end
     end
     return self
 end
 
 function Style:Create(className, props, themeMap)
     local instance = Instance.new(className)
-    if props then
-        for key, value in props do instance[key] = value end
-    end
+    if props then for key, value in props do instance[key] = value end end
     if themeMap then
         for prop, spec in themeMap do
             local themeKey, transform
-            if type(spec) == "table" then themeKey, transform = spec[1], spec[2]
-            else themeKey = spec end
+            if type(spec) == "table" then themeKey, transform = spec[1], spec[2] else themeKey = spec end
             local value = self.theme[themeKey]
             if value ~= nil and transform then value = transform(value) end
             if value ~= nil then instance[prop] = value end
@@ -200,11 +152,11 @@ end
 
 function Style:StyleElementPanel(frame)
     local stroke = Instance.new("UIStroke")
-    stroke.Color           = self.theme.SurfaceStroke or Color3.fromRGB(60, 60, 70)
-    stroke.Thickness       = 1
-    stroke.Transparency    = 1
+    stroke.Color = self.theme.SurfaceStroke or Color3.fromRGB(60, 60, 70)
+    stroke.Thickness = 1
+    stroke.Transparency = 1
     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    stroke.Parent          = frame
+    stroke.Parent = frame
     return stroke
 end
 
@@ -212,29 +164,22 @@ function Style:Connect(signal, fn) return signal:Connect(fn) end
 function Style:Disconnect(connection) if connection then connection:Disconnect() end end
 function Style:DestroySubtree(instance) if instance then instance:Destroy() end end
 
--- ==== Stack bookkeeping ====
 local function pruneStack()
     for i = #stack, 1, -1 do
         local open = stack[i]
-        if open._closed or not open.screenGui.Parent then
-            table.remove(stack, i)
-        end
+        if open._closed or not open.screenGui.Parent then table.remove(stack, i) end
     end
 end
 
-local function topmost(popup)
-    pruneStack()
-    return stack[#stack] == popup
-end
+local function topmost(popup) pruneStack(); return stack[#stack] == popup end
 
--- ==== Popup API ====
 function Popup.new(a, b)
     local properties, themeOverrides
     if type(a) == "table" and type(a.Create) == "function" and type(a.theme) == "table" then
         properties = if typeof(b) == "table" then b else {}
         local merged = {}
         for k, v in a.theme do merged[k] = v end
-        local overrides = properties.theme or prop2147483647erties.Theme
+        local overrides = properties.theme or properties.Theme
         if type(overrides) == "table" then for k, v in overrides do merged[k] = v end end
         themeOverrides = merged
     else
@@ -251,21 +196,14 @@ function Popup.new(a, b)
         boxes        = properties.boxes    or properties.Boxes,
         options      = properties.options  or properties.Options,
         dismissable  = if properties.dismissable ~= nil then properties.dismissable
-            elseif properties.Dismissable ~= nil then properties.Dismissable
-            else true,
-        _reveal      = {},
-        _connections = {},
-        _closed      = false,
+            elseif properties.Dismissable ~= nil then properties.Dismissable else true,
+        _reveal      = {}, _connections = {}, _closed = false,
     }, Popup)
 
-    if not self.options or #self.options == 0 then
-        self.options = { { text = "Okay" } }
-    end
-
+    if not self.options or #self.options == 0 then self.options = { { text = "Okay" } } end
     self:_build()
     pruneStack()
     table.insert(stack, self)
-
     task.spawn(function() self:_show() end)
     return self
 end
@@ -279,88 +217,46 @@ function Popup:_build()
     local window  = self.window
     local hasIcon = self.icon ~= nil and self.icon ~= 0 and self.icon ~= ""
 
-    -- FIXED: Switched from Global to Sibling so text/buttons don't hide behind the card
     self.screenGui = window:Create("ScreenGui", {
-        Name              = variables.httpService:GenerateGUID(false),
-        IgnoreGuiInset    = true,
-        ResetOnSpawn      = false,
-        Enabled           = true,
-        DisplayOrder      = constants.displayOrder.popup,
-        ZIndexBehavior    = Enum.ZIndexBehavior.Sibling,
-        Parent            = variables.guiContainer,
+        Name = variables.httpService:GenerateGUID(false), IgnoreGuiInset = true, ResetOnSpawn = false,
+        Enabled = true, DisplayOrder = constants.displayOrder.popup, ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        Parent = variables.guiContainer,
     })
 
     self.backdrop = window:Create("Frame", {
-        Name                 = "Backdrop",
-        BackgroundColor3     = Color3.fromRGB(0, 0, 0),
-        BorderSizePixel      = 0,
-        Size                 = UDim2.fromScale(1, 1),
-        Active               = true,
-        BackgroundTransparency = 1,
-        Parent               = self.screenGui,
+        Name = "Backdrop", BackgroundColor3 = Color3.fromRGB(0, 0, 0), BorderSizePixel = 0,
+        Size = UDim2.fromScale(1, 1), Active = true, BackgroundTransparency = 1, Parent = self.screenGui,
     })
     self:_fade(self.backdrop, "BackgroundTransparency", backdropShown)
 
-    -- Clean shadow layer
     self.shadow = window:Create("ImageLabel", {
-        Name = "Shadow",
-        Image = "rbxassetid://1316045217",
-        ImageColor3 = Color3.new(0, 0, 0),
-        ImageTransparency = 1,
-        ScaleType = Enum.ScaleType.Slice,
-        SliceCenter = Rect.new(10, 10, 118, 118),
-        Size = UDim2.new(1, 40, 1, 40),
-        Position = UDim2.new(0.5, 0, 0.5, 18),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundTransparency = 1,
-        Parent = self.screenGui,
+        Name = "Shadow", Image = "rbxassetid://1316045217", ImageColor3 = Color3.new(0, 0, 0),
+        ImageTransparency = 1, ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(10, 10, 118, 118),
+        Size = UDim2.new(1, 40, 1, 40), Position = UDim2.new(0.5, 0, 0.5, 18),
+        AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, Parent = self.screenGui,
     })
     self:_fade(self.shadow, "ImageTransparency", 0.4)
 
     self.card = window:Create("Frame", {
-        Name                 = "Card",
-        BackgroundColor3     = Color3.fromRGB(255, 255, 255),
-        AnchorPoint          = Vector2.new(0.5, 0.5),
-        Position             = UDim2.new(0.5, 0, 0.5, 14),
-        Size                 = UDim2.fromOffset(cardWidth, 0),
-        AutomaticSize        = Enum.AutomaticSize.Y,
-        Active               = true,
-        BorderSizePixel      = 0,
-        BackgroundTransparency = 1,
-        Parent               = self.screenGui,
+        Name = "Card", BackgroundColor3 = Color3.fromRGB(255, 255, 255), AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 14), Size = UDim2.fromOffset(cardWidth, 0),
+        AutomaticSize = Enum.AutomaticSize.Y, Active = true, BorderSizePixel = 0, BackgroundTransparency = 1, Parent = self.screenGui,
     })
     self:_fade(self.card, "BackgroundTransparency", 0)
 
-    window:Create("UIGradient", {
-        Rotation = 270,
-        Offset   = Vector2.new(0, -0.1),
-        Parent   = self.card,
-    }, { Color = { "WindowColor", functions.toColorSequence } })
+    window:Create("UIGradient", { Rotation = 270, Offset = Vector2.new(0, -0.1), Parent = self.card }, { Color = { "WindowColor", functions.toColorSequence } })
+    window:Create("UICorner", { Parent = self.card }, { CornerRadius = "CornerRoundness" })
 
-    window:Create("UICorner", {
-        Parent = self.card,
-    }, { CornerRadius = "CornerRoundness" })
-
-    self.cardStroke = window:Create("UIStroke", {
-        Transparency = 1,
-        Parent       = self.card,
-    }, { Color = "SurfaceStroke" })
+    self.cardStroke = window:Create("UIStroke", { Transparency = 1, Parent = self.card }, { Color = "SurfaceStroke" })
     self:_fade(self.cardStroke, "Transparency", 0.9)
 
     window:Create("UIPadding", {
-        PaddingLeft   = UDim.new(0, sidePadding),
-        PaddingRight  = UDim.new(0, sidePadding),
-        PaddingTop    = UDim.new(0, topPadding),
-        PaddingBottom = UDim.new(0, bottomPadding),
-        Parent        = self.card,
+        PaddingLeft = UDim.new(0, sidePadding), PaddingRight = UDim.new(0, sidePadding),
+        PaddingTop = UDim.new(0, topPadding), PaddingBottom = UDim.new(0, bottomPadding), Parent = self.card,
     })
-
     window:Create("UIListLayout", {
-        FillDirection       = Enum.FillDirection.Vertical,
-        HorizontalAlignment = Enum.HorizontalAlignment.Center,
-        SortOrder           = Enum.SortOrder.LayoutOrder,
-        Padding             = UDim.new(0, regionGap),
-        Parent              = self.card,
+        FillDirection = Enum.FillDirection.Vertical, HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, regionGap), Parent = self.card,
     })
 
     local headerHeight  = self:_measureHeader(hasIcon)
@@ -369,17 +265,13 @@ function Popup:_build()
     self:_buildFooter()
 
     local regions = 2 + (contentHeight > 0 and 1 or 0)
-    local cardHeight = topPadding + headerHeight + contentHeight + buttonHeight + bottomPadding
-        + regionGap * (regions - 1)
+    local cardHeight = topPadding + headerHeight + contentHeight + buttonHeight + bottomPadding + regionGap * (regions - 1)
     self.card.Size = UDim2.fromOffset(cardWidth, cardHeight)
     self.card.AutomaticSize = Enum.AutomaticSize.None
 
     if self.dismissable then
         table.insert(self._connections, window:Connect(self.backdrop.InputBegan, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.UserInputType == Enum.UserInputType.Touch then
-                self:Close()
-            end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then self:Close() end
         end))
         table.insert(self._connections, window:Connect(variables.userInputService.InputBegan, function(input, processed)
             if not processed and input.KeyCode == Enum.KeyCode.Escape and topmost(self) then
@@ -393,136 +285,45 @@ end
 
 function Popup:_buildHeader(hasIcon, headerHeight)
     local window = self.window
-
-    local header = window:Create("Frame", {
-        Name                 = "Header",
-        BackgroundTransparency = 1,
-        Size                 = UDim2.new(1, 0, 0, headerHeight),
-        LayoutOrder          = 1,
-        Parent               = self.card,
-    })
-
-    window:Create("UIListLayout", {
-        FillDirection       = Enum.FillDirection.Horizontal,
-        VerticalAlignment   = Enum.VerticalAlignment.Center,
-        HorizontalAlignment = Enum.HorizontalAlignment.Left,
-        SortOrder           = Enum.SortOrder.LayoutOrder,
-        Padding             = UDim.new(0, headerIconGap),
-        Parent              = header,
-    })
+    local header = window:Create("Frame", { Name = "Header", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, headerHeight), LayoutOrder = 1, Parent = self.card })
+    window:Create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, HorizontalAlignment = Enum.HorizontalAlignment.Left, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, headerIconGap), Parent = header })
 
     if hasIcon then
-        self:_fade(window:Create("ImageLabel", {
-            Image                 = self.icon,
-            Size                  = UDim2.fromOffset(headerIconSize, headerIconSize),
-            BackgroundTransparency = 1,
-            BorderSizePixel       = 0,
-            LayoutOrder           = 1,
-            ImageTransparency     = 1,
-            Parent                = header,
-        }, { ImageColor3 = "TitlingColor" }), "ImageTransparency", 0)
+        self:_fade(window:Create("ImageLabel", { Image = self.icon, Size = UDim2.fromOffset(headerIconSize, headerIconSize), BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = 1, ImageTransparency = 1, Parent = header }, { ImageColor3 = "TitlingColor" }), "ImageTransparency", 0)
     end
 
-    local textColumn = window:Create("Frame", {
-        Name                 = "Text",
-        BackgroundTransparency = 1,
-        Size                 = UDim2.new(1, hasIcon and -(headerIconSize + headerIconGap) or 0, 0, self._columnH),
-        LayoutOrder          = 2,
-        Parent               = header,
-    })
+    local textColumn = window:Create("Frame", { Name = "Text", BackgroundTransparency = 1, Size = UDim2.new(1, hasIcon and -(headerIconSize + headerIconGap) or 0, 0, self._columnH), LayoutOrder = 2, Parent = header })
+    window:Create("UIListLayout", { FillDirection = Enum.FillDirection.Vertical, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 3), Parent = textColumn })
 
-    window:Create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-        SortOrder     = Enum.SortOrder.LayoutOrder,
-        Padding       = UDim.new(0, 3),
-        Parent        = textColumn,
-    })
-
-    self:_fade(window:Create("TextLabel", {
-        Text                 = locale.t(self.title),
-        Size                 = UDim2.new(1, 0, 0, self._titleH),
-        BackgroundTransparency = 1,
-        TextSize             = titleSize,
-        TextXAlignment       = Enum.TextXAlignment.Left,
-        TextWrapped          = true,
-        LayoutOrder          = 1,
-        TextTransparency     = 1,
-        Parent               = textColumn,
-    }, { TextColor3 = "TitlingColor", FontFace = "TitleFont" }), "TextTransparency", 0)
+    self:_fade(window:Create("TextLabel", { Text = locale.t(self.title), Size = UDim2.new(1, 0, 0, self._titleH), BackgroundTransparency = 1, TextSize = titleSize, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, LayoutOrder = 1, TextTransparency = 1, Parent = textColumn }, { TextColor3 = "TitlingColor", FontFace = "TitleFont" }), "TextTransparency", 0)
 
     if self.subtitle and self.subtitle ~= "" then
-        self:_fade(window:Create("TextLabel", {
-            Text                 = locale.t(self.subtitle),
-            Size                 = UDim2.new(1, 0, 0, self._subH),
-            BackgroundTransparency = 1,
-            TextSize             = subtitleSize,
-            TextXAlignment       = Enum.TextXAlignment.Left,
-            TextWrapped          = true,
-            LayoutOrder          = 2,
-            TextTransparency     = 1,
-            Parent               = textColumn,
-        }, { TextColor3 = "TitlingColor", FontFace = "Font" }), "TextTransparency", 0.55)
+        self:_fade(window:Create("TextLabel", { Text = locale.t(self.subtitle), Size = UDim2.new(1, 0, 0, self._subH), BackgroundTransparency = 1, TextSize = subtitleSize, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, LayoutOrder = 2, TextTransparency = 1, Parent = textColumn }, { TextColor3 = "TitlingColor", FontFace = "Font" }), "TextTransparency", 0.55)
     end
 end
 
 function Popup:_buildContent()
-    if (not self.content or self.content == "") and (not self.boxes or #self.boxes == 0) then
-        return 0
-    end
-
+    if (not self.content or self.content == "") and (not self.boxes or #self.boxes == 0) then return 0 end
     local window = self.window
     local measured = if self.boxes and #self.boxes > 0 then self:_measureBoxes() else self:_measureText()
     local viewHeight = math.min(measured, maxContentHeight) + contentInset * 2
 
     local content = window:Create("ScrollingFrame", {
-        Name                  = "Content",
-        BackgroundTransparency = 1,
-        BorderSizePixel       = 0,
-        Size                  = UDim2.new(1, 0, 0, viewHeight),
-        CanvasSize            = UDim2.new(0, 0, 0, 0),
-        AutomaticCanvasSize   = Enum.AutomaticSize.Y,
-        ScrollBarThickness    = 4,
-        ScrollBarImageColor3  = Color3.fromRGB(255, 255, 255),
-        ScrollingDirection    = Enum.ScrollingDirection.Y,
-        LayoutOrder           = 2,
-        ScrollBarImageTransparency = 1,
-        Parent                = self.card,
+        Name = "Content", BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, viewHeight),
+        CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 4,
+        ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255), ScrollingDirection = Enum.ScrollingDirection.Y,
+        LayoutOrder = 2, ScrollBarImageTransparency = 1, Parent = self.card,
     })
     self:_fade(content, "ScrollBarImageTransparency", 0.8)
 
-    window:Create("UIPadding", {
-        PaddingLeft   = UDim.new(0, contentInset),
-        PaddingRight  = UDim.new(0, contentInset),
-        PaddingTop    = UDim.new(0, contentInset),
-        PaddingBottom = UDim.new(0, contentInset),
-        Parent        = content,
-    })
+    window:Create("UIPadding", { PaddingLeft = UDim.new(0, contentInset), PaddingRight = UDim.new(0, contentInset), PaddingTop = UDim.new(0, contentInset), PaddingBottom = UDim.new(0, contentInset), Parent = content })
 
     if self.boxes and #self.boxes > 0 then
-        window:Create("UIListLayout", {
-            FillDirection       = Enum.FillDirection.Vertical,
-            HorizontalAlignment = Enum.HorizontalAlignment.Center,
-            SortOrder           = Enum.SortOrder.LayoutOrder,
-            Padding             = UDim.new(0, boxGap),
-            Parent              = content,
-        })
-        for index, box in self.boxes do
-            self:_buildBox(content, box, index)
-        end
+        window:Create("UIListLayout", { FillDirection = Enum.FillDirection.Vertical, HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, boxGap), Parent = content })
+        for index, box in self.boxes do self:_buildBox(content, box, index) end
     else
-        self:_fade(window:Create("TextLabel", {
-            Text                 = locale.t(self.content),
-            Size                 = UDim2.new(1, 0, 0, measured),
-            BackgroundTransparency = 1,
-            TextSize             = contentSize,
-            TextXAlignment       = Enum.TextXAlignment.Left,
-            TextYAlignment       = Enum.TextYAlignment.Top,
-            TextWrapped          = true,
-            TextTransparency     = 1,
-            Parent               = content,
-        }, { TextColor3 = "ContentColor", FontFace = "Font" }), "TextTransparency", 0.5)
+        self:_fade(window:Create("TextLabel", { Text = locale.t(self.content), Size = UDim2.new(1, 0, 0, measured), BackgroundTransparency = 1, TextSize = contentSize, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, TextTransparency = 1, Parent = content }, { TextColor3 = "ContentColor", FontFace = "Font" }), "TextTransparency", 0.5)
     end
-
     return viewHeight
 end
 
@@ -532,116 +333,35 @@ function Popup:_buildBox(parent, box, order)
     local hasIcon = box.icon ~= nil and box.icon ~= 0 and box.icon ~= ""
     local frameH, titleH, descH, columnH = self:_measureBox(box)
 
-    local frame = window:Create("Frame", {
-        Name                 = "Box",
-        BackgroundColor3     = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel      = 0,
-        Size                 = UDim2.new(1, -boxWidthInset, 0, frameH),
-        LayoutOrder          = order,
-        BackgroundTransparency = 1,
-        Parent               = parent,
-    })
+    local frame = window:Create("Frame", { Name = "Box", BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0, Size = UDim2.new(1, -boxWidthInset, 0, frameH), LayoutOrder = order, BackgroundTransparency = 1, Parent = parent })
     self:_fade(frame, "BackgroundTransparency", 0)
 
     local stroke = window:StyleElementPanel(frame)
     self:_fade(stroke, "Transparency", window.theme.ElementStrokeTransparency)
 
-    window:Create("UIPadding", {
-        PaddingLeft   = UDim.new(0, boxSidePad),
-        PaddingRight  = UDim.new(0, boxSidePad),
-        PaddingTop    = UDim.new(0, boxVerticalPad),
-        PaddingBottom = UDim.new(0, boxVerticalPad),
-        Parent        = frame,
-    })
-
-    window:Create("UIListLayout", {
-        FillDirection       = Enum.FillDirection.Horizontal,
-        VerticalAlignment   = Enum.VerticalAlignment.Center,
-        HorizontalAlignment = Enum.HorizontalAlignment.Left,
-        SortOrder           = Enum.SortOrder.LayoutOrder,
-        Padding             = UDim.new(0, boxIconGap),
-        Parent              = frame,
-    })
+    window:Create("UIPadding", { PaddingLeft = UDim.new(0, boxSidePad), PaddingRight = UDim.new(0, boxSidePad), PaddingTop = UDim.new(0, boxVerticalPad), PaddingBottom = UDim.new(0, boxVerticalPad), Parent = frame })
+    window:Create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, HorizontalAlignment = Enum.HorizontalAlignment.Left, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, boxIconGap), Parent = frame })
 
     if hasIcon then
-        self:_fade(window:Create("ImageLabel", {
-            Image                 = box.icon,
-            Size                  = UDim2.fromOffset(boxIconSize, boxIconSize),
-            BackgroundTransparency = 1,
-            BorderSizePixel       = 0,
-            LayoutOrder           = 1,
-            ImageTransparency     = 1,
-            Parent                = frame,
-        }, { ImageColor3 = "ContentColor" }), "ImageTransparency", 0)
+        self:_fade(window:Create("ImageLabel", { Image = box.icon, Size = UDim2.fromOffset(boxIconSize, boxIconSize), BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = 1, ImageTransparency = 1, Parent = frame }, { ImageColor3 = "ContentColor" }), "ImageTransparency", 0)
     end
 
-    local textColumn = window:Create("Frame", {
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, hasIcon and -(boxIconSize + boxIconGap) or 0, 0, columnH),
-        LayoutOrder = 2,
-        Parent      = frame,
-    })
+    local textColumn = window:Create("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, hasIcon and -(boxIconSize + boxIconGap) or 0, 0, columnH), LayoutOrder = 2, Parent = frame })
+    window:Create("UIListLayout", { FillDirection = Enum.FillDirection.Vertical, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 3), Parent = textColumn })
 
-    window:Create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-        SortOrder     = Enum.SortOrder.LayoutOrder,
-        Padding       = UDim.new(0, 3),
-        Parent        = textColumn,
-    })
-
-    self:_fade(window:Create("TextLabel", {
-        Text                 = locale.t(box.title or box.Title or ""),
-        Size                 = UDim2.new(1, 0, 0, titleH),
-        BackgroundTransparency = 1,
-        TextSize             = boxTitleSize,
-        TextXAlignment       = Enum.TextXAlignment.Left,
-        TextWrapped          = true,
-        LayoutOrder          = 1,
-        TextTransparency     = 1,
-        Parent               = textColumn,
-    }, { TextColor3 = "ContentColor", FontFace = "TitleFont" }), "TextTransparency", 0)
+    self:_fade(window:Create("TextLabel", { Text = locale.t(box.title or box.Title or ""), Size = UDim2.new(1, 0, 0, titleH), BackgroundTransparency = 1, TextSize = boxTitleSize, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, LayoutOrder = 1, TextTransparency = 1, Parent = textColumn }, { TextColor3 = "ContentColor", FontFace = "TitleFont" }), "TextTransparency", 0)
 
     local description = box.description or box.Description
     if description and description ~= "" then
-        self:_fade(window:Create("TextLabel", {
-            Text                 = locale.t(description),
-            Size                 = UDim2.new(1, 0, 0, descH),
-            BackgroundTransparency = 1,
-            TextSize             = boxDescSize,
-            TextXAlignment       = Enum.TextXAlignment.Left,
-            TextYAlignment       = Enum.TextYAlignment.Top,
-            TextWrapped          = true,
-            LayoutOrder          = 2,
-            TextTransparency     = 1,
-            Parent               = textColumn,
-        }, { TextColor3 = "ContentColor", FontFace = "Font" }), "TextTransparency", 0.65)
+        self:_fade(window:Create("TextLabel", { Text = locale.t(description), Size = UDim2.new(1, 0, 0, descH), BackgroundTransparency = 1, TextSize = boxDescSize, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, LayoutOrder = 2, TextTransparency = 1, Parent = textColumn }, { TextColor3 = "ContentColor", FontFace = "Font" }), "TextTransparency", 0.65)
     end
 end
 
 function Popup:_buildFooter()
     local window = self.window
-
-    local footer = window:Create("Frame", {
-        Name                 = "Footer",
-        BackgroundTransparency = 1,
-        Size                 = UDim2.new(1, 0, 0, buttonHeight),
-        LayoutOrder          = 3,
-        Parent               = self.card,
-    })
-
-    window:Create("UIListLayout", {
-        FillDirection       = Enum.FillDirection.Horizontal,
-        VerticalAlignment   = Enum.VerticalAlignment.Center,
-        HorizontalAlignment = Enum.HorizontalAlignment.Center,
-        HorizontalFlex      = Enum.UIFlexAlignment.Fill,
-        SortOrder           = Enum.SortOrder.LayoutOrder,
-        Padding             = UDim.new(0, buttonGap),
-        Parent              = footer,
-    })
-
-    for index, option in self.options do
-        self:_buildButton(footer, option, index)
-    end
+    local footer = window:Create("Frame", { Name = "Footer", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, buttonHeight), LayoutOrder = 3, Parent = self.card })
+    window:Create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, HorizontalAlignment = Enum.HorizontalAlignment.Center, HorizontalFlex = Enum.UIFlexAlignment.Fill, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, buttonGap), Parent = footer })
+    for index, option in self.options do self:_buildButton(footer, option, index) end
 end
 
 function Popup:_buildButton(parent, option, order)
@@ -653,62 +373,35 @@ function Popup:_buildButton(parent, option, order)
 
     local restColor, hoverColor, edgeColor, strokeShown
     if style == "primary" then
-        restColor, hoverColor, edgeColor, strokeShown =
-            window.theme.AccentColor, window.theme.AccentStroke, window.theme.AccentStroke, 0.1
+        restColor, hoverColor, edgeColor, strokeShown = window.theme.AccentColor, window.theme.AccentStroke, window.theme.AccentStroke, 0.1
     elseif style == "danger" then
-        restColor, hoverColor, edgeColor, strokeShown =
-            window.theme.ErrorColor, window.theme.ErrorStrokeColor, window.theme.ErrorStrokeColor, 0
+        restColor, hoverColor, edgeColor, strokeShown = window.theme.ErrorColor, window.theme.ErrorStrokeColor, window.theme.ErrorStrokeColor, 0
+    elseif style == "success" then
+        -- Added "success" style (Green)
+        restColor, hoverColor, edgeColor, strokeShown = Color3.fromRGB(40, 167, 69), Color3.fromRGB(50, 187, 79), Color3.fromRGB(50, 187, 79), 0.1
     else
-        restColor, hoverColor, edgeColor, strokeShown =
-            window.theme.NeutralButton, window.theme.NeutralButtonHover, window.theme.NeutralButtonStroke, 0.85
+        restColor, hoverColor, edgeColor, strokeShown = window.theme.NeutralButton, window.theme.NeutralButtonHover, window.theme.NeutralButtonStroke, 0.85
     end
 
-    local button = window:Create("Frame", {
-        Name                 = "Button",
-        BackgroundColor3     = restColor,
-        BorderSizePixel      = 0,
-        Size                 = UDim2.new(0, 0, 0, buttonHeight),
-        LayoutOrder          = order,
-        BackgroundTransparency = 1,
-        Parent               = parent,
-    })
+    local button = window:Create("Frame", { Name = "Button", BackgroundColor3 = restColor, BorderSizePixel = 0, Size = UDim2.new(0, 0, 0, buttonHeight), LayoutOrder = order, BackgroundTransparency = 1, Parent = parent })
     self:_fade(button, "BackgroundTransparency", 0)
 
     window:Create("UIFlexItem", { FlexMode = Enum.UIFlexMode.Fill, Parent = button })
-    window:Create("UICorner",   { CornerRadius = buttonCorner, Parent = button })
+    window:Create("UICorner", { CornerRadius = buttonCorner, Parent = button })
 
-    local stroke = window:Create("UIStroke", {
-        Color        = edgeColor,
-        Transparency = 1,
-        Parent       = button,
-    })
+    local stroke = window:Create("UIStroke", { Color = edgeColor, Transparency = 1, Parent = button })
     self:_fade(stroke, "Transparency", strokeShown)
 
-    self:_fade(window:Create("TextLabel", {
-        Text                 = locale.t(label),
-        Size                 = UDim2.fromScale(1, 1),
-        BackgroundTransparency = 1,
-        TextSize             = buttonTextSize,
-        TextXAlignment       = Enum.TextXAlignment.Center,
-        TextTruncate         = Enum.TextTruncate.AtEnd,
-        TextColor3           = functions.contrastText(restColor),
-        TextTransparency     = 1,
-        Parent               = button,
-    }, { FontFace = "Font" }), "TextTransparency", 0)
+    self:_fade(window:Create("TextLabel", { Text = locale.t(label), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, TextSize = buttonTextSize, TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, TextColor3 = functions.contrastText(restColor), TextTransparency = 1, Parent = button }, { FontFace = "Font" }), "TextTransparency", 0)
 
-    local interact = window:Create("TextButton", {
-        Text                 = "",
-        BackgroundTransparency = 1,
-        Size                 = UDim2.fromScale(1, 1),
-        BorderSizePixel      = 0,
-        Parent               = button,
-    })
-
+    local interact = window:Create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), BorderSizePixel = 0, Parent = button })
     local hoverInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
     table.insert(self._connections, window:Connect(interact.MouseEnter, function()
         if self._closed then return end
         variables.tweenService:Create(button, hoverInfo, { BackgroundColor3 = hoverColor }):Play()
     end))
+    
     table.insert(self._connections, window:Connect(interact.MouseLeave, function()
         variables.tweenService:Create(button, hoverInfo, { BackgroundColor3 = restColor }):Play()
     end))
@@ -720,10 +413,7 @@ function Popup:_buildButton(parent, option, order)
         if callback then
             task.spawn(function()
                 local ok, err = pcall(callback)
-                if not ok then
-                    log.warn("Popup button '" .. label .. "' callback errored:")
-                    log.print(err)
-                end
+                if not ok then log.warn("Popup button '" .. label .. "' callback errored:"); log.print(err) end
             end)
         end
         self:Close()
@@ -733,9 +423,7 @@ end
 function Popup:_measureHeader(hasIcon)
     local textWidth = innerWidth - (if hasIcon then headerIconSize + headerIconGap else 0)
     self._titleH = functions.textHeight(self.window.theme.Font, titleSize, locale.resolve(self.title), textWidth)
-    self._subH = if self.subtitle and self.subtitle ~= ""
-        then functions.textHeight(self.window.theme.Font, subtitleSize, locale.resolve(self.subtitle), textWidth)
-        else 0
+    self._subH = if self.subtitle and self.subtitle ~= "" then functions.textHeight(self.window.theme.Font, subtitleSize, locale.resolve(self.subtitle), textWidth) else 0
     self._columnH = self._titleH + (if self._subH > 0 then 3 + self._subH else 0)
     return math.max(self._columnH, if hasIcon then headerIconSize else 0)
 end
@@ -748,15 +436,10 @@ function Popup:_measureBox(box)
     box = if typeof(box) == "table" then box else { title = tostring(box) }
     local hasIcon = box.icon ~= nil and box.icon ~= 0 and box.icon ~= ""
     local textWidth = contentWidth - boxWidthInset - boxSidePad * 2 - (if hasIcon then boxIconSize + boxIconGap else 0)
-
-    local titleH = functions.textHeight(
-        self.window.theme.TitleFont, boxTitleSize, locale.resolve(box.title or box.Title or ""), textWidth)
+    local titleH = functions.textHeight(self.window.theme.TitleFont, boxTitleSize, locale.resolve(box.title or box.Title or ""), textWidth)
     local descH = 0
     local description = box.description or box.Description
-    if description and description ~= "" then
-        descH = functions.textHeight(self.window.theme.Font, boxDescSize, locale.resolve(description), textWidth)
-    end
-
+    if description and description ~= "" then descH = functions.textHeight(self.window.theme.Font, boxDescSize, locale.resolve(description), textWidth) end
     local columnH = titleH + (if descH > 0 then 3 + descH else 0)
     local frameH = math.max(columnH, if hasIcon then boxIconSize else 0) + boxVerticalPad * 2
     return frameH, titleH, descH, columnH
@@ -766,9 +449,7 @@ function Popup:_measureBoxes()
     local total = 0
     for index, box in self.boxes do
         total += (self:_measureBox(box))
-        if index < #self.boxes then
-            total += boxGap
-        end
+        if index < #self.boxes then total += boxGap end
     end
     return total
 end
@@ -776,10 +457,8 @@ end
 function Popup:_show()
     if not self.screenGui.Parent then return end
     hapticEngine.notify()
-    
     variables.tweenService:Create(self.card, enterInfo, { Position = UDim2.new(0.5, 0, 0.5, 0) }):Play()
     variables.tweenService:Create(self.shadow, enterInfo, { Position = UDim2.new(0.5, 0, 0.5, 10) }):Play()
-
     for _, entry in self._reveal do
         local info = if entry.instance == self.backdrop then backdropInfo else fadeLong
         variables.tweenService:Create(entry.instance, info, { [entry.prop] = entry.to }):Play()
@@ -789,25 +468,17 @@ end
 function Popup:Close()
     if self._closed then return end
     self._closed = true
-
     local index = table.find(stack, self)
     if index then table.remove(stack, index) end
-
-    for _, connection in self._connections do
-        self.window:Disconnect(connection)
-    end
+    for _, connection in self._connections do self.window:Disconnect(connection) end
     self._connections = {}
-
     if not self.screenGui.Parent then return end
-
     variables.tweenService:Create(self.card, fadeShort, { Position = UDim2.new(0.5, 0, 0.5, 10) }):Play()
     variables.tweenService:Create(self.shadow, fadeShort, { Position = UDim2.new(0.5, 0, 0.5, 20) }):Play()
-
     for _, entry in self._reveal do
         variables.tweenService:Create(entry.instance, fadeShort, { [entry.prop] = 1 }):Play()
     end
-
-    task.delay(fadeShort.Time, function()
-        self.window:DestroySubtree(self.screenGui)
-    end)
+    task.delay(fadeShort.Time, function() self.window:DestroySubtree(self.screenGui) end)
 end
+
+return Popup
