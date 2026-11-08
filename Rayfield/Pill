@@ -1,209 +1,342 @@
---!nonstrict
+-- work pls
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
+local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
+-- ============================================================================
+-- MOCK UTILITIES (To make your exact code work standalone)
+-- ============================================================================
+local variables = {
+    guiContainer = PlayerGui,
+    tweenService = TweenService,
+    userInputService = UserInputService,
+    guiService = GuiService,
+    runService = RunService,
+    httpService = HttpService,
+    brandFont = function(weight) return Font.new("rbxasset://fonts/families/GothamSSm.json", weight) end,
+}
+
+local constants = {
+    zIndex = { restoreContent = 10, restoreInteract = 20 }
+}
+
+local locale = { t = function(s) return s end }
+local hapticEngine = { click = function() end }
+local filesystem = { isfile = function() return false end, writefile = function() end }
+
+-- ============================================================================
+-- YOUR EXACT CHROME CODE (Copied from your message)
+-- ============================================================================
+local chrome = {}
+local dragThreshold = 5
+
+function chrome.buildCollapsedFace(window)
+    local iconOnly = window.showIconOnly
+
+    window.collapsedIcon = window:Create("ImageLabel", {
+        Name = "CollapsedIcon",
+        AnchorPoint = if iconOnly then Vector2.new(0.5, 0.5) else Vector2.new(0, 0.5),
+        Position = if iconOnly then UDim2.fromScale(0.5, 0.5) else UDim2.new(0, 16, 0.5, 0),
+        Size = UDim2.fromOffset(24, 24),
+        BackgroundTransparency = 1,
+        Image = window.showIcon,
+        ZIndex = constants.zIndex.restoreContent,
+        ImageTransparency = 1,
+        Parent = window.main,
+    }, { ImageColor3 = "TitlingColor" })
+
+    window:Create("UICorner", {
+        Parent = window.collapsedIcon,
+    }, { CornerRadius = "PillCornerRadius" })
+
+    local textContainer = window:Create("Frame", {
+        Name = "CollapsedText",
+        Visible = not iconOnly,
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 50, 0.5, 0),
+        Size = UDim2.new(1, -60, 0, 32),
+        BackgroundTransparency = 1,
+        ZIndex = constants.zIndex.restoreContent,
+        Parent = window.main,
+    })
+
+    window:Create("UIListLayout", {
+        Padding = UDim.new(0, 1),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = textContainer,
+    })
+
+    window.collapsedTitle = window:Create("TextLabel", {
+        Name = "Title",
+        Text = window.showName,
+        Size = UDim2.new(1, 0, 0, 16),
+        BackgroundTransparency = 1,
+        FontFace = variables.brandFont(Enum.FontWeight.Medium),
+        RichText = true,
+        TextSize = 16,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = 1,
+        ZIndex = constants.zIndex.restoreContent,
+        TextTransparency = 1,
+        Parent = textContainer,
+    }, { TextColor3 = "TitlingColor" })
+
+    window.collapsedSubtitle = window:Create("TextLabel", {
+        Name = "Subtitle",
+        Text = window.showSubtitle or "Tap to show", -- Added to allow subtitle passing
+        Size = UDim2.new(1, 0, 0, 14),
+        BackgroundTransparency = 1,
+        FontFace = variables.brandFont(Enum.FontWeight.Medium),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = 2,
+        ZIndex = constants.zIndex.restoreContent,
+        TextTransparency = 1,
+        Parent = textContainer,
+    }, { TextColor3 = "TitlingColor" })
+
+    window.collapsedInteract = window:Create("TextButton", {
+        Name = "CollapsedInteract",
+        BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1),
+        Text = "",
+        TextTransparency = 1,
+        Visible = false,
+        ZIndex = constants.zIndex.restoreInteract,
+        Parent = window.main,
+    })
+
+    chrome.bindCollapsedDrag(window)
+end
+
+function chrome.bindCollapsedDrag(window)
+    local uis = variables.userInputService
+    local dragging, moved = false, false
+    local grabOffset, grabMouse = Vector2.zero, Vector2.zero
+
+    local function insetOffset()
+        if window.screenGui and window.screenGui.IgnoreGuiInset then
+            return variables.guiService:GetGuiInset()
+        end
+        return Vector2.zero
+    end
+
+    window:Connect(window.collapsedInteract.InputBegan, function(input, processed)
+        if processed or not window.hidden or window.animating then
+            return
+        end
+        local inputType = input.UserInputType.Name
+        if inputType ~= "MouseButton1" and inputType ~= "Touch" then
+            return
+        end
+        dragging, moved = true, false
+        grabMouse = uis:GetMouseLocation()
+        grabOffset = window.main.AbsolutePosition + window.main.AbsoluteSize * window.main.AnchorPoint - grabMouse
+    end)
+
+    window:Connect(uis.InputEnded, function(input)
+        local inputType = input.UserInputType.Name
+        if inputType ~= "MouseButton1" and inputType ~= "Touch" then return end
+        if not dragging then return end
+        dragging = false
+        if moved then
+            window._collapsedPosition = window.main.Position
+            return
+        end
+        hapticEngine.click()
+        window:ToggleHide()
+    end)
+
+    window:Connect(uis.WindowFocusReleased, function()
+        dragging = false
+    end)
+
+    window:Connect(variables.runService.RenderStepped, function()
+        if not dragging then return end
+        if not window.hidden or window.animating then
+            dragging = false
+            return
+        end
+        local mouse = uis:GetMouseLocation()
+        if not moved and (mouse - grabMouse).Magnitude < dragThreshold then
+            return
+        end
+        moved = true
+        local target = mouse + grabOffset + insetOffset()
+        window.main.Position = UDim2.fromOffset(target.X, target.Y)
+    end)
+end
+
+function chrome.setCollapsedShown(window, shown, tweenInfo)
+    local targets = {
+        [window.collapsedIcon] = { ImageTransparency = if shown then 0 else 1 },
+    }
+    if not window.showIconOnly then
+        targets[window.collapsedTitle] = { TextTransparency = if shown then 0 else 1 }
+        targets[window.collapsedSubtitle] = { TextTransparency = if shown then 0.5 else 1 }
+    end
+    for instance, props in targets do
+        if tweenInfo then
+            variables.tweenService:Create(instance, tweenInfo, props):Play()
+        else
+            for property, value in props do instance[property] = value end
+        end
+    end
+end
+
+-- ============================================================================
+-- STANDALONE WRAPPER (The "Thing")
+-- ============================================================================
 local Pill = {}
 Pill.__index = Pill
 
 function Pill.new(props)
     local self = setmetatable({
-        title = props.title or "RuinWare",
-        subtitle = props.subtitle or "Tap to show",
-        icon = props.icon or "rbxassetid://10734895456",
+        showName = props.title or "Rayfield",
+        showSubtitle = props.subtitle or "Tap to show",
+        showIcon = props.icon or "rbxassetid://10734895456",
+        showIconOnly = false,
         onShow = props.onShow,
         onHide = props.onHide,
         onClick = props.onClick,
-        visible = false,
+        hidden = true, -- true means it accepts clicks
+        animating = false,
+        connections = {},
+        themeProperties = {},
     }, Pill)
+
     self:_build()
     return self
 end
 
 function Pill:_build()
-    self.gui = Instance.new("ScreenGui")
-    self.gui.Name = HttpService:GenerateGUID(false)
-    self.gui.IgnoreGuiInset = true
-    self.gui.ResetOnSpawn = false
-    self.gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    self.gui.Parent = PlayerGui
+    -- 1. ScreenGui (No dimming background)
+    self.screenGui = Instance.new("ScreenGui")
+    self.screenGui.Name = HttpService:GenerateGUID(false)
+    self.screenGui.IgnoreGuiInset = true
+    self.screenGui.ResetOnSpawn = false
+    self.screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    self.screenGui.Parent = variables.guiContainer
 
-    -- Perfect pill shape (Sized compactly: 240x72)
-    self.main = Instance.new("Frame")
-    self.main.Size = UDim2.fromOffset(240, 72)
-    self.main.Position = UDim2.new(0.5, 0, 0.85, 0)
-    self.main.AnchorPoint = Vector2.new(0.5, 0.5)
-    self.main.BackgroundColor3 = Color3.fromRGB(22, 22, 24)
-    self.main.BackgroundTransparency = 1
-    self.main.BorderSizePixel = 0
-    self.main.Visible = false
-    self.main.Parent = self.gui
+    -- 2. Main Pill Frame (Exact size from your window.lua: 185x50)
+    self.main = self:Create("Frame", {
+        Name = "Pill",
+        Size = UDim2.fromOffset(185, 50),
+        Position = UDim2.new(0.5, 0, 0.85, 0), -- Default bottom center
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = Color3.fromRGB(22, 22, 24),
+        BackgroundTransparency = 1,
+        Visible = false,
+        BorderSizePixel = 0,
+        Parent = self.screenGui,
+    })
 
-    -- 180 Degree Rounding
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = self.main
-
-    local stroke = Instance.new("UIStroke")
+    -- Exact 180 degree roundness
+    self:Create("UICorner", { Parent = self.main }).CornerRadius = UDim.new(1, 0)
+    
+    -- Subtle stroke matching Rayfield
+    local stroke = self:Create("UIStroke", { Parent = self.main })
     stroke.Color = Color3.fromRGB(60, 60, 65)
     stroke.Transparency = 1
-    stroke.Parent = self.main
 
-    -- Circular Icon Background (Properly sized at 52x52)
-    local iconBg = Instance.new("Frame")
-    iconBg.Size = UDim2.fromOffset(52, 52)
-    iconBg.Position = UDim2.new(0, 10, 0.5, 0)
-    iconBg.AnchorPoint = Vector2.new(0, 0.5)
-    iconBg.BackgroundColor3 = Color3.fromRGB(35, 35, 38)
-    iconBg.BackgroundTransparency = 1
-    iconBg.Parent = self.main
+    -- 3. Build the exact face from your chrome.lua
+    chrome.buildCollapsedFace(self)
     
-    local iconCorner = Instance.new("UICorner")
-    iconCorner.CornerRadius = UDim.new(1, 0)
-    iconCorner.Parent = iconBg
+    -- Initial state setup
+    self.collapsedInteract.Visible = true
+    chrome.setCollapsedShown(self, false, nil)
+end
 
-    -- Icon Image
-    local iconImg = Instance.new("ImageLabel")
-    iconImg.Size = UDim2.fromOffset(28, 28)
-    iconImg.Position = UDim2.fromScale(0.5, 0.5)
-    iconImg.AnchorPoint = Vector2.new(0.5, 0.5)
-    iconImg.BackgroundTransparency = 1
-    iconImg.Image = self.icon
-    iconImg.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    iconImg.ImageTransparency = 1
-    iconImg.Parent = iconBg
-
-    -- Text
-    local textContainer = Instance.new("Frame")
-    textContainer.Size = UDim2.new(1, -80, 1, 0)
-    textContainer.Position = UDim2.new(0, 74, 0, 0)
-    textContainer.BackgroundTransparency = 1
-    textContainer.Parent = self.main
-
-    local layout = Instance.new("UIListLayout")
-    layout.VerticalAlignment = Enum.VerticalAlignment.Center
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = textContainer
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 22)
-    title.BackgroundTransparency = 1
-    title.Text = self.title
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextSize = 22
-    title.Font = Enum.Font.GothamBold
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.TextTransparency = 1
-    title.LayoutOrder = 1
-    title.Parent = textContainer
-
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(1, 0, 0, 18)
-    subtitle.BackgroundTransparency = 1
-    subtitle.Text = self.subtitle
-    subtitle.TextColor3 = Color3.fromRGB(160, 160, 165)
-    subtitle.TextSize = 18
-    subtitle.Font = Enum.Font.GothamMedium
-    subtitle.TextXAlignment = Enum.TextXAlignment.Left
-    subtitle.TextTransparency = 1
-    subtitle.LayoutOrder = 2
-    subtitle.Parent = textContainer
-
-    -- Interaction (Click + Drag)
-    local interact = Instance.new("TextButton")
-    interact.Size = UDim2.fromScale(1, 1)
-    interact.BackgroundTransparency = 1
-    interact.Text = ""
-    interact.TextTransparency = 1
-    interact.Parent = self.main
-
-    local dragging, moved = false, false
-    local startMouse, startPos
-
-    interact.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            moved = false
-            startMouse = UserInputService:GetMouseLocation()
-            startPos = self.main.Position
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local currentMouse = UserInputService:GetMouseLocation()
-            local delta = currentMouse - startMouse
-            if delta.Magnitude > 5 then
-                moved = true
-            end
-            if moved then
-                self.main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+-- Mock Create function so your exact code works
+function Pill:Create(className, props, themeMap)
+    local inst = Instance.new(className)
+    if props then
+        for k, v in pairs(props) do
+            if k ~= "Parent" and typeof(v) ~= "table" then -- Skip theme tables
+                inst[k] = v
             end
         end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if dragging then
-                dragging = false
-                if not moved and self.onClick then
-                    task.spawn(self.onClick)
-                end
+    end
+    if themeMap then
+        for prop, spec in pairs(themeMap) do
+            local key = if typeof(spec) == "table" then spec[1] else spec
+            if key == "TitlingColor" then inst[prop] = Color3.fromRGB(255, 255, 255)
+            elseif key == "ContentColor" then inst[prop] = Color3.fromRGB(180, 180, 185)
+            elseif key == "PillCornerRadius" then inst[prop] = UDim.new(1,0)
             end
         end
-    end)
+    end
+    if props and props.Parent then inst.Parent = props.Parent end
+    return inst
+end
 
-    self.reveal = {self.main, iconBg, iconImg, title, subtitle, stroke}
+function Pill:Connect(signal, callback)
+    local conn = signal:Connect(callback)
+    table.insert(self.connections, conn)
+    return conn
+end
+
+-- Called by the drag logic when clicked
+function Pill:ToggleHide()
+    if self.animating then return end
+    if self.onClick then
+        task.spawn(self.onClick)
+    end
 end
 
 -- 2. TRIGGER VIS
 function Pill:Show()
-    if self.visible then return end
-    self.visible = true
-    self.main.Visible = true
-
-    local info = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    TweenService:Create(self.main, info, {BackgroundTransparency = 0}):Play()
-    TweenService:Create(self.main.UIStroke, info, {Transparency = 0.8}):Play()
-    TweenService:Create(self.main:FindFirstChildOfClass("Frame"), info, {BackgroundTransparency = 0}):Play()
-    TweenService:Create(self.main:FindFirstChildOfClass("Frame"):FindFirstChildOfClass("ImageLabel"), info, {ImageTransparency = 0}):Play()
+    if not self.hidden then return end
+    self.hidden = false
+    self.animating = true
     
-    local textContainer = self.main:FindFirstChildOfClass("Frame")
-    for _, v in ipairs(textContainer:GetChildren()) do
-        if v:IsA("TextLabel") then
-            TweenService:Create(v, info, {TextTransparency = v.Name == "TextLabel" and 0 or 0.2}):Play()
-        end
+    self.main.Visible = true
+    local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    -- Fade in the background frame
+    TweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 0 }):Play()
+    if self.main:FindFirstChildOfClass("UIStroke") then
+        TweenService:Create(self.main:FindFirstChildOfClass("UIStroke"), fadeInfo, { Transparency = 0.9 }):Play()
     end
-
+    
+    -- Fade in the text/icon using your exact function
+    chrome.setCollapsedShown(self, true, fadeInfo)
+    
+    task.delay(0.3, function() self.animating = false end)
     if self.onShow then task.spawn(self.onShow) end
 end
 
 -- 3. TRIGGER OFF
 function Pill:Hide()
-    if not self.visible then return end
-    self.visible = false
-
-    local info = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    TweenService:Create(self.main, info, {BackgroundTransparency = 1}):Play()
-    TweenService:Create(self.main.UIStroke, info, {Transparency = 1}):Play()
-    TweenService:Create(self.main:FindFirstChildOfClass("Frame"), info, {BackgroundTransparency = 1}):Play()
-    TweenService:Create(self.main:FindFirstChildOfClass("Frame"):FindFirstChildOfClass("ImageLabel"), info, {ImageTransparency = 1}):Play()
+    if self.hidden then return end
+    self.hidden = true
+    self.animating = true
     
-    local textContainer = self.main:FindFirstChildOfClass("Frame")
-    for _, v in ipairs(textContainer:GetChildren()) do
-        if v:IsA("TextLabel") then
-            TweenService:Create(v, info, {TextTransparency = 1}):Play()
-        end
+    local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    -- Fade out the background frame
+    TweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    if self.main:FindFirstChildOfClass("UIStroke") then
+        TweenService:Create(self.main:FindFirstChildOfClass("UIStroke"), fadeInfo, { Transparency = 1 }):Play()
     end
-
+    
+    -- Fade out text/icon using your exact function
+    chrome.setCollapsedShown(self, false, fadeInfo)
+    
     task.delay(0.3, function()
-        if not self.visible then
+        if self.hidden then
             self.main.Visible = false
+            self.animating = false
         end
     end)
-
+    
     if self.onHide then task.spawn(self.onHide) end
 end
 
