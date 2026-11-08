@@ -26,7 +26,7 @@ local variables = {
 
 local constants = {
     displayOrder = {
-        popup = 100,
+        popup = 217291,
     },
 }
 
@@ -815,14 +815,15 @@ end
 -- ============================================================================
 -- DEMO
 -- ============================================================================
+task.wait(1)
 Popup.new({
-    title   = Test",
+    title   = "Test",
     icon    = "rbxassetid://10734898355", -- The white "X" icon
     content = "test",
     options = {
-        { text = "Cancel" },
+        { text = "Kill ur self" },
         {
-          text     = "Reset",
+          text     = "die",
             style    = "danger",
             callback = function()
                 print("[Popup] Reset clicked.")
