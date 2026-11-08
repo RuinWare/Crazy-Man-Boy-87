@@ -609,15 +609,15 @@ local sidebar = make("Frame", {
 	ClipsDescendants = true,
 	ZIndex = 2,
 }, body)
-corner(sidebar, UDim.new(0, 14))
-glass(sidebar, UDim.new(0, 14), 0.8)
+corner(sidebar, UDim.new(0, 20))
+glass(sidebar, UDim.new(0, 20), 0.3)
 
 make("TextLabel", {
 	Name = "SideTitle",
 	Position = UDim2.fromOffset(16, 10),
 	Size = UDim2.new(1, -60, 0, 18),
 	BackgroundTransparency = 1,
-	Text = "SCRIPTS",
+	Text = "Scripts",
 	TextColor3 = SUBTITLE_COLOR,
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
