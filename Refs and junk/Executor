@@ -1,0 +1,2292 @@
+-- Code Runner
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+local TITLE = "Code Runner"
+local SUBTITLE = "Write, run and save Lua"
+local FLAG = "CodeRunner"                           -- name of this window (DeleteGuiByFlag can remove it)
+local SAVE_FILE = "CodeRunner_Scripts.json"         -- where your scripts are saved
+local START_SIZE = Vector2.new(580, 380)
+local MIN_SIZE = Vector2.new(440, 300)
+local MAX_SIZE = Vector2.new(1000, 720)
+local SPAWN = Vector2.new(0.5, 0.5)                 -- where it appears (0-1 of the screen)
+local CORNER = 18
+local BODY_TRANSPARENCY = 0.10
+local TITLE_COLOR = Color3.fromRGB(245, 245, 245)   -- off-white, because black text can't be seen on a black box
+local SUBTITLE_COLOR = Color3.fromRGB(140, 140, 150)
+local SIDEBAR_COLOR = Color3.fromRGB(16, 16, 19)    -- slightly off black
+local EDITOR_COLOR = SUBTITLE_COLOR:Lerp(Color3.new(0, 0, 0), 0.84) -- the subtitle gray, darkened so code is readable
+local CODE_SIZE = 14
+local SCREEN_MARGIN = 6
+local DRAG_FOLLOW_SPEED = 9                         -- lower = the window trails the drag bar more
+local RESIZE_FOLLOW_SPEED = 26
+local UI_FONT = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Medium)
+local UI_FONT_BOLD = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.SemiBold)
+
+-- Icons (all uploaded in white, so the script recolors them)
+local ICON_RUN = "rbxassetid://101968242089255"
+local ICON_CLOSE = "rbxassetid://122079403738862"
+local ICON_FILE = "rbxassetid://84710966599036"
+local ICON_RENAME = "rbxassetid://138570826481183"
+local ICON_DELETE = "rbxassetid://71855002670984"   -- also used by the Clear button
+local ICON_ERROR = "rbxassetid://139101153957019"
+
+-- ============================================================
+-- DO NOT EDIT BELOW THIS LINE
+-- ============================================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CollectionService = game:GetService("CollectionService")
+local HttpService = game:GetService("HttpService")
+local TextService = game:GetService("TextService")
+
+local TAG = "DraggableBoxGui" -- same tag as the mobile buttons, so DestroyAllGuis / DeleteGuiByFlag work on this too
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local WHITE = Color3.new(1, 1, 1)
+local BLACK = Color3.new(0, 0, 0)
+local OFFWHITE = Color3.fromRGB(236, 236, 238)
+local ERROR_RED = Color3.fromRGB(255, 88, 88)
+local DELETE_RED = Color3.fromRGB(222, 64, 64)
+local DELETE_TEXT = Color3.fromRGB(255, 96, 96)
+local BUTTON_GRAY = Color3.fromRGB(70, 70, 78)
+local CODE_FONT = Enum.Font.Code
+
+-- layout numbers
+local HEADER_H = 56
+local FOOT_H = 36
+local PAD = 12
+local GAP = 12
+local MIN_SIDEBAR = 120
+local MIN_EDITOR = 200
+local GUTTER_W = 42
+local PADX, PADY = 8, 8
+local ITEM_H = 34
+local CHUNK = 12
+local MENU_W, MENU_H = 138, 82
+
+-- drag bar (below the window), resize icon (bottom-right): same as the mobile buttons
+local BAR_DISTANCE = 8
+local BAR_HIT = Vector2.new(72, 22)
+local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2
+local BAR_SIZE = UDim2.fromOffset(51, 3)
+local BAR_SIZE_ACTIVE = UDim2.fromOffset(61, 4)
+local BAR_IDLE = 0.55
+local ICON_R, ICON_THICK, ICON_INSET = 15, 2.5, 12
+local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
+local ICON_IDLE = 0.45
+
+local PILL_SIZE = Vector2.new(88, 34)
+
+----------------------------------------------------------------
+-- Helpers
+----------------------------------------------------------------
+local function tween(obj, time, props, style, direction)
+	local t = TweenService:Create(
+		obj,
+		TweenInfo.new(time, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out),
+		props
+	)
+	t:Play()
+	return t
+end
+
+local function make(class, props, parent)
+	local inst = Instance.new(class)
+	for key, value in pairs(props) do
+		inst[key] = value
+	end
+	inst.Parent = parent
+	return inst
+end
+
+local function corner(parent, radius)
+	return make("UICorner", { CornerRadius = radius }, parent)
+end
+
+local function isPress(input)
+	return input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+end
+
+local function p2(input)
+	return Vector2.new(input.Position.X, input.Position.Y)
+end
+
+local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+local rng = Random.new()
+local function randomName(length)
+	local out = {}
+	for i = 1, length do
+		local n = rng:NextInteger(1, #CHARS)
+		out[i] = CHARS:sub(n, n)
+	end
+	return table.concat(out)
+end
+
+-- Highest place available: hidden UI container > CoreGui > PlayerGui
+local function parentGui(gui)
+	local targets = {}
+	if gethui then
+		local ok, container = pcall(gethui)
+		if ok and container then targets[#targets + 1] = container end
+	end
+	local okCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+	if okCore and coreGui then targets[#targets + 1] = coreGui end
+	targets[#targets + 1] = playerGui
+
+	for _, target in ipairs(targets) do
+		local ok = pcall(function() gui.Parent = target end)
+		if ok and gui.Parent == target then return end
+	end
+end
+
+-- An icon from an uploaded image (recolored with ImageColor3, because the images are white)
+local function makeIcon(parent, image, color, size, extra)
+	local props = {
+		BackgroundTransparency = 1,
+		Image = image,
+		ImageColor3 = color,
+		ScaleType = Enum.ScaleType.Fit,
+		Size = UDim2.fromOffset(size, size),
+		ZIndex = 6,
+	}
+	if extra then
+		for key, value in pairs(extra) do props[key] = value end
+	end
+	return make("ImageLabel", props, parent)
+end
+
+-- Liquid glass: a bright edge that fades around the shape, plus a soft sheen across the surface.
+-- Returns the stroke, the sheen frame and the sheen gradient (so buttons can make it shimmer).
+local function glass(frame, radius, strength)
+	strength = strength or 1
+	local stroke = make("UIStroke", {
+		Name = "GlassStroke",
+		Color = WHITE,
+		Thickness = 1.2,
+		Transparency = 0.4,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, frame)
+	make("UIGradient", {
+		Rotation = 45,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.05),
+			NumberSequenceKeypoint.new(0.4, 0.82),
+			NumberSequenceKeypoint.new(0.75, 0.92),
+			NumberSequenceKeypoint.new(1, 0.5),
+		}),
+	}, stroke)
+
+	local sheen = make("Frame", {
+		Name = "Sheen",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+	}, frame)
+	corner(sheen, radius)
+	local function soft(t) return 1 - (1 - t) * strength end
+	local gradient = make("UIGradient", {
+		Rotation = 60,
+		Offset = Vector2.new(-0.5, 0),
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, soft(0.82)),
+			NumberSequenceKeypoint.new(0.4, soft(0.95)),
+			NumberSequenceKeypoint.new(1, soft(0.985)),
+		}),
+	}, sheen)
+	return stroke, sheen, gradient
+end
+
+-- Fading groups of things in and out (without blurring text): remember each value, then tween it
+local function snapshotFor(root)
+	local list = {}
+	local function add(obj, prop)
+		list[#list + 1] = { obj, prop, obj[prop] }
+	end
+	local function visit(obj)
+		if obj:IsA("GuiObject") then
+			add(obj, "BackgroundTransparency")
+			if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+				add(obj, "TextTransparency")
+			end
+			if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
+				add(obj, "ImageTransparency")
+			end
+		elseif obj:IsA("UIStroke") then
+			add(obj, "Transparency")
+		end
+	end
+	visit(root)
+	for _, d in ipairs(root:GetDescendants()) do visit(d) end
+	return list
+end
+
+local function setGroup(list, value)
+	for _, item in ipairs(list) do item[1][item[2]] = value end
+end
+
+local function fadeGroup(list, visible, duration)
+	for _, item in ipairs(list) do
+		tween(item[1], duration, { [item[2]] = visible and item[3] or 1 }, Enum.EasingStyle.Quad)
+	end
+end
+
+-- Custom scroll thumb: a thin bar that fades in while you scroll, follows the scroll position,
+-- and can be dragged. Returns functions to refresh it.
+local function makeScrollbar(scroll, host, rightInset, topInset, bottomInset, zindex)
+	local track = make("Frame", {
+		Name = "ScrollTrack",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -rightInset, 0, topInset),
+		Size = UDim2.new(0, 10, 1, -(topInset + bottomInset)),
+		BackgroundTransparency = 1,
+		ZIndex = zindex,
+	}, host)
+	local thumb = make("TextButton", {
+		Name = "Thumb",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		Size = UDim2.fromOffset(10, 30),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = zindex,
+	}, track)
+	local bar = make("Frame", {
+		Name = "Bar",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 4, 1, 0),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = zindex,
+	}, thumb)
+	corner(bar, UDim.new(1, 0))
+
+	local fadeToken = 0
+	local dragging = false
+
+	local function show()
+		fadeToken += 1
+		local token = fadeToken
+		tween(bar, 0.15, { BackgroundTransparency = 0.45 }, Enum.EasingStyle.Quad)
+		task.delay(0.9, function()
+			if token == fadeToken and not dragging then
+				tween(bar, 0.45, { BackgroundTransparency = 1 }, Enum.EasingStyle.Sine)
+			end
+		end)
+	end
+
+	local function metrics()
+		return scroll.AbsoluteWindowSize.Y, scroll.AbsoluteCanvasSize.Y, track.AbsoluteSize.Y
+	end
+
+	local function update()
+		local viewH, contentH, trackH = metrics()
+		if contentH <= viewH + 1 or trackH < 10 then
+			thumb.Visible = false
+			return
+		end
+		thumb.Visible = true
+		local thumbH = math.max(28, trackH * viewH / contentH)
+		local alpha = math.clamp(scroll.CanvasPosition.Y / (contentH - viewH), 0, 1)
+		thumb.Size = UDim2.fromOffset(10, thumbH)
+		thumb.Position = UDim2.new(0.5, 0, 0, alpha * (trackH - thumbH))
+	end
+
+	scroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+		update()
+		show()
+	end)
+	scroll:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(update)
+	scroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(update)
+	track:GetPropertyChangedSignal("AbsoluteSize"):Connect(update)
+	thumb.MouseEnter:Connect(show)
+
+	thumb.InputBegan:Connect(function(input)
+		if not isPress(input) then return end
+		dragging = true
+		show()
+		local startY = p2(input).Y
+		local startCanvas = scroll.CanvasPosition.Y
+		local connection
+		connection = UserInputService.InputChanged:Connect(function(change)
+			if change.UserInputType ~= Enum.UserInputType.MouseMovement and change ~= input then return end
+			local viewH, contentH, trackH = metrics()
+			local thumbH = math.max(28, trackH * viewH / contentH)
+			local movable = trackH - thumbH
+			if movable <= 0 then return end
+			local maxScroll = contentH - viewH
+			local target = startCanvas + (p2(change).Y - startY) * (maxScroll / movable)
+			scroll.CanvasPosition = Vector2.new(scroll.CanvasPosition.X, math.clamp(target, 0, maxScroll))
+		end)
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+				connection:Disconnect()
+				show()
+			end
+		end)
+	end)
+
+	update()
+	return { update = update, show = show }
+end
+
+-- Button feel: press squish and a shimmer across the glass
+local function attachPress(button, scale, down)
+	down = down or 0.94
+	button.InputBegan:Connect(function(input)
+		if isPress(input) then tween(scale, 0.1, { Scale = down }, Enum.EasingStyle.Quad) end
+	end)
+	button.InputEnded:Connect(function(input)
+		if isPress(input) then tween(scale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back) end
+	end)
+end
+
+----------------------------------------------------------------
+-- Remove an older copy of this window (same flag)
+----------------------------------------------------------------
+local function collectGuis()
+	local list, seen = {}, {}
+	local function add(inst)
+		if inst:IsA("ScreenGui") and not seen[inst] then
+			seen[inst] = true
+			list[#list + 1] = inst
+		end
+	end
+	for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
+
+	local function scan(container)
+		if not container then return end
+		local ok, children = pcall(function() return container:GetChildren() end)
+		if not ok then return end
+		for _, child in ipairs(children) do
+			if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
+		end
+	end
+	scan(playerGui)
+	pcall(function() scan(game:GetService("CoreGui")) end)
+	if gethui then pcall(function() scan(gethui()) end) end
+	return list
+end
+
+for _, old in ipairs(collectGuis()) do
+	if old:GetAttribute("Flag") == FLAG then old:Destroy() end
+end
+
+----------------------------------------------------------------
+-- Saved scripts (kept in a file, so they survive between sessions)
+----------------------------------------------------------------
+local canUseFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+local memoryStore = _G
+pcall(function()
+	if getgenv then memoryStore = getgenv() end
+end)
+
+local function defaultData()
+	return { scripts = { { name = "Script 1.lua", code = "" } }, selected = 1, sidebar = 0.28 }
+end
+
+local function loadData()
+	local raw
+	if canUseFiles then
+		local ok, result = pcall(function()
+			if isfile(SAVE_FILE) then return HttpService:JSONDecode(readfile(SAVE_FILE)) end
+			return nil
+		end)
+		if ok then raw = result end
+	else
+		raw = memoryStore.CodeRunnerData
+	end
+
+	local result = defaultData()
+	if type(raw) == "table" and type(raw.scripts) == "table" then
+		local scripts = {}
+		for _, item in ipairs(raw.scripts) do
+			if type(item) == "table" and type(item.name) == "string" and type(item.code) == "string" then
+				scripts[#scripts + 1] = { name = item.name, code = item.code }
+			end
+		end
+		if #scripts > 0 then
+			result.scripts = scripts
+			result.selected = math.clamp(tonumber(raw.selected) or 1, 1, #scripts)
+			result.sidebar = math.clamp(tonumber(raw.sidebar) or 0.28, 0.12, 0.6)
+		end
+	end
+	return result
+end
+
+local data = loadData()
+
+local function writeData()
+	if canUseFiles then
+		pcall(function()
+			writefile(SAVE_FILE, HttpService:JSONEncode(data))
+		end)
+	else
+		memoryStore.CodeRunnerData = data
+	end
+end
+
+local saveToken = 0
+local function scheduleSave()
+	saveToken += 1
+	local token = saveToken
+	task.delay(0.5, function()
+		if token == saveToken then writeData() end
+	end)
+end
+
+----------------------------------------------------------------
+-- The window
+----------------------------------------------------------------
+local screenGui = make("ScreenGui", {
+	Name = randomName(20),
+	ResetOnSpawn = false,
+	IgnoreGuiInset = true,
+	DisplayOrder = 2147483647, -- above every other GUI
+	OnTopOfCoreBlur = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, nil)
+screenGui:SetAttribute(TAG, "CodeRunner")
+screenGui:SetAttribute("Flag", FLAG)
+CollectionService:AddTag(screenGui, TAG)
+parentGui(screenGui)
+
+local function viewport()
+	local size = screenGui.AbsoluteSize
+	if size.X < 1 or size.Y < 1 then
+		size = workspace.CurrentCamera.ViewportSize
+	end
+	return size
+end
+
+-- Off-screen protection (the drag bar below the window is counted too)
+local function fitSize(size)
+	local v = viewport()
+	return Vector2.new(
+		math.min(size.X, v.X - SCREEN_MARGIN * 2),
+		math.min(size.Y, v.Y - SCREEN_MARGIN * 2 - BAR_BELOW)
+	)
+end
+
+local function clampCenter(center, size)
+	local v = viewport()
+	local half = size / 2
+	local minX, minY = half.X + SCREEN_MARGIN, half.Y + SCREEN_MARGIN
+	local maxX = v.X - half.X - SCREEN_MARGIN
+	local maxY = v.Y - half.Y - SCREEN_MARGIN - BAR_BELOW
+	return Vector2.new(
+		math.clamp(center.X, minX, math.max(minX, maxX)),
+		math.clamp(center.Y, minY, math.max(minY, maxY))
+	)
+end
+
+local startSize = fitSize(START_SIZE)
+local v0 = viewport()
+local startCenter = clampCenter(Vector2.new(v0.X * SPAWN.X, v0.Y * SPAWN.Y), startSize)
+
+-- state shared by many parts below
+local sizeTarget, posTarget = startSize, startCenter
+local sizeCur, posCur = startSize, startCenter
+local drag = {}              -- what is being dragged right now: { kind = "move" | "resize" | "divider" | "pill", ... }
+local layoutDirty = true
+local lastSideW = 150
+local isOpen = false
+local busy = false
+local pillCenter = nil
+local flashLine, liveErrorLine = nil, nil
+local lineCount = 1
+local connections = {}
+
+-- functions that get defined further down
+local render, layout, buildList, applySelection, selectScript, addScript
+local openMenu, closeMenu, beginRename, openDeletePopup
+local showToast, hideToast, execute, setOpen, followCaret, scheduleLiveCheck
+
+local holder = make("Frame", {
+	Name = "Holder",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromOffset(startCenter.X, startCenter.Y),
+	Size = UDim2.fromOffset(startSize.X, startSize.Y),
+	BackgroundTransparency = 1,
+	Visible = false,
+}, screenGui)
+local popScale = make("UIScale", { Name = "PopScale", Scale = 1 }, holder)
+
+local body = make("Frame", {
+	Name = "Body",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = BODY_TRANSPARENCY,
+	BorderSizePixel = 0,
+	ZIndex = 1,
+}, holder)
+corner(body, UDim.new(0, CORNER))
+make("UIGradient", { -- the black background gradient
+	Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(40, 40, 50)),
+	Rotation = 60,
+}, body)
+glass(body, UDim.new(0, CORNER), 0.9)
+
+-- Title, subtitle and the close button
+local titleLabel = make("TextLabel", {
+	Name = "Title",
+	Position = UDim2.fromOffset(PAD + 6, 10),
+	Size = UDim2.new(1, -(PAD * 2 + 56), 0, 20),
+	BackgroundTransparency = 1,
+	Text = TITLE,
+	TextColor3 = TITLE_COLOR,
+	TextSize = 17,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+	FontFace = UI_FONT_BOLD,
+	ZIndex = 3,
+}, body)
+local subtitleLabel = make("TextLabel", {
+	Name = "Subtitle",
+	Position = UDim2.fromOffset(PAD + 6, 31),
+	Size = UDim2.new(1, -(PAD * 2 + 56), 0, 16),
+	BackgroundTransparency = 1,
+	Text = SUBTITLE,
+	TextColor3 = SUBTITLE_COLOR,
+	TextSize = 12,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+	FontFace = UI_FONT,
+	ZIndex = 3,
+}, body)
+
+local closeButton = make("TextButton", {
+	Name = "Close",
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -(PAD + 2), 0, 22),
+	Size = UDim2.fromOffset(30, 30),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 4,
+}, body)
+corner(closeButton, UDim.new(1, 0))
+local closeScale = make("UIScale", { Scale = 1 }, closeButton)
+local closeIcon = makeIcon(closeButton, ICON_CLOSE, OFFWHITE, 14, {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	ZIndex = 5,
+})
+closeButton.MouseEnter:Connect(function()
+	tween(closeButton, 0.25, { BackgroundTransparency = 0.86 })
+	tween(closeIcon, 0.4, { Rotation = 90, ImageColor3 = ERROR_RED }, Enum.EasingStyle.Back)
+end)
+closeButton.MouseLeave:Connect(function()
+	tween(closeButton, 0.3, { BackgroundTransparency = 1 })
+	tween(closeIcon, 0.4, { Rotation = 0, ImageColor3 = OFFWHITE }, Enum.EasingStyle.Back)
+end)
+attachPress(closeButton, closeScale, 0.8)
+closeButton.Activated:Connect(function()
+	task.spawn(setOpen, false)
+end)
+
+----------------------------------------------------------------
+-- Sidebar (the scripts)
+----------------------------------------------------------------
+local sidebar = make("Frame", {
+	Name = "Sidebar",
+	BackgroundColor3 = SIDEBAR_COLOR,
+	BackgroundTransparency = 0.12,
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	ZIndex = 2,
+}, body)
+corner(sidebar, UDim.new(0, 14))
+glass(sidebar, UDim.new(0, 14), 0.8)
+
+make("TextLabel", {
+	Name = "SideTitle",
+	Position = UDim2.fromOffset(16, 10),
+	Size = UDim2.new(1, -60, 0, 18),
+	BackgroundTransparency = 1,
+	Text = "SCRIPTS",
+	TextColor3 = SUBTITLE_COLOR,
+	TextSize = 11,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	FontFace = UI_FONT_BOLD,
+	ZIndex = 3,
+}, sidebar)
+
+local addButton = make("TextButton", {
+	Name = "Add",
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -8, 0, 6),
+	Size = UDim2.fromOffset(26, 26),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 4,
+}, sidebar)
+corner(addButton, UDim.new(1, 0))
+local addScale = make("UIScale", { Scale = 1 }, addButton)
+local plusHolder = make("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(12, 12),
+	BackgroundTransparency = 1,
+	ZIndex = 5,
+}, addButton)
+for _, size in ipairs({ Vector2.new(12, 2), Vector2.new(2, 12) }) do
+	local bar = make("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(size.X, size.Y),
+		BackgroundColor3 = OFFWHITE,
+		BorderSizePixel = 0,
+		ZIndex = 5,
+	}, plusHolder)
+	corner(bar, UDim.new(1, 0))
+end
+addButton.MouseEnter:Connect(function()
+	tween(addButton, 0.25, { BackgroundTransparency = 0.88 })
+	tween(plusHolder, 0.4, { Rotation = 90 }, Enum.EasingStyle.Back)
+end)
+addButton.MouseLeave:Connect(function()
+	tween(addButton, 0.3, { BackgroundTransparency = 1 })
+	tween(plusHolder, 0.4, { Rotation = 0 }, Enum.EasingStyle.Back)
+end)
+attachPress(addButton, addScale, 0.85)
+addButton.Activated:Connect(function()
+	addScript()
+end)
+
+local listScroll = make("ScrollingFrame", {
+	Name = "List",
+	Position = UDim2.fromOffset(0, 38),
+	Size = UDim2.new(1, 0, 1, -(38 + 34)),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 0,
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollingDirection = Enum.ScrollingDirection.Y,
+	ZIndex = 3,
+}, sidebar)
+make("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, listScroll)
+make("UIPadding", {
+	PaddingLeft = UDim.new(0, 6),
+	PaddingRight = UDim.new(0, 12),
+	PaddingTop = UDim.new(0, 2),
+	PaddingBottom = UDim.new(0, 4),
+}, listScroll)
+local listBar = makeScrollbar(listScroll, sidebar, 3, 40, 36, 8)
+
+make("TextLabel", {
+	Name = "Hint",
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.new(0, 14, 1, -6),
+	Size = UDim2.new(1, -28, 0, 26),
+	BackgroundTransparency = 1,
+	Text = "Tap the file icon for options",
+	TextColor3 = SUBTITLE_COLOR,
+	TextTransparency = 0.35,
+	TextSize = 10,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Bottom,
+	FontFace = UI_FONT,
+	ZIndex = 3,
+}, sidebar)
+
+----------------------------------------------------------------
+-- Editor (line numbers, colored code, Run and Clear)
+----------------------------------------------------------------
+local editorPanel = make("Frame", {
+	Name = "EditorPanel",
+	BackgroundColor3 = EDITOR_COLOR,
+	BackgroundTransparency = 0.1,
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	ZIndex = 2,
+}, body)
+corner(editorPanel, UDim.new(0, 14))
+glass(editorPanel, UDim.new(0, 14), 0.7)
+
+local lineH
+do
+	local huge = Vector2.new(100000, 100000)
+	local one = TextService:GetTextSize("A", CODE_SIZE, CODE_FONT, huge).Y
+	local two = TextService:GetTextSize("A\nA", CODE_SIZE, CODE_FONT, huge).Y
+	lineH = two - one
+	if lineH < 1 then lineH = math.ceil(CODE_SIZE * 1.2) end
+end
+
+-- line numbers (stay put when scrolling sideways, follow when scrolling up and down)
+local gutterClip = make("Frame", {
+	Name = "GutterClip",
+	Size = UDim2.new(0, GUTTER_W, 1, 0),
+	BackgroundTransparency = 1,
+	ClipsDescendants = true,
+	ZIndex = 3,
+}, editorPanel)
+local gutterLabel = make("TextLabel", {
+	Name = "Numbers",
+	Position = UDim2.fromOffset(0, PADY),
+	Size = UDim2.new(1, -8, 0, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1,
+	Text = "1",
+	TextColor3 = SUBTITLE_COLOR,
+	TextSize = CODE_SIZE,
+	TextXAlignment = Enum.TextXAlignment.Right,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	Font = CODE_FONT,
+	ZIndex = 3,
+}, gutterClip)
+make("Frame", {
+	Name = "GutterLine",
+	Position = UDim2.fromOffset(GUTTER_W, 8),
+	Size = UDim2.new(0, 1, 1, -16),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.92,
+	BorderSizePixel = 0,
+	ZIndex = 3,
+}, editorPanel)
+
+local scroll = make("ScrollingFrame", {
+	Name = "CodeScroll",
+	Position = UDim2.fromOffset(GUTTER_W + 1, 0),
+	Size = UDim2.new(1, -(GUTTER_W + 1), 1, 0),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 0,
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.XY,
+	ScrollingDirection = Enum.ScrollingDirection.XY,
+	ZIndex = 3,
+}, editorPanel)
+
+local flashBar = make("Frame", {
+	Name = "FlashBar",
+	Size = UDim2.fromOffset(0, lineH),
+	BackgroundColor3 = ERROR_RED,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 1,
+}, scroll)
+
+local editor = make("TextBox", {
+	Name = "Editor",
+	Size = UDim2.fromOffset(10, 10),
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BackgroundTransparency = 1,
+	Text = "",
+	TextColor3 = WHITE,
+	TextTransparency = 1, -- the colored copy underneath is what you see; the cursor and selection stay visible
+	TextSize = CODE_SIZE,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	TextWrapped = false,
+	MultiLine = true,
+	ClearTextOnFocus = false,
+	Font = CODE_FONT,
+	ZIndex = 4,
+}, scroll)
+make("UIPadding", {
+	PaddingLeft = UDim.new(0, PADX),
+	PaddingTop = UDim.new(0, PADY),
+	PaddingRight = UDim.new(0, 70),
+	PaddingBottom = UDim.new(0, 56),
+}, editor)
+
+local codeBar = makeScrollbar(scroll, editorPanel, 4, 8, 50, 7)
+
+-- Run and Clear
+local function makeActionButton(name, text, width, bg, fg, image, slot)
+	local button = make("TextButton", {
+		Name = name,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -(10 + slot), 1, -10),
+		Size = UDim2.fromOffset(width, 32),
+		BackgroundColor3 = bg,
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 8,
+	}, editorPanel)
+	corner(button, UDim.new(0, 11))
+	local _, _, gradient = glass(button, UDim.new(0, 11), 0.8)
+	local scale = make("UIScale", { Scale = 1 }, button)
+	makeIcon(button, image, fg, 15, {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 12, 0.5, 0),
+		ZIndex = 9,
+	})
+	make("TextLabel", {
+		Position = UDim2.new(0, 34, 0.5, -8),
+		Size = UDim2.new(1, -40, 0, 16),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextColor3 = fg,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		FontFace = UI_FONT_BOLD,
+		ZIndex = 9,
+	}, button)
+	button.MouseEnter:Connect(function()
+		tween(button, 0.2, { BackgroundColor3 = bg:Lerp(WHITE, 0.14) })
+		tween(gradient, 0.6, { Offset = Vector2.new(0.5, 0) }, Enum.EasingStyle.Quint)
+	end)
+	button.MouseLeave:Connect(function()
+		tween(button, 0.3, { BackgroundColor3 = bg })
+		tween(gradient, 0.6, { Offset = Vector2.new(-0.5, 0) }, Enum.EasingStyle.Quint)
+	end)
+	attachPress(button, scale, 0.93)
+	return button
+end
+local clearButton = makeActionButton("Clear", "Clear", 92, BUTTON_GRAY, WHITE, ICON_DELETE, 0)
+local runButton = makeActionButton("Run", "Run", 84, OFFWHITE, BLACK, ICON_RUN, 100)
+
+----------------------------------------------------------------
+-- Divider (drag it to change how wide the sidebar is), resize corner, drag bar
+----------------------------------------------------------------
+local divider = make("TextButton", {
+	Name = "Divider",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 6,
+}, body)
+local dividerPill = make("Frame", {
+	Name = "Pill",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(3, 34),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.78,
+	BorderSizePixel = 0,
+	ZIndex = 6,
+}, divider)
+corner(dividerPill, UDim.new(1, 0))
+divider.MouseEnter:Connect(function()
+	if not drag.kind then
+		tween(dividerPill, 0.25, { BackgroundTransparency = 0.4, Size = UDim2.fromOffset(4, 46) }, Enum.EasingStyle.Back)
+	end
+end)
+divider.MouseLeave:Connect(function()
+	if drag.kind ~= "divider" then
+		tween(dividerPill, 0.3, { BackgroundTransparency = 0.78, Size = UDim2.fromOffset(3, 34) }, Enum.EasingStyle.Quint)
+	end
+end)
+
+-- Resize handle (bottom-right): a hollow quarter circle with rounded ends, same as the mobile buttons
+local handle = make("TextButton", {
+	Name = "ResizeHandle",
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, 0, 1, 0),
+	Size = UDim2.fromOffset(34, 34),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 8,
+}, body)
+local iconGroup = make("CanvasGroup", {
+	Name = "Icon",
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, -ICON_INSET, 1, -ICON_INSET),
+	Size = UDim2.fromOffset(ICON_BOX, ICON_BOX),
+	BackgroundTransparency = 1,
+	GroupTransparency = ICON_IDLE,
+	ZIndex = 8,
+}, handle)
+do
+	local half = ICON_THICK / 2
+	local steps = math.max(8, math.ceil((math.pi / 2 * ICON_R) / (ICON_THICK / 3)))
+	for i = 0, steps do
+		local angle = (math.pi / 2) * (i / steps)
+		local dot = make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(half + ICON_R * math.cos(angle), half + ICON_R * math.sin(angle)),
+			Size = UDim2.fromOffset(ICON_THICK, ICON_THICK),
+			BackgroundColor3 = WHITE,
+			BorderSizePixel = 0,
+			ZIndex = 8,
+		}, iconGroup)
+		corner(dot, UDim.new(1, 0))
+	end
+end
+handle.MouseEnter:Connect(function()
+	if drag.kind ~= "resize" then tween(iconGroup, 0.2, { GroupTransparency = 0.2 }) end
+end)
+handle.MouseLeave:Connect(function()
+	if drag.kind ~= "resize" then tween(iconGroup, 0.25, { GroupTransparency = ICON_IDLE }) end
+end)
+
+-- Drag bar: outside the window, just below it
+local dragHit = make("TextButton", {
+	Name = "DragHit",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 1, BAR_DISTANCE),
+	Size = UDim2.fromOffset(BAR_HIT.X, BAR_HIT.Y),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	ZIndex = 8,
+}, body)
+local bar = make("Frame", {
+	Name = "Bar",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = BAR_SIZE,
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = BAR_IDLE,
+	BorderSizePixel = 0,
+	ZIndex = 8,
+}, dragHit)
+corner(bar, UDim.new(1, 0))
+dragHit.MouseEnter:Connect(function()
+	if drag.kind ~= "move" then tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end
+end)
+dragHit.MouseLeave:Connect(function()
+	if drag.kind ~= "move" then tween(bar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
+end)
+
+----------------------------------------------------------------
+-- Options menu (opens when you tap a file icon), error notification, delete popup, Open pill
+----------------------------------------------------------------
+local menuCatcher = make("TextButton", {
+	Name = "MenuCatcher",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	Visible = false,
+	ZIndex = 25,
+}, body)
+
+local menu = make("Frame", {
+	Name = "Menu",
+	Size = UDim2.fromOffset(MENU_W, MENU_H),
+	BackgroundColor3 = Color3.fromRGB(26, 26, 31),
+	BackgroundTransparency = 0.1,
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 26,
+}, body)
+corner(menu, UDim.new(0, 14))
+glass(menu, UDim.new(0, 14), 1.2)
+local menuScale = make("UIScale", { Scale = 1 }, menu)
+
+local function makeMenuOption(text, image, color, y, tint)
+	local option = make("TextButton", {
+		Name = text,
+		Position = UDim2.fromOffset(6, y),
+		Size = UDim2.new(1, -12, 0, 34),
+		BackgroundColor3 = tint,
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 27,
+	}, menu)
+	corner(option, UDim.new(0, 10))
+	local scale = make("UIScale", { Scale = 1 }, option)
+	makeIcon(option, image, color, 16, {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 11, 0.5, 0),
+		ZIndex = 28,
+	})
+	make("TextLabel", {
+		Position = UDim2.new(0, 36, 0.5, -8),
+		Size = UDim2.new(1, -42, 0, 16),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextColor3 = color,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		FontFace = UI_FONT_BOLD,
+		ZIndex = 28,
+	}, option)
+	option.MouseEnter:Connect(function()
+		tween(option, 0.2, { BackgroundTransparency = 0.88 })
+	end)
+	option.MouseLeave:Connect(function()
+		tween(option, 0.25, { BackgroundTransparency = 1 })
+	end)
+	attachPress(option, scale, 0.95)
+	return option
+end
+local renameOption = makeMenuOption("Rename", ICON_RENAME, WHITE, 6, WHITE)
+local deleteOption = makeMenuOption("Delete", ICON_DELETE, DELETE_TEXT, 42, DELETE_RED)
+local menuFades = snapshotFor(menu)
+
+-- Error notification: red, black text, black icon on the left
+local toast = make("TextButton", {
+	Name = "Toast",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, HEADER_H + 2),
+	Size = UDim2.fromOffset(380, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundColor3 = ERROR_RED,
+	BackgroundTransparency = 0.03,
+	BorderSizePixel = 0,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	Visible = false,
+	ZIndex = 20,
+}, body)
+corner(toast, UDim.new(0, 16))
+glass(toast, UDim.new(0, 16), 0.9)
+local toastIcon = makeIcon(toast, ICON_ERROR, BLACK, 22, {
+	AnchorPoint = Vector2.new(0, 0.5),
+	Position = UDim2.new(0, 14, 0.5, 0),
+	ZIndex = 22,
+})
+local toastContent = make("Frame", {
+	Name = "Content",
+	Position = UDim2.fromOffset(46, 0),
+	Size = UDim2.new(1, -60, 0, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1,
+	ZIndex = 21,
+}, toast)
+make("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) }, toastContent)
+make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, toastContent)
+local toastText = make("TextLabel", {
+	Name = "Message",
+	LayoutOrder = 1,
+	Size = UDim2.new(1, 0, 0, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1,
+	Text = "",
+	TextColor3 = BLACK,
+	TextSize = 13,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	FontFace = UI_FONT_BOLD,
+	ZIndex = 22,
+}, toastContent)
+local toastLink = make("TextButton", {
+	Name = "Proceed",
+	LayoutOrder = 2,
+	Size = UDim2.fromOffset(0, 0),
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BackgroundTransparency = 1,
+	Text = "<u>Proceed anyway</u>",
+	RichText = true,
+	TextColor3 = BLACK,
+	TextSize = 13,
+	AutoButtonColor = false,
+	Selectable = false,
+	FontFace = UI_FONT_BOLD,
+	ZIndex = 23,
+}, toastContent)
+local toastFades = snapshotFor(toast)
+
+-- Delete popup
+local modal = make("TextButton", {
+	Name = "Modal",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = BLACK,
+	BackgroundTransparency = 0.5,
+	BorderSizePixel = 0,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	Visible = false,
+	ZIndex = 30,
+}, body)
+corner(modal, UDim.new(0, CORNER))
+local dialog = make("Frame", {
+	Name = "Dialog",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(280, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundColor3 = Color3.fromRGB(24, 24, 29),
+	BackgroundTransparency = 0.08,
+	BorderSizePixel = 0,
+	ZIndex = 31,
+}, modal)
+corner(dialog, UDim.new(0, 18))
+glass(dialog, UDim.new(0, 18), 1.1)
+local dialogScale = make("UIScale", { Scale = 1 }, dialog)
+make("UIPadding", {
+	PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18),
+	PaddingTop = UDim.new(0, 18), PaddingBottom = UDim.new(0, 18),
+}, dialog)
+make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, dialog)
+make("TextLabel", {
+	Name = "DialogTitle",
+	LayoutOrder = 1,
+	Size = UDim2.new(1, 0, 0, 22),
+	BackgroundTransparency = 1,
+	Text = "Are You Sure",
+	TextColor3 = WHITE,
+	TextSize = 17,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	FontFace = UI_FONT_BOLD,
+	ZIndex = 32,
+}, dialog)
+local dialogBody = make("TextLabel", {
+	Name = "DialogBody",
+	LayoutOrder = 2,
+	Size = UDim2.new(1, 0, 0, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1,
+	Text = "",
+	TextColor3 = SUBTITLE_COLOR,
+	TextSize = 13,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	FontFace = UI_FONT,
+	ZIndex = 32,
+}, dialog)
+local dialogRow = make("Frame", {
+	Name = "Buttons",
+	LayoutOrder = 3,
+	Size = UDim2.new(1, 0, 0, 38),
+	BackgroundTransparency = 1,
+	ZIndex = 32,
+}, dialog)
+local function makeDialogButton(text, color, xScale, xOffset)
+	local button = make("TextButton", {
+		Name = text,
+		Position = UDim2.new(xScale, xOffset, 0, 0),
+		Size = UDim2.new(0.5, -5, 1, 0),
+		BackgroundColor3 = color,
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 33,
+	}, dialogRow)
+	corner(button, UDim.new(0, 12))
+	local _, _, gradient = glass(button, UDim.new(0, 12), 0.9)
+	local scale = make("UIScale", { Scale = 1 }, button)
+	make("TextLabel", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextColor3 = WHITE,
+		TextSize = 14,
+		FontFace = UI_FONT_BOLD,
+		ZIndex = 34,
+	}, button)
+	button.MouseEnter:Connect(function()
+		tween(button, 0.2, { BackgroundColor3 = color:Lerp(WHITE, 0.14) })
+		tween(gradient, 0.6, { Offset = Vector2.new(0.5, 0) }, Enum.EasingStyle.Quint)
+	end)
+	button.MouseLeave:Connect(function()
+		tween(button, 0.3, { BackgroundColor3 = color })
+		tween(gradient, 0.6, { Offset = Vector2.new(-0.5, 0) }, Enum.EasingStyle.Quint)
+	end)
+	attachPress(button, scale, 0.94)
+	return button
+end
+local cancelButton = makeDialogButton("Cancel", BUTTON_GRAY, 0, 0)
+local confirmButton = makeDialogButton("Delete", DELETE_RED, 0.5, 5)
+local modalFades = snapshotFor(modal)
+
+-- The floating "Open" pill (shown while the window is closed)
+local pill = make("TextButton", {
+	Name = "OpenPill",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Size = UDim2.fromOffset(PILL_SIZE.X, PILL_SIZE.Y),
+	BackgroundColor3 = BLACK,
+	BackgroundTransparency = BODY_TRANSPARENCY,
+	Text = "",
+	AutoButtonColor = false,
+	Selectable = false,
+	Visible = false,
+	ZIndex = 50,
+}, screenGui)
+corner(pill, UDim.new(1, 0))
+local _, _, pillGradient = glass(pill, UDim.new(1, 0), 1)
+local pillScale = make("UIScale", { Name = "PillScale", Scale = 1 }, pill)
+make("TextLabel", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
+	Text = "Open",
+	TextColor3 = OFFWHITE,
+	TextSize = 14,
+	FontFace = UI_FONT_BOLD,
+	ZIndex = 52,
+}, pill)
+local pillFades = snapshotFor(pill)
+pill.MouseEnter:Connect(function()
+	tween(pillGradient, 0.6, { Offset = Vector2.new(0.5, 0) }, Enum.EasingStyle.Quint)
+end)
+pill.MouseLeave:Connect(function()
+	tween(pillGradient, 0.6, { Offset = Vector2.new(-0.5, 0) }, Enum.EasingStyle.Quint)
+end)
+
+----------------------------------------------------------------
+-- Layout (everything follows the window size and the sidebar width)
+----------------------------------------------------------------
+function layout()
+	layoutDirty = false
+	local w, h = sizeCur.X, sizeCur.Y
+	local contentW = math.max(100, w - PAD * 2)
+	local contentH = math.max(60, h - HEADER_H - FOOT_H)
+	local maxSide = math.max(MIN_SIDEBAR, contentW - MIN_EDITOR - GAP)
+	local sideW = math.floor(math.clamp(data.sidebar * contentW, MIN_SIDEBAR, maxSide))
+	local editorW = math.floor(math.max(80, contentW - sideW - GAP))
+	local cH = math.floor(contentH)
+	lastSideW = sideW
+
+	sidebar.Position = UDim2.fromOffset(PAD, HEADER_H)
+	sidebar.Size = UDim2.fromOffset(sideW, cH)
+	editorPanel.Position = UDim2.fromOffset(PAD + sideW + GAP, HEADER_H)
+	editorPanel.Size = UDim2.fromOffset(editorW, cH)
+	divider.Position = UDim2.fromOffset(PAD + sideW + GAP / 2, HEADER_H + cH / 2)
+	divider.Size = UDim2.fromOffset(GAP + 8, cH)
+	toast.Size = UDim2.fromOffset(math.floor(math.clamp(w - 60, 220, 480)), 0)
+end
+
+----------------------------------------------------------------
+-- Colored code (Lua syntax highlighting)
+----------------------------------------------------------------
+local COLORS = {
+	default = "#d4d4d4", keyword = "#c586c0", constant = "#569cd6", builtin = "#4fc1d9",
+	func = "#dcdcaa", property = "#9cdcfe", string = "#98c379", number = "#d19a66",
+	comment = "#6b6b76", operator = "#b9b9c2", error = "#ff5555", flash = "#000000",
+}
+
+local function toSet(words)
+	local set = {}
+	for word in words:gmatch("%S+") do set[word] = true end
+	return set
+end
+
+local KEYWORDS = toSet("and break do else elseif end for function if in local not or repeat return then until while continue")
+local CONSTANTS = toSet("true false nil")
+local BUILTINS = toSet([[
+game workspace script task math string table os coroutine utf8 bit32 debug print warn error assert pcall xpcall select
+type typeof tostring tonumber pairs ipairs next require setmetatable getmetatable rawget rawset rawequal rawlen unpack
+loadstring Instance Vector2 Vector3 CFrame Color3 UDim UDim2 Enum Ray Rect BrickColor TweenInfo NumberSequence
+ColorSequence NumberRange Random wait spawn delay tick time shared _G _VERSION getgenv gethui self
+]])
+
+local RICH_ESCAPES = { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&quot;", ["'"] = "&apos;" }
+local function escapeRich(text)
+	return (text:gsub("[&<>\"']", RICH_ESCAPES))
+end
+
+-- Returns one string of colored text for every line of the code
+local function highlightLines(code, errorLine, flashedLine)
+	local lines = { {} }
+	local line = 1
+
+	local function emit(text, color)
+		local start = 1
+		while true do
+			local newline = text:find("\n", start, true)
+			local piece = text:sub(start, (newline or (#text + 1)) - 1)
+			if piece ~= "" then
+				local current = lines[line]
+				if piece:find("^%s+$") then
+					current[#current + 1] = piece
+				else
+					local use = color
+					if line == flashedLine then
+						use = COLORS.flash
+					elseif line == errorLine and color ~= COLORS.comment then
+						use = COLORS.error
+					end
+					current[#current + 1] = '<font color="' .. use .. '">' .. escapeRich(piece) .. "</font>"
+				end
+			end
+			if not newline then break end
+			line += 1
+			lines[line] = {}
+			start = newline + 1
+		end
+	end
+
+	local i, n = 1, #code
+	local prevText, prevWord = "", ""
+	while i <= n do
+		local c = code:sub(i, i)
+		if c:find("%s") then
+			local stop = (code:find("[^%s]", i) or (n + 1)) - 1
+			emit(code:sub(i, stop), COLORS.default)
+			i = stop + 1
+		elseif c == "-" and code:sub(i + 1, i + 1) == "-" then
+			local level = code:match("^%-%-%[(=*)%[", i)
+			local stop
+			if level then
+				local _, closeAt = code:find("]" .. level .. "]", i + 4 + #level, true)
+				stop = closeAt or n
+			else
+				stop = (code:find("\n", i, true) or (n + 1)) - 1
+			end
+			emit(code:sub(i, stop), COLORS.comment)
+			i = stop + 1
+			prevText = "--"
+		elseif c == '"' or c == "'" then
+			local j = i + 1
+			local stop = n
+			while j <= n do
+				local d = code:sub(j, j)
+				if d == "\\" then
+					j += 2
+				elseif d == c then
+					stop = j
+					break
+				elseif d == "\n" then
+					stop = j - 1
+					break
+				else
+					j += 1
+				end
+			end
+			emit(code:sub(i, stop), COLORS.string)
+			i = stop + 1
+			prevText = "str"
+		elseif c == "[" and code:find("^%[=*%[", i) then
+			local level = code:match("^%[(=*)%[", i)
+			local _, closeAt = code:find("]" .. level .. "]", i + 2 + #level, true)
+			local stop = closeAt or n
+			emit(code:sub(i, stop), COLORS.string)
+			i = stop + 1
+			prevText = "str"
+		elseif c:find("%d") or (c == "." and code:sub(i + 1, i + 1):find("%d")) then
+			local number = code:match("^0[xX][%x_]+", i)
+				or code:match("^%d[%d_]*%.?[%d_]*[eE][%+%-]?%d+", i)
+				or code:match("^%d[%d_]*%.?[%d_]*", i)
+				or code:match("^%.%d[%d_]*", i)
+				or c
+			emit(number, COLORS.number)
+			i += #number
+			prevText = "num"
+		elseif c:find("[%a_]") then
+			local word = code:match("^[%a_][%w_]*", i)
+			local nextAt = code:find("[^%s]", i + #word)
+			local after = nextAt and code:sub(nextAt, nextAt) or ""
+			local color = COLORS.default
+			if KEYWORDS[word] then
+				color = COLORS.keyword
+			elseif CONSTANTS[word] then
+				color = COLORS.constant
+			elseif prevText == "." or prevText == ":" then
+				color = (after == "(") and COLORS.func or COLORS.property
+			elseif BUILTINS[word] then
+				color = COLORS.builtin
+			elseif after == "(" or prevWord == "function" then
+				color = COLORS.func
+			end
+			emit(word, color)
+			i += #word
+			prevText = word
+			prevWord = word
+		elseif c == "." then
+			local dots = code:match("^%.%.%.?", i)
+			if dots then
+				emit(dots, COLORS.operator)
+				i += #dots
+				prevText = ".."
+			else
+				emit(".", COLORS.operator)
+				i += 1
+				prevText = "."
+			end
+		else
+			local char = code:match("^" .. utf8.charpattern, i) or c
+			emit(char, #char > 1 and COLORS.default or COLORS.operator)
+			i += #char
+			prevText = char
+		end
+	end
+
+	local result = table.create(#lines)
+	for index = 1, #lines do
+		result[index] = table.concat(lines[index])
+	end
+	return result
+end
+
+-- The colored copy of the code sits under the real text box, in chunks of a few lines
+local chunkLabels = {}
+local function chunkLabel(index)
+	local label = chunkLabels[index]
+	if label then return label end
+	label = make("TextLabel", {
+		Name = "Code" .. index,
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		Text = "",
+		RichText = true,
+		TextColor3 = Color3.fromRGB(212, 212, 212),
+		TextSize = CODE_SIZE,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextWrapped = false,
+		Font = CODE_FONT,
+		ZIndex = 2,
+	}, scroll)
+	chunkLabels[index] = label
+	return label
+end
+
+function render()
+	local lines = highlightLines(editor.Text, liveErrorLine, flashLine)
+	lineCount = #lines
+
+	local chunks = math.ceil(lineCount / CHUNK)
+	for index = 1, chunks do
+		local label = chunkLabel(index)
+		local first = (index - 1) * CHUNK + 1
+		label.Visible = true
+		label.Position = UDim2.fromOffset(PADX, PADY + (first - 1) * lineH)
+		label.Text = table.concat(lines, "\n", first, math.min(index * CHUNK, lineCount))
+	end
+	for index = chunks + 1, #chunkLabels do
+		chunkLabels[index].Visible = false
+	end
+
+	local numbers = table.create(lineCount)
+	for index = 1, lineCount do numbers[index] = tostring(index) end
+	gutterLabel.Text = table.concat(numbers, "\n")
+end
+
+-- keep the text box big enough to fill the visible area
+local function fitEditor()
+	local size = scroll.AbsoluteWindowSize
+	editor.Size = UDim2.fromOffset(size.X, size.Y)
+end
+scroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(fitEditor)
+scroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+	gutterLabel.Position = UDim2.fromOffset(0, PADY - scroll.CanvasPosition.Y)
+end)
+
+-- keep the cursor on screen while typing
+function followCaret()
+	local cursor = editor.CursorPosition
+	if cursor < 1 then return end
+	local before = editor.Text:sub(1, cursor - 1)
+	local _, newlines = before:gsub("\n", "")
+	local top = PADY + newlines * lineH
+	local bottom = top + lineH
+	local view = scroll.AbsoluteWindowSize
+	local position = scroll.CanvasPosition
+	local x, y = position.X, position.Y
+
+	if top < y then
+		y = top - lineH
+	elseif bottom > y + view.Y - 16 then
+		y = bottom - view.Y + 16 + lineH
+	end
+
+	local lastLine = before:match("([^\n]*)$") or ""
+	local width = TextService:GetTextSize(lastLine, CODE_SIZE, CODE_FONT, Vector2.new(100000, 100000)).X
+	local caretX = PADX + width
+	if caretX < x + 12 then
+		x = math.max(0, caretX - 40)
+	elseif caretX > x + view.X - 30 then
+		x = caretX - view.X + 70
+	end
+
+	if x ~= position.X or y ~= position.Y then
+		scroll.CanvasPosition = Vector2.new(math.max(0, x), math.max(0, y))
+	end
+end
+
+-- A quick syntax check a moment after you stop typing, so a mistake turns red
+local liveToken = 0
+function scheduleLiveCheck()
+	liveToken += 1
+	local token = liveToken
+	task.delay(0.5, function()
+		if token ~= liveToken or not loadstring then return end
+		local code = editor.Text
+		local newLine = nil
+		if code:find("%S") then
+			local ok, fn, err = pcall(loadstring, code, "=CodeRunner")
+			if ok and not fn then
+				local number = tonumber(tostring(err):match(":(%d+):"))
+				if number then newLine = math.clamp(number, 1, lineCount) end
+			end
+		end
+		if newLine ~= liveErrorLine then
+			liveErrorLine = newLine
+			render()
+		end
+	end)
+end
+
+editor:GetPropertyChangedSignal("Text"):Connect(function()
+	local text = editor.Text
+	if text:find("\t", 1, true) then
+		-- tabs become four spaces
+		local cursor = editor.CursorPosition
+		local _, tabsBefore = text:sub(1, math.max(cursor - 1, 0)):gsub("\t", "")
+		editor.Text = (text:gsub("\t", "    "))
+		if cursor > 0 then editor.CursorPosition = cursor + tabsBefore * 3 end
+		return
+	end
+	local entry = data.scripts[data.selected]
+	if entry then entry.code = text end
+	liveErrorLine = nil
+	render()
+	followCaret()
+	scheduleLiveCheck()
+	scheduleSave()
+end)
+editor:GetPropertyChangedSignal("CursorPosition"):Connect(followCaret)
+
+----------------------------------------------------------------
+-- Running code and reporting errors
+----------------------------------------------------------------
+local function describe(kind, line, because)
+	if line then
+		return ("%s error at line %d, this happened because %s."):format(kind, line, because)
+	end
+	return ("%s error, this happened because %s."):format(kind, because)
+end
+
+local function cleanMessage(message)
+	return (tostring(message):gsub("^.-:%d+:%s*", ""))
+end
+
+local function errorLineOf(message)
+	return tonumber(tostring(message):match(":(%d+):"))
+end
+
+local function lineTextOf(code, number)
+	local index = 0
+	for text in (code .. "\n"):gmatch("(.-)\n") do
+		index += 1
+		if index == number then return text end
+	end
+	return nil
+end
+
+local function classifyCompile(message)
+	if message:find("Expected 'end'") or message:find("Expected 'then'") or message:find("Expected 'do'")
+		or message:find("Expected '%)'") or message:find("Expected '}'") or message:find("Expected '%]'")
+		or message:find("<eof>") then
+		return "Parsing"
+	end
+	return "Syntax"
+end
+
+-- Turns a Luau error message into the "because ..." part of the notification
+local function explain(message, lineText)
+	local word = lineText and lineText:match("[%a_][%w_]*") or nil
+
+	local blockName, blockLine = message:match("Expected 'end' %(to close '([%w_]+)' at line (%d+)%)")
+	if blockName then
+		return ("the '%s' on line %s is never closed with 'end'"):format(blockName, blockLine)
+	end
+	if message:find("Incomplete statement") then
+		return ("'%s' is not a line of code"):format(word or "this")
+	end
+	if message:find("Expected 'end'") then return "a block is never closed with 'end'" end
+	if message:find("Expected 'then'") then return "an 'if' is missing its 'then'" end
+	if message:find("Expected 'do'") then return "a loop is missing its 'do'" end
+	if message:find("Expected '%)'") then return "a '(' is never closed with ')'" end
+	if message:find("Expected '}'") then return "a '{' is never closed with '}'" end
+	if message:find("Expected '%]'") then return "a '[' is never closed with ']'" end
+	if message:find("Unfinished string") or message:find("unfinished string") then
+		return "a piece of text is missing its closing quote"
+	end
+	if message:find("Malformed number") then return "a number is written wrong" end
+
+	local _, name = message:match("attempt to call a nil value %((%a+) '([^']+)'%)")
+	if name then return ("'%s' is undefined (nil)"):format(name) end
+	if message:find("attempt to call a nil value") then return "something that is called is undefined (nil)" end
+	local _, indexed = message:match("attempt to index a nil value %((%a+) '([^']+)'%)")
+	if indexed then return ("'%s' is undefined (nil)"):format(indexed) end
+	local key = message:match("attempt to index nil with '([^']+)'")
+	if key then return ("something is undefined (nil), so '%s' can't be read from it"):format(key) end
+	if message:find("attempt to index") then return "something is undefined (nil), so it can't be indexed" end
+	if message:find("attempt to perform arithmetic") then return "a value is the wrong type to be used in math" end
+	if message:find("attempt to compare") then return "two values of different types are being compared" end
+	if message:find("attempt to concatenate") then return "a value is the wrong type to be joined with text" end
+	if message:find("stack overflow") or message:find("exhausted allowed execution time") or message:find("timeout") then
+		return "something keeps looping and never ends"
+	end
+
+	if #message > 100 then message = message:sub(1, 97) .. "..." end
+	return ("Luau said: %s"):format(message)
+end
+
+-- Blank out some lines (keeps every other line number the same)
+local function blankLines(code, skip)
+	if next(skip) == nil then return code end
+	local out = {}
+	local index = 0
+	for text in (code .. "\n"):gmatch("(.-)\n") do
+		index += 1
+		out[#out + 1] = skip[index] and "" or text
+	end
+	return table.concat(out, "\n")
+end
+
+-- Scroll to a line, then flash it red and turn its text black for a moment
+local function goToLine(line)
+	if not line or line < 1 or line > lineCount then return end
+	local target = math.max(0, PADY + (line - 1) * lineH - scroll.AbsoluteWindowSize.Y / 2 + lineH)
+	local move = tween(scroll, 0.4, { CanvasPosition = Vector2.new(0, target) }, Enum.EasingStyle.Quint)
+	move.Completed:Wait()
+
+	flashLine = line
+	render()
+	flashBar.Position = UDim2.fromOffset(0, PADY + (line - 1) * lineH)
+	flashBar.Size = UDim2.fromOffset(math.max(scroll.AbsoluteCanvasSize.X, scroll.AbsoluteWindowSize.X), lineH)
+	flashBar.BackgroundTransparency = 0.1
+	tween(flashBar, 0.9, { BackgroundTransparency = 1 }, Enum.EasingStyle.Sine)
+	task.delay(1, function()
+		if flashLine == line then
+			flashLine = nil
+			render()
+		end
+	end)
+end
+
+local toastToken = 0
+local toastAction = nil
+
+function hideToast()
+	toastToken += 1
+	toastAction = nil
+	if not toast.Visible then return end
+	local token = toastToken
+	fadeGroup(toastFades, false, 0.2)
+	tween(toast, 0.25, { Position = UDim2.new(0.5, -18, 0, HEADER_H + 2) }, Enum.EasingStyle.Quint)
+	task.delay(0.25, function()
+		if token == toastToken then toast.Visible = false end
+	end)
+end
+
+function showToast(message, onProceed)
+	toastToken += 1
+	local token = toastToken
+	toastAction = onProceed
+	toastText.Text = message
+	toastLink.Visible = onProceed ~= nil
+
+	toast.Visible = true
+	toast.Position = UDim2.new(0.5, -28, 0, HEADER_H + 2) -- slides in from the left
+	setGroup(toastFades, 1)
+	tween(toast, 0.45, { Position = UDim2.new(0.5, 0, 0, HEADER_H + 2) }, Enum.EasingStyle.Back)
+	fadeGroup(toastFades, true, 0.25)
+
+	task.delay(10, function()
+		if token == toastToken then hideToast() end
+	end)
+end
+
+toast.Activated:Connect(function() hideToast() end)
+toastLink.Activated:Connect(function()
+	local action = toastAction
+	hideToast()
+	if action then action() end
+end)
+
+local function reportError(kind, line, because, onProceed)
+	showToast(describe(kind, line, because), onProceed)
+	if line then task.spawn(goToLine, line) end
+end
+
+-- Runs the code. `skip` holds lines to leave out, `proceeding` means "run it anyway".
+function execute(code, skip, proceeding)
+	skip = skip or {}
+	hideToast()
+
+	if not loadstring then
+		showToast("Runtime error, this happened because loadstring isn't available here, so code can't be run.", nil)
+		return
+	end
+
+	local function compile(text)
+		local ok, fn, err = pcall(loadstring, text, "=CodeRunner")
+		if not ok then return nil, tostring(fn) end
+		return fn, err
+	end
+
+	local fn, err = compile(blankLines(code, skip))
+	local guard = 0
+	while not fn do
+		local message = cleanMessage(err)
+		local line = errorLineOf(err)
+		local kind = classifyCompile(message)
+		if proceeding and kind == "Parsing" and line and not skip[line] and guard < 30 then
+			-- run it anyway: leave out the line that can't be understood and try again
+			skip[line] = true
+			guard += 1
+			fn, err = compile(blankLines(code, skip))
+		else
+			local because = explain(message, line and lineTextOf(code, line))
+			local proceed = nil
+			if kind == "Parsing" and not proceeding then
+				proceed = function()
+					task.spawn(execute, code, {}, true)
+				end
+			end
+			reportError(kind, line, because, proceed)
+			return
+		end
+	end
+
+	local ok, runtimeError = xpcall(fn, function(message) return tostring(message) end)
+	if not ok then
+		local message = cleanMessage(runtimeError)
+		local line = errorLineOf(runtimeError)
+		if line and (line < 1 or line > lineCount) then line = nil end
+		local because = explain(message, line and lineTextOf(code, line))
+		local proceed = nil
+		if line then
+			proceed = function()
+				local nextSkip = {}
+				for key, value in pairs(skip) do nextSkip[key] = value end
+				nextSkip[line] = true
+				task.spawn(execute, code, nextSkip, true)
+			end
+		end
+		reportError("Runtime", line, because, proceed)
+	end
+end
+
+runButton.Activated:Connect(function()
+	task.spawn(execute, editor.Text, {}, false)
+end)
+clearButton.Activated:Connect(function()
+	hideToast()
+	editor.Text = ""
+	editor:ReleaseFocus()
+end)
+
+----------------------------------------------------------------
+-- The scripts list: select, add, rename, delete
+----------------------------------------------------------------
+local itemRefs = {}
+
+local function loadEditorText()
+	local entry = data.scripts[data.selected]
+	liveErrorLine, flashLine = nil, nil
+	editor.Text = entry and entry.code or ""
+	scroll.CanvasPosition = Vector2.new(0, 0)
+	render()
+end
+
+local function createItem(index, entry, animate)
+	local selected = index == data.selected
+	local item = make("TextButton", {
+		Name = "Item",
+		LayoutOrder = index,
+		Size = UDim2.new(1, 0, 0, animate and 0 or ITEM_H),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = selected and 0.9 or 1,
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ClipsDescendants = true,
+		ZIndex = 4,
+	}, listScroll)
+	corner(item, UDim.new(0, 11))
+
+	local accent = make("Frame", {
+		Name = "Accent",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 3, 0.5, 0),
+		Size = UDim2.fromOffset(3, 14),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = selected and 0.15 or 1,
+		BorderSizePixel = 0,
+		ZIndex = 5,
+	}, item)
+	corner(accent, UDim.new(1, 0))
+
+	-- the file icon: tap it for Rename / Delete
+	local iconButton = make("TextButton", {
+		Name = "FileButton",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 8, 0.5, 0),
+		Size = UDim2.fromOffset(28, 28),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 6,
+	}, item)
+	corner(iconButton, UDim.new(1, 0))
+	local iconScale = make("UIScale", { Scale = 1 }, iconButton)
+	local fileIcon = makeIcon(iconButton, ICON_FILE, WHITE, 16, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		ImageTransparency = selected and 0.05 or 0.35,
+		ZIndex = 7,
+	})
+
+	local nameLabel = make("TextLabel", {
+		Name = "Name",
+		Position = UDim2.new(0, 42, 0, 0),
+		Size = UDim2.new(1, -48, 1, 0),
+		BackgroundTransparency = 1,
+		Text = entry.name,
+		TextColor3 = selected and OFFWHITE or SUBTITLE_COLOR,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		FontFace = UI_FONT,
+		ZIndex = 5,
+	}, item)
+
+	itemRefs[index] = { item = item, accent = accent, icon = fileIcon, name = nameLabel }
+
+	item.MouseEnter:Connect(function()
+		if index ~= data.selected then tween(item, 0.2, { BackgroundTransparency = 0.94 }) end
+	end)
+	item.MouseLeave:Connect(function()
+		if index ~= data.selected then tween(item, 0.25, { BackgroundTransparency = 1 }) end
+	end)
+	item.Activated:Connect(function()
+		selectScript(index)
+	end)
+
+	iconButton.MouseEnter:Connect(function()
+		tween(iconButton, 0.2, { BackgroundTransparency = 0.86 })
+		tween(fileIcon, 0.2, { ImageTransparency = 0 })
+	end)
+	iconButton.MouseLeave:Connect(function()
+		tween(iconButton, 0.25, { BackgroundTransparency = 1 })
+		tween(fileIcon, 0.25, { ImageTransparency = index == data.selected and 0.05 or 0.35 })
+	end)
+	attachPress(iconButton, iconScale, 0.82)
+	iconButton.Activated:Connect(function()
+		openMenu(index)
+	end)
+
+	if animate then
+		tween(item, 0.4, { Size = UDim2.new(1, 0, 0, ITEM_H) }, Enum.EasingStyle.Back)
+	end
+end
+
+function buildList(animateIndex)
+	for _, child in ipairs(listScroll:GetChildren()) do
+		if child:IsA("GuiObject") then child:Destroy() end
+	end
+	table.clear(itemRefs)
+	for index, entry in ipairs(data.scripts) do
+		createItem(index, entry, index == animateIndex)
+	end
+	listBar.update()
+end
+
+function applySelection()
+	for index, ref in pairs(itemRefs) do
+		local selected = index == data.selected
+		tween(ref.item, 0.25, { BackgroundTransparency = selected and 0.9 or 1 })
+		tween(ref.accent, 0.3, { BackgroundTransparency = selected and 0.15 or 1 })
+		tween(ref.name, 0.25, { TextColor3 = selected and OFFWHITE or SUBTITLE_COLOR })
+		tween(ref.icon, 0.25, { ImageTransparency = selected and 0.05 or 0.35 })
+	end
+end
+
+function selectScript(index)
+	if index == data.selected or not data.scripts[index] then return end
+	closeMenu()
+	hideToast()
+	data.selected = index
+	loadEditorText()
+	applySelection()
+	scheduleSave()
+end
+
+function addScript()
+	closeMenu()
+	local used = {}
+	for _, entry in ipairs(data.scripts) do used[entry.name] = true end
+	local number = #data.scripts + 1
+	while used["Script " .. number .. ".lua"] do number += 1 end
+
+	data.scripts[#data.scripts + 1] = { name = "Script " .. number .. ".lua", code = "" }
+	data.selected = #data.scripts
+	buildList(data.selected)
+	loadEditorText()
+	task.defer(function()
+		listScroll.CanvasPosition = Vector2.new(0, 100000)
+	end)
+	scheduleSave()
+end
+
+-- The options menu for a file
+local menuToken = 0
+local menuIndex = nil
+
+function closeMenu()
+	menuToken += 1
+	if not menu.Visible then return end
+	local token = menuToken
+	menuIndex = nil
+	menuCatcher.Visible = false
+	tween(menuScale, 0.2, { Scale = 0.88 }, Enum.EasingStyle.Quad)
+	fadeGroup(menuFades, false, 0.2)
+	task.delay(0.22, function()
+		if token == menuToken then menu.Visible = false end
+	end)
+end
+
+function openMenu(index)
+	local ref = itemRefs[index]
+	if not ref then return end
+	menuToken += 1
+	menuIndex = index
+
+	-- next to the file icon, kept inside the window
+	local relative = ref.item.AbsolutePosition - body.AbsolutePosition
+	local size = body.AbsoluteSize
+	local x = math.clamp(relative.X + 38, 8, math.max(8, size.X - MENU_W - 8))
+	local y = math.clamp(relative.Y + ITEM_H - 6, HEADER_H, math.max(HEADER_H, size.Y - MENU_H - FOOT_H))
+	menu.Position = UDim2.fromOffset(x, y)
+
+	menu.Visible = true
+	menuCatcher.Visible = true
+	menuScale.Scale = 0.85
+	setGroup(menuFades, 1)
+	tween(menuScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+	fadeGroup(menuFades, true, 0.22)
+end
+
+menuCatcher.Activated:Connect(function() closeMenu() end)
+listScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+	if menu.Visible then closeMenu() end
+end)
+renameOption.Activated:Connect(function()
+	local index = menuIndex
+	closeMenu()
+	if index then beginRename(index) end
+end)
+deleteOption.Activated:Connect(function()
+	local index = menuIndex
+	closeMenu()
+	if index then openDeletePopup(index) end
+end)
+
+-- Renaming: the name turns into a text box
+function beginRename(index)
+	local ref = itemRefs[index]
+	local entry = data.scripts[index]
+	if not ref or not entry then return end
+
+	ref.name.Visible = false
+	local box = make("TextBox", {
+		Name = "RenameBox",
+		Position = UDim2.new(0, 42, 0.5, -12),
+		Size = UDim2.new(1, -50, 0, 24),
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 0.88,
+		Text = entry.name,
+		TextColor3 = WHITE,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ClearTextOnFocus = false,
+		FontFace = UI_FONT,
+		ZIndex = 8,
+	}, ref.item)
+	corner(box, UDim.new(0, 8))
+	make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 6) }, box)
+	box:CaptureFocus()
+	box.CursorPosition = #box.Text + 1
+
+	local finished = false
+	box.FocusLost:Connect(function()
+		if finished then return end
+		finished = true
+		local text = box.Text:match("^%s*(.-)%s*$")
+		if text ~= "" then
+			if not text:lower():find("%.lua$") then text = text .. ".lua" end
+			if #text > 40 then text = text:sub(1, 40) end
+			entry.name = text
+			scheduleSave()
+		end
+		ref.name.Text = entry.name
+		ref.name.Visible = true
+		box:Destroy()
+	end)
+end
+
+-- The "Are You Sure" popup
+local deleteIndex = nil
+local modalToken = 0
+
+local function closePopup()
+	modalToken += 1
+	local token = modalToken
+	deleteIndex = nil
+	fadeGroup(modalFades, false, 0.2)
+	tween(dialogScale, 0.2, { Scale = 0.9 }, Enum.EasingStyle.Quad)
+	task.delay(0.22, function()
+		if token == modalToken then modal.Visible = false end
+	end)
+end
+
+function openDeletePopup(index)
+	local entry = data.scripts[index]
+	if not entry then return end
+	modalToken += 1
+	deleteIndex = index
+	dialogBody.Text = ("Are you sure you want to delete %s?"):format(entry.name)
+
+	modal.Visible = true
+	dialogScale.Scale = 0.88
+	setGroup(modalFades, 1)
+	tween(dialogScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+	fadeGroup(modalFades, true, 0.25)
+end
+
+cancelButton.Activated:Connect(closePopup)
+modal.Activated:Connect(closePopup)
+confirmButton.Activated:Connect(function()
+	local index = deleteIndex
+	closePopup()
+	if not index or not data.scripts[index] then return end
+
+	local ref = itemRefs[index]
+	if ref then
+		tween(ref.item, 0.25, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, Enum.EasingStyle.Quint)
+		task.wait(0.26)
+	end
+
+	table.remove(data.scripts, index)
+	if #data.scripts == 0 then
+		data.scripts[1] = { name = "Script 1.lua", code = "" }
+		data.selected = 1
+	elseif index < data.selected then
+		data.selected -= 1
+	elseif index == data.selected then
+		data.selected = math.min(index, #data.scripts)
+	end
+	buildList()
+	loadEditorText()
+	scheduleSave()
+end)
+
+----------------------------------------------------------------
+-- Moving, resizing and the divider
+----------------------------------------------------------------
+local function begin(kind, input, extra)
+	local state = { kind = kind, input = input, start = p2(input) }
+	if extra then
+		for key, value in pairs(extra) do state[key] = value end
+	end
+	drag = state
+	return state
+end
+
+-- Drag bar: moves the window
+dragHit.InputBegan:Connect(function(input)
+	if not isPress(input) or drag.kind or busy then return end
+	begin("move", input, { origin = posTarget })
+	tween(bar, 0.2, { BackgroundTransparency = 0.15, Size = BAR_SIZE_ACTIVE })
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			drag = {}
+			tween(bar, 0.3, { BackgroundTransparency = BAR_IDLE, Size = BAR_SIZE })
+		end
+	end)
+end)
+
+-- Corner icon: resizes the window
+handle.InputBegan:Connect(function(input)
+	if not isPress(input) or drag.kind or busy then return end
+	begin("resize", input, { originSize = sizeTarget, topLeft = posTarget - sizeTarget / 2 })
+	tween(iconGroup, 0.2, { GroupTransparency = 0.05 })
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			drag = {}
+			tween(iconGroup, 0.3, { GroupTransparency = ICON_IDLE })
+		end
+	end)
+end)
+
+-- Divider: changes how wide the sidebar is compared to the editor
+divider.InputBegan:Connect(function(input)
+	if not isPress(input) or drag.kind or busy then return end
+	begin("divider", input, { startSide = lastSideW })
+	tween(dividerPill, 0.2, { BackgroundTransparency = 0.25, Size = UDim2.fromOffset(4, 50) }, Enum.EasingStyle.Back)
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			drag = {}
+			tween(dividerPill, 0.3, { BackgroundTransparency = 0.78, Size = UDim2.fromOffset(3, 34) }, Enum.EasingStyle.Quint)
+			scheduleSave()
+		end
+	end)
+end)
+
+connections[#connections + 1] = UserInputService.InputChanged:Connect(function(input)
+	local kind = drag.kind
+	if not kind then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement and input ~= drag.input then return end
+
+	local delta = p2(input) - drag.start
+	if kind == "move" then
+		posTarget = clampCenter(drag.origin + delta, sizeTarget)
+	elseif kind == "resize" then
+		local v = viewport()
+		local newSize = Vector2.new(
+			math.clamp(drag.originSize.X + delta.X, MIN_SIZE.X, MAX_SIZE.X),
+			math.clamp(drag.originSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y)
+		)
+		newSize = Vector2.new(
+			math.min(newSize.X, v.X - SCREEN_MARGIN - drag.topLeft.X),
+			math.min(newSize.Y, v.Y - SCREEN_MARGIN - BAR_BELOW - drag.topLeft.Y)
+		)
+		sizeTarget = newSize
+		posTarget = drag.topLeft + newSize / 2 -- the top-left corner stays put
+	elseif kind == "divider" then
+		local contentW = math.max(100, sizeCur.X - PAD * 2)
+		data.sidebar = math.clamp((drag.startSide + delta.X) / contentW, 0.12, 0.6)
+		layoutDirty = true
+	elseif kind == "pill" then
+		if delta.Magnitude > 6 then drag.moved = true end
+		if drag.moved then pillCenter = drag.origin + delta end
+	end
+end)
+
+----------------------------------------------------------------
+-- Open / close, with the floating pill
+----------------------------------------------------------------
+local fadeValue = Instance.new("NumberValue")
+local fadeList = {}
+fadeValue.Changed:Connect(function(alpha)
+	for _, item in ipairs(fadeList) do
+		item[1][item[2]] = item[3] + (1 - item[3]) * alpha
+	end
+end)
+
+local function showPill()
+	if not pillCenter then
+		pillCenter = Vector2.new(viewport().X / 2, 44)
+	end
+	pill.Visible = true
+	pillScale.Scale = 0.6
+	setGroup(pillFades, 1)
+	tween(pillScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+	fadeGroup(pillFades, true, 0.3)
+end
+
+local function hidePill()
+	if not pill.Visible then return end
+	tween(pillScale, 0.25, { Scale = 0.6 }, Enum.EasingStyle.Quad)
+	fadeGroup(pillFades, false, 0.22)
+	task.wait(0.25)
+	pill.Visible = false
+end
+
+function setOpen(open)
+	if busy or open == isOpen then return end
+	busy = true
+	closeMenu()
+	if open then
+		hidePill()
+		fadeList = snapshotFor(holder)
+		holder.Visible = true
+		popScale.Scale = 0.92
+		fadeValue.Value = 1
+		tween(popScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+		local fade = tween(fadeValue, 0.35, { Value = 0 }, Enum.EasingStyle.Quad)
+		fade.Completed:Wait()
+		isOpen = true
+	else
+		fadeList = snapshotFor(holder)
+		fadeValue.Value = 0
+		tween(popScale, 0.3, { Scale = 0.92 }, Enum.EasingStyle.Quint)
+		local fade = tween(fadeValue, 0.28, { Value = 1 }, Enum.EasingStyle.Quad)
+		fade.Completed:Wait()
+		holder.Visible = false
+		isOpen = false
+		showPill()
+	end
+	busy = false
+end
+
+pill.InputBegan:Connect(function(input)
+	if not isPress(input) or drag.kind or busy then return end
+	begin("pill", input, { origin = pillCenter or Vector2.new(0, 0), moved = false })
+	tween(pillScale, 0.1, { Scale = 0.94 }, Enum.EasingStyle.Quad)
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			local moved = drag.moved
+			drag = {}
+			tween(pillScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+			if not moved then task.spawn(setOpen, true) end
+		end
+	end)
+end)
+
+----------------------------------------------------------------
+-- Every frame: smooth movement, off-screen protection, layout
+----------------------------------------------------------------
+local lastLayoutKey = -1
+
+connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
+	sizeTarget = fitSize(sizeTarget)
+	posTarget = clampCenter(posTarget, sizeTarget)
+
+	local speed = drag.kind == "resize" and RESIZE_FOLLOW_SPEED or DRAG_FOLLOW_SPEED
+	local alpha = 1 - math.exp(-dt * speed)
+	sizeCur = fitSize(sizeCur:Lerp(sizeTarget, alpha))
+	posCur = clampCenter(posCur:Lerp(posTarget, alpha), sizeCur)
+
+	holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
+	holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
+
+	local key = math.floor(sizeCur.X + 0.5) * 8192 + math.floor(sizeCur.Y + 0.5)
+	if key ~= lastLayoutKey or layoutDirty then
+		lastLayoutKey = key
+		layout()
+	end
+
+	-- the Open pill: off-screen protection too
+	if pill.Visible and pillCenter then
+		local v = viewport()
+		local half = PILL_SIZE / 2
+		pillCenter = Vector2.new(
+			math.clamp(pillCenter.X, half.X + SCREEN_MARGIN, math.max(half.X + SCREEN_MARGIN, v.X - half.X - SCREEN_MARGIN)),
+			math.clamp(pillCenter.Y, half.Y + SCREEN_MARGIN, math.max(half.Y + SCREEN_MARGIN, v.Y - half.Y - SCREEN_MARGIN))
+		)
+		pill.Position = UDim2.fromOffset(math.floor(pillCenter.X + 0.5), math.floor(pillCenter.Y + 0.5))
+	end
+end)
+
+screenGui.Destroying:Connect(function()
+	for _, c in ipairs(connections) do c:Disconnect() end
+	table.clear(connections)
+	writeData()
+end)
+
+----------------------------------------------------------------
+-- Start up
+----------------------------------------------------------------
+layout()
+fitEditor()
+buildList()
+loadEditorText()
+task.defer(function()
+	fitEditor()
+	listBar.update()
+	codeBar.update()
+	setOpen(true) -- pops in
+end)
