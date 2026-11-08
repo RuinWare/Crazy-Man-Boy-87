@@ -1,0 +1,325 @@
+--!nonstrict
+-- ============================================================================
+-- Standalone Rayfield Gen 2 Pill / Chrome
+-- ============================================================================
+-- Returns a Pill class. Supports dragging, click callbacks, and fade animations.
+-- ============================================================================
+
+local Players          = game:GetService("Players")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService       = game:GetService("RunService")
+local GuiService       = game:GetService("GuiService")
+local HttpService      = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
+
+local variables = {
+    guiContainer     = PlayerGui,
+    tweenService     = TweenService,
+    userInputService = UserInputService,
+    runService       = RunService,
+    guiService       = GuiService,
+    httpService      = HttpService,
+}
+
+local constants = { displayOrder = { pill = 90 } }
+
+local function toColorSequence(color)
+    if typeof(color) == "ColorSequence" then return color end
+    return ColorSequence.new({
+        ColorSequenceKeypoint.new(0, color),
+        ColorSequenceKeypoint.new(1, color:Lerp(Color3.new(0, 0, 0), 0.15)),
+    })
+end
+
+local functions = { toColorSequence = toColorSequence }
+
+local DEFAULT_FONT_FAMILY = "rbxasset://fonts/families/GothamSSm.json"
+local function makeFont(weight) return Font.new(DEFAULT_FONT_FAMILY, weight) end
+
+local defaultTheme = {
+    WindowColor               = Color3.fromRGB(22, 22, 24),
+    SurfaceStroke             = Color3.fromRGB(60, 60, 65),
+    TitlingColor              = Color3.fromRGB(255, 255, 255),
+    ContentColor              = Color3.fromRGB(180, 180, 185),
+    Font                      = makeFont(Enum.FontWeight.Medium),
+    TitleFont                 = makeFont(Enum.FontWeight.SemiBold),
+}
+
+local Style = {}
+Style.__index = Style
+
+function Style.new(themeOverrides)
+    local self = setmetatable({ theme = {} }, Style)
+    for k, v in defaultTheme do self.theme[k] = v end
+    if type(themeOverrides) == "table" then
+        for k, v in themeOverrides do
+            if v ~= nil then self.theme[k] = v end
+        end
+    end
+    return self
+end
+
+function Style:Create(className, props, themeMap)
+    local instance = Instance.new(className)
+    if props then for key, value in props do instance[key] = value end end
+    if themeMap then
+        for prop, spec in themeMap do
+            local themeKey, transform
+            if type(spec) == "table" then themeKey, transform = spec[1], spec[2] else themeKey = spec end
+            local value = self.theme[themeKey]
+            if value ~= nil and transform then value = transform(value) end
+            if value ~= nil then instance[prop] = value end
+        end
+    end
+    return instance
+end
+
+function Style:DestroySubtree(instance) if instance then instance:Destroy() end end
+
+-- ==== Pill Class ====
+local Pill = {}
+Pill.__index = Pill
+Pill.__type = "Pill"
+
+function Pill.new(properties)
+    properties = if typeof(properties) == "table" then properties else {}
+
+    local self = setmetatable({
+        window       = Style.new(properties.theme),
+        title        = properties.title or properties.Title or "Rayfield",
+        subtitle     = properties.subtitle or properties.Subtitle or "Tap to show",
+        icon         = properties.icon or properties.Icon or "rbxassetid://10734895456", -- Hamburger menu icon
+        onShow       = properties.onShow or properties.OnShow,
+        onHide       = properties.onHide or properties.OnHide,
+        onClick      = properties.onClick or properties.OnClick,
+        visible      = false,
+        animating    = false,
+        _position    = UDim2.new(0.5, 0, 0.85, 0), -- Default position (bottom center)
+    }, Pill)
+
+    self:_build()
+    return self
+end
+
+function Pill:_build()
+    local window = self.window
+
+    self.screenGui = window:Create("ScreenGui", {
+        Name              = variables.httpService:GenerateGUID(false),
+        IgnoreGuiInset    = true,
+        ResetOnSpawn      = false,
+        Enabled           = true,
+        DisplayOrder      = constants.displayOrder.pill,
+        ZIndexBehavior    = Enum.ZIndexBehavior.Sibling,
+        Parent            = variables.guiContainer,
+    })
+
+    self.main = window:Create("Frame", {
+        Name                 = "Pill",
+        BackgroundColor3     = Color3.fromRGB(255, 255, 255),
+        AnchorPoint          = Vector2.new(0.5, 0.5),
+        Position             = self._position,
+        Size                 = UDim2.fromOffset(180, 54),
+        Active               = true,
+        BorderSizePixel      = 0,
+        BackgroundTransparency = 1,
+        Visible              = false,
+        Parent               = self.screenGui,
+    })
+
+    window:Create("UIGradient", {
+        Rotation = 270,
+        Offset   = Vector2.new(0, -0.1),
+        Parent   = self.main,
+    }, { Color = { "WindowColor", functions.toColorSequence } })
+
+    window:Create("UICorner", {
+        Parent = self.main,
+    }, { CornerRadius = UDim.new(1, 0) }) -- Pill shape
+
+    self.stroke = window:Create("UIStroke", {
+        Transparency = 1,
+        Parent       = self.main,
+    }, { Color = "SurfaceStroke" })
+
+    self.iconLabel = window:Create("ImageLabel", {
+        Name                 = "Icon",
+        AnchorPoint          = Vector2.new(0, 0.5),
+        Position             = UDim2.new(0, 16, 0.5, 0),
+        Size                 = UDim2.fromOffset(24, 24),
+        BackgroundTransparency = 1,
+        Image                = self.icon,
+        ImageTransparency    = 1,
+        Parent               = self.main,
+    }, { ImageColor3 = "TitlingColor" })
+
+    local textContainer = window:Create("Frame", {
+        Name                 = "TextContainer",
+        AnchorPoint          = Vector2.new(0, 0.5),
+        Position             = UDim2.new(0, 50, 0.5, 0),
+        Size                 = UDim2.new(1, -60, 0, 32),
+        BackgroundTransparency = 1,
+        Parent               = self.main,
+    })
+
+    window:Create("UIListLayout", {
+        Padding           = UDim.new(0, 1),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder         = Enum.SortOrder.LayoutOrder,
+        Parent            = textContainer,
+    })
+
+    self.titleLabel = window:Create("TextLabel", {
+        Name                 = "Title",
+        Text                 = self.title,
+        Size                 = UDim2.new(1, 0, 0, 16),
+        BackgroundTransparency = 1,
+        TextSize             = 16,
+        TextXAlignment       = Enum.TextXAlignment.Left,
+        LayoutOrder          = 1,
+        TextTransparency     = 1,
+        Parent               = textContainer,
+    }, { TextColor3 = "TitlingColor", FontFace = "TitleFont" })
+
+    self.subtitleLabel = window:Create("TextLabel", {
+        Name                 = "Subtitle",
+        Text                 = self.subtitle,
+        Size                 = UDim2.new(1, 0, 0, 14),
+        BackgroundTransparency = 1,
+        TextSize             = 14,
+        TextXAlignment       = Enum.TextXAlignment.Left,
+        LayoutOrder          = 2,
+        TextTransparency     = 1,
+        Parent               = textContainer,
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+    self.interact = window:Create("TextButton", {
+        Name                 = "Interact",
+        BackgroundTransparency = 1,
+        Size                 = UDim2.fromScale(1, 1),
+        Text                 = "",
+        TextTransparency     = 1,
+        Visible              = false,
+        Parent               = self.main,
+    })
+
+    self:_bindDrag()
+end
+
+function Pill:_bindDrag()
+    local dragging, moved = false, false
+    local grabOffset, grabMouse = Vector2.zero, Vector2.zero
+
+    local function insetOffset()
+        if self.screenGui and self.screenGui.IgnoreGuiInset then
+            return variables.guiService:GetGuiInset()
+        end
+        return Vector2.zero
+    end
+
+    self.interact.InputBegan:Connect(function(input, processed)
+        if processed or not self.visible or self.animating then return end
+        local inputType = input.UserInputType.Name
+        if inputType ~= "MouseButton1" and inputType ~= "Touch" then return end
+
+        dragging, moved = true, false
+        grabMouse = variables.userInputService:GetMouseLocation()
+        grabOffset = self.main.AbsolutePosition + self.main.AbsoluteSize * self.main.AnchorPoint - grabMouse
+    end)
+
+    variables.userInputService.InputEnded:Connect(function(input)
+        local inputType = input.UserInputType.Name
+        if inputType ~= "MouseButton1" and inputType ~= "Touch" then return end
+        if not dragging then return end
+        dragging = false
+
+        if moved then
+            self._position = self.main.Position -- Save new drag position
+            return
+        end
+
+        -- If it wasn't dragged, it's a click
+        if self.onClick then task.spawn(self.onClick) end
+    end)
+
+    variables.userInputService.WindowFocusReleased:Connect(function()
+        dragging = false
+    end)
+
+    variables.runService.RenderStepped:Connect(function()
+        if not dragging then return end
+        if not self.visible or self.animating then
+            dragging = false
+            return
+        end
+
+        local mouse = variables.userInputService:GetMouseLocation()
+        if not moved and (mouse - grabMouse).Magnitude < 5 then
+            return
+        end
+        moved = true
+
+        local target = mouse + grabOffset + insetOffset()
+        self.main.Position = UDim2.fromOffset(target.X, target.Y)
+    end)
+end
+
+function Pill:Show()
+    if self.visible then return end
+    self.visible = true
+    self.animating = true
+    
+    self.main.Visible = true
+    self.interact.Visible = true
+
+    local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 0 }):Play()
+    variables.tweenService:Create(self.stroke, fadeInfo, { Transparency = 0.9 }):Play()
+    variables.tweenService:Create(self.iconLabel, fadeInfo, { ImageTransparency = 0 }):Play()
+    variables.tweenService:Create(self.titleLabel, fadeInfo, { TextTransparency = 0 }):Play()
+    variables.tweenService:Create(self.subtitleLabel, fadeInfo, { TextTransparency = 0.5 }):Play()
+
+    task.delay(fadeInfo.Time, function()
+        self.animating = false
+    end)
+
+    if self.onShow then task.spawn(self.onShow) end
+end
+
+function Pill:Hide()
+    if not self.visible then return end
+    self.visible = false
+    self.animating = true
+
+    local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+    variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    variables.tweenService:Create(self.stroke, fadeInfo, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.iconLabel, fadeInfo, { ImageTransparency = 1 }):Play()
+    variables.tweenService:Create(self.titleLabel, fadeInfo, { TextTransparency = 1 }):Play()
+    variables.tweenService:Create(self.subtitleLabel, fadeInfo, { TextTransparency = 1 }):Play()
+
+    task.delay(fadeInfo.Time, function()
+        self.animating = false
+        if not self.visible then
+            self.main.Visible = false
+            self.interact.Visible = false
+        end
+    end)
+    
+    if self.onHide then task.spawn(self.onHide) end
+end
+
+function Pill:Toggle()
+    if self.visible then
+        self:Hide()
+    else
+        self:Show()
+    end
+end
+
+return Pill
