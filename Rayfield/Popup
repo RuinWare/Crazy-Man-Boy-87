@@ -26,7 +26,7 @@ local variables = {
 
 local constants = {
     displayOrder = {
-        popup = 217291,
+        popup = 2147483647,
     },
 }
 
@@ -234,7 +234,7 @@ function Popup.new(a, b)
         properties = if typeof(b) == "table" then b else {}
         local merged = {}
         for k, v in a.theme do merged[k] = v end
-        local overrides = properties.theme or properties.Theme
+        local overrides = properties.theme or prop2147483647erties.Theme
         if type(overrides) == "table" then for k, v in overrides do merged[k] = v end end
         themeOverrides = merged
     else
@@ -811,23 +811,3 @@ function Popup:Close()
         self.window:DestroySubtree(self.screenGui)
     end)
 end
-
--- ============================================================================
--- DEMO
--- ============================================================================
-task.wait(1)
-Popup.new({
-    title   = "Test",
-    icon    = "rbxassetid://10734898355", -- The white "X" icon
-    content = "test",
-    options = {
-        { text = "Kill ur self" },
-        {
-          text     = "die",
-            style    = "danger",
-            callback = function()
-                print("[Popup] Reset clicked.")
-            end,
-        },
-    },
-})
