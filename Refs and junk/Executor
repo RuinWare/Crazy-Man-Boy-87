@@ -3,7 +3,7 @@
 -- ============================================================
 local TITLE = "RuinWare Executor"
 local SUBTITLE = "Made By RuinWare"
-local FLAG = "CodeRunner"                           -- name of this window (DeleteGuiByFlag can remove it)
+local FLAG = "RuinWareExe"                           -- name of this window (DeleteGuiByFlag can remove it)
 local SAVE_FILE = "RuinWare_Executor.json"         -- where your scripts are saved
 local START_SIZE = Vector2.new(580, 380)
 local MIN_SIZE = Vector2.new(440, 300)
@@ -56,12 +56,12 @@ local BUTTON_GRAY = Color3.fromRGB(70, 70, 78)
 local CODE_FONT = Enum.Font.Code
 
 -- layout numbers
-local HEADER_H = 56
-local FOOT_H = 36
+local HEADER_H = 40
+local FOOT_H = 4
 local PAD = 12
-local GAP = 12
-local MIN_SIDEBAR = 1
-local MIN_EDITOR = 400
+local GAP = 3
+local MIN_SIDEBAR = 0
+local MIN_EDITOR = 1200
 local GUTTER_W = 42
 local PADX, PADY = 8, 8
 local ITEM_H = 34
