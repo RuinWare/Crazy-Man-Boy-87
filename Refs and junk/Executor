@@ -1,5 +1,3 @@
--- Code Runner
-
 -- ============================================================
 -- SETTINGS
 -- ============================================================
@@ -15,7 +13,7 @@ local CORNER = 20
 local BODY_TRANSPARENCY = 0
 local TITLE_COLOR = Color3.fromRGB(245, 245, 245)   -- off-white, because black text can't be seen on a black box
 local SUBTITLE_COLOR = Color3.fromRGB(140, 140, 150)
-local SIDEBAR_COLOR = Color3.fromRGB(16, 16, 19)    -- slightly off black
+local SIDEBAR_COLOR = Color3.fromRGB(10, 10, 10)    -- slightly off black
 local EDITOR_COLOR = SUBTITLE_COLOR:Lerp(Color3.new(0, 0, 0), 0.84) -- the subtitle gray, darkened so code is readable
 local CODE_SIZE = 14
 local SCREEN_MARGIN = 6
@@ -74,8 +72,8 @@ local MENU_W, MENU_H = 138, 82
 local BAR_DISTANCE = 8
 local BAR_HIT = Vector2.new(72, 22)
 local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2
-local BAR_SIZE = UDim2.fromOffset(150, 4)
-local BAR_SIZE_ACTIVE = UDim2.fromOffset(170, 5)
+local BAR_SIZE = UDim2.fromOffset(140, 3)
+local BAR_SIZE_ACTIVE = UDim2.fromOffset(160, 4)
 local BAR_IDLE = 0.55
 local ICON_R, ICON_THICK, ICON_INSET = 15, 2.5, 12
 local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
