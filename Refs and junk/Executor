@@ -570,7 +570,7 @@ local closeButton = make("TextButton", {
 	Name = "Close",
 	AnchorPoint = Vector2.new(1, 0.5),
 	Position = UDim2.new(1, -(PAD + 2), 0, 22),
-	Size = UDim2.fromOffset(50, 50),
+	Size = UDim2.fromOffset(90, 90),
 	BackgroundColor3 = WHITE,
 	BackgroundTransparency = 1,
 	Text = "",
@@ -579,7 +579,7 @@ local closeButton = make("TextButton", {
 	ZIndex = 4,
 }, body)
 corner(closeButton, UDim.new(1, 0))
-local closeScale = make("UIScale", { Scale = 1 }, closeButton)
+local closeScale = make("UIScale", { Scale = 2 }, closeButton)
 local closeIcon = makeIcon(closeButton, ICON_CLOSE, OFFWHITE, 14, {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.5),
@@ -587,7 +587,7 @@ local closeIcon = makeIcon(closeButton, ICON_CLOSE, OFFWHITE, 14, {
 })
 closeButton.MouseEnter:Connect(function()
 	tween(closeButton, 0.25, { BackgroundTransparency = 0.86 })
-	tween(closeIcon, 0.4, { Rotation = 90, ImageColor3 = ERROR_RED }, Enum.EasingStyle.Back)
+	tween(closeIcon, 0.4, { Rotation = 90, ImageColor3 = Color3.fromRGB(55, 55, 65) }, Enum.EasingStyle.Back)
 end)
 closeButton.MouseLeave:Connect(function()
 	tween(closeButton, 0.3, { BackgroundTransparency = 1 })
