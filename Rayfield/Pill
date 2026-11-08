@@ -1,4 +1,4 @@
--- work pls
+--!nonstrict
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -9,7 +9,7 @@ local HttpService = game:GetService("HttpService")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- ============================================================================
--- MOCK UTILITIES (To make your exact code work standalone)
+-- MOCK UTILITIES
 -- ============================================================================
 local variables = {
     guiContainer = PlayerGui,
@@ -21,16 +21,12 @@ local variables = {
     brandFont = function(weight) return Font.new("rbxasset://fonts/families/GothamSSm.json", weight) end,
 }
 
-local constants = {
-    zIndex = { restoreContent = 10, restoreInteract = 20 }
-}
-
+local constants = { zIndex = { restoreContent = 10, restoreInteract = 20 } }
 local locale = { t = function(s) return s end }
 local hapticEngine = { click = function() end }
-local filesystem = { isfile = function() return false end, writefile = function() end }
 
 -- ============================================================================
--- YOUR EXACT CHROME CODE (Copied from your message)
+-- YOUR EXACT CHROME CODE
 -- ============================================================================
 local chrome = {}
 local dragThreshold = 5
@@ -90,7 +86,7 @@ function chrome.buildCollapsedFace(window)
 
     window.collapsedSubtitle = window:Create("TextLabel", {
         Name = "Subtitle",
-        Text = window.showSubtitle or "Tap to show", -- Added to allow subtitle passing
+        Text = window.showSubtitle or "Tap to show",
         Size = UDim2.new(1, 0, 0, 14),
         BackgroundTransparency = 1,
         FontFace = variables.brandFont(Enum.FontWeight.Medium),
@@ -192,21 +188,26 @@ function chrome.setCollapsedShown(window, shown, tweenInfo)
 end
 
 -- ============================================================================
--- STANDALONE WRAPPER (The "Thing")
+-- STANDALONE WRAPPER
 -- ============================================================================
 local Pill = {}
 Pill.__index = Pill
 
 function Pill.new(props)
+    -- Automatically convert numeric ID to string if provided as a number
+    local iconId = props.icon or 10734895456
+    if type(iconId) == "number" then
+        iconId = "rbxassetid://" .. tostring(iconId)
+    end
+
     local self = setmetatable({
-        showName = props.title or "Rayfield",
+        showName = props.title or "RuinWare",
         showSubtitle = props.subtitle or "Tap to show",
-        showIcon = props.icon or "rbxassetid://10734895456",
+        showIcon = iconId,
         showIconOnly = false,
-        onShow = props.onShow,
-        onHide = props.onHide,
         onClick = props.onClick,
-        hidden = true, -- true means it accepts clicks
+        visible = false,
+        hidden = true, -- Must be true for chrome.lua drag/click to work
         animating = false,
         connections = {},
         themeProperties = {},
@@ -217,7 +218,6 @@ function Pill.new(props)
 end
 
 function Pill:_build()
-    -- 1. ScreenGui (No dimming background)
     self.screenGui = Instance.new("ScreenGui")
     self.screenGui.Name = HttpService:GenerateGUID(false)
     self.screenGui.IgnoreGuiInset = true
@@ -225,11 +225,11 @@ function Pill:_build()
     self.screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     self.screenGui.Parent = variables.guiContainer
 
-    -- 2. Main Pill Frame (Exact size from your window.lua: 185x50)
+    -- Exact size (185x50) and starting position from your window.lua script
     self.main = self:Create("Frame", {
         Name = "Pill",
         Size = UDim2.fromOffset(185, 50),
-        Position = UDim2.new(0.5, 0, 0.85, 0), -- Default bottom center
+        Position = UDim2.new(0.5, 0, 0, 45), -- Top center, slightly down
         AnchorPoint = Vector2.new(0.5, 0.5),
         BackgroundColor3 = Color3.fromRGB(22, 22, 24),
         BackgroundTransparency = 1,
@@ -238,28 +238,20 @@ function Pill:_build()
         Parent = self.screenGui,
     })
 
-    -- Exact 180 degree roundness
     self:Create("UICorner", { Parent = self.main }).CornerRadius = UDim.new(1, 0)
     
-    -- Subtle stroke matching Rayfield
     local stroke = self:Create("UIStroke", { Parent = self.main })
     stroke.Color = Color3.fromRGB(60, 60, 65)
     stroke.Transparency = 1
 
-    -- 3. Build the exact face from your chrome.lua
     chrome.buildCollapsedFace(self)
-    
-    -- Initial state setup
-    self.collapsedInteract.Visible = true
-    chrome.setCollapsedShown(self, false, nil)
 end
 
--- Mock Create function so your exact code works
 function Pill:Create(className, props, themeMap)
     local inst = Instance.new(className)
     if props then
         for k, v in pairs(props) do
-            if k ~= "Parent" and typeof(v) ~= "table" then -- Skip theme tables
+            if k ~= "Parent" and typeof(v) ~= "table" then
                 inst[k] = v
             end
         end
@@ -283,61 +275,57 @@ function Pill:Connect(signal, callback)
     return conn
 end
 
--- Called by the drag logic when clicked
 function Pill:ToggleHide()
-    if self.animating then return end
     if self.onClick then
         task.spawn(self.onClick)
+    else
+        self:Hide()
     end
 end
 
--- 2. TRIGGER VIS
 function Pill:Show()
-    if not self.hidden then return end
-    self.hidden = false
+    if self.visible then return end
+    self.visible = true
+    self.hidden = true -- Required for drag/click
     self.animating = true
     
     self.main.Visible = true
+    self.collapsedInteract.Visible = true
+    
     local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
-    -- Fade in the background frame
     TweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 0 }):Play()
     if self.main:FindFirstChildOfClass("UIStroke") then
         TweenService:Create(self.main:FindFirstChildOfClass("UIStroke"), fadeInfo, { Transparency = 0.9 }):Play()
     end
     
-    -- Fade in the text/icon using your exact function
     chrome.setCollapsedShown(self, true, fadeInfo)
     
     task.delay(0.3, function() self.animating = false end)
-    if self.onShow then task.spawn(self.onShow) end
 end
 
--- 3. TRIGGER OFF
 function Pill:Hide()
-    if self.hidden then return end
-    self.hidden = true
+    if not self.visible then return end
+    self.visible = false
+    self.hidden = false -- Required for drag/click
     self.animating = true
     
     local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
-    -- Fade out the background frame
     TweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 1 }):Play()
     if self.main:FindFirstChildOfClass("UIStroke") then
         TweenService:Create(self.main:FindFirstChildOfClass("UIStroke"), fadeInfo, { Transparency = 1 }):Play()
     end
     
-    -- Fade out text/icon using your exact function
     chrome.setCollapsedShown(self, false, fadeInfo)
     
     task.delay(0.3, function()
-        if self.hidden then
+        if not self.visible then
             self.main.Visible = false
+            self.collapsedInteract.Visible = false
             self.animating = false
         end
     end)
-    
-    if self.onHide then task.spawn(self.onHide) end
 end
 
 return Pill
