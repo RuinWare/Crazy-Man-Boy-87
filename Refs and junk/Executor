@@ -56,12 +56,12 @@ local BUTTON_GRAY = Color3.fromRGB(70, 70, 78)
 local CODE_FONT = Enum.Font.Code
 
 -- layout numbers
-local HEADER_H = 40
-local FOOT_H = 4
+local HEADER_H = 53
+local FOOT_H = 8
 local PAD = 12
 local GAP = 3
 local MIN_SIDEBAR = 0
-local MIN_EDITOR = 1200
+local MIN_EDITOR = 200
 local GUTTER_W = 42
 local PADX, PADY = 8, 8
 local ITEM_H = 34
