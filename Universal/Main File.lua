@@ -1,3 +1,12 @@
+--[[
+===========================
+EARLY DECLARATIONS
+===========================
+]]--
+
+_G.SPEEDCHANGER_SLIDERQ = 16
+getgenv().SPEEDCHANGER_SLIDERQ = 16
+
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
 
 -- WINDOW
@@ -22,8 +31,9 @@ local tab = window:CreateTab({ name = "Main", icon = 83935746771599 })
 
 tab:CreateDivider({ text = "Player" })
 
+do
 local RunService = game:GetService("RunService")
-local SPEEDCHANGER_SLIDERQ = 16
+_G.SPEEDCHANGER_SLIDERQ = 16
 local speedEnabled = false
 
 tab:CreateToggle({
@@ -47,8 +57,9 @@ RunService.Heartbeat:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then
         hum.WalkSpeed = speedEnabled and SPEEDCHANGER_SLIDERQ or 16
-    end
-end)
+           end
+     end)
+end
 
 --[[
 ===========================
