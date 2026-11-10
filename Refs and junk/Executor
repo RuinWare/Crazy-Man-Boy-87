@@ -1,19 +1,21 @@
+-- Code Runner
+
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-local TITLE = "RuinWare Executor"
-local SUBTITLE = "Made By RuinWare"
-local FLAG = "RuinWareExe"                           -- name of this window (DeleteGuiByFlag can remove it)
-local SAVE_FILE = "RuinWare_Executor.json"         -- where your scripts are saved
+local TITLE = "Code Runner"
+local SUBTITLE = "Write, run and save Lua"
+local FLAG = "CodeRunner"                           -- name of this window (DeleteGuiByFlag can remove it)
+local SAVE_FILE = "CodeRunner_Scripts.json"         -- where your scripts are saved
 local START_SIZE = Vector2.new(580, 380)
 local MIN_SIZE = Vector2.new(440, 300)
 local MAX_SIZE = Vector2.new(1000, 720)
 local SPAWN = Vector2.new(0.5, 0.5)                 -- where it appears (0-1 of the screen)
-local CORNER = 20
-local BODY_TRANSPARENCY = 0
+local CORNER = 30                               -- very rounded, like Apple's liquid glass
+local BODY_TRANSPARENCY = 0.10
 local TITLE_COLOR = Color3.fromRGB(245, 245, 245)   -- off-white, because black text can't be seen on a black box
 local SUBTITLE_COLOR = Color3.fromRGB(140, 140, 150)
-local SIDEBAR_COLOR = Color3.fromRGB(10, 10, 10)    -- slightly off black
+local SIDEBAR_COLOR = Color3.fromRGB(0, 0, 0)       -- full black
 local EDITOR_COLOR = SUBTITLE_COLOR:Lerp(Color3.new(0, 0, 0), 0.84) -- the subtitle gray, darkened so code is readable
 local CODE_SIZE = 14
 local SCREEN_MARGIN = 6
@@ -29,6 +31,17 @@ local ICON_FILE = "rbxassetid://84710966599036"
 local ICON_RENAME = "rbxassetid://138570826481183"
 local ICON_DELETE = "rbxassetid://71855002670984"   -- also used by the Clear button
 local ICON_ERROR = "rbxassetid://139101153957019"
+
+-- Soft shadow under the window (the glow image, recolored black)
+local SHADOW_ASSET = "rbxassetid://138843696730147"
+
+-- The Popup and Pill libraries (the built-in versions are only used if these can't be loaded)
+local POPUP_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rayfield/Popup"
+local PILL_URL = "https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Rayfield/Pill"
+local PILL_TITLE = "Run Code"
+local PILL_SUBTITLE = "Tap to show"
+local PILL_ICON = 98691154054966
+local TOAST_TOP = 16                                -- how far from the top of the screen the error notification sits
 
 -- ============================================================
 -- DO NOT EDIT BELOW THIS LINE
@@ -60,7 +73,7 @@ local HEADER_H = 53
 local FOOT_H = 8
 local PAD = 12
 local GAP = 3
-local MIN_SIDEBAR = 0
+local MIN_SIDEBAR = 120
 local MIN_EDITOR = 200
 local GUTTER_W = 42
 local PADX, PADY = 8, 8
@@ -72,8 +85,8 @@ local MENU_W, MENU_H = 138, 82
 local BAR_DISTANCE = 8
 local BAR_HIT = Vector2.new(72, 22)
 local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2
-local BAR_SIZE = UDim2.fromOffset(140, 3)
-local BAR_SIZE_ACTIVE = UDim2.fromOffset(160, 4)
+local BAR_SIZE = UDim2.fromOffset(51, 3)
+local BAR_SIZE_ACTIVE = UDim2.fromOffset(61, 4)
 local BAR_IDLE = 0.55
 local ICON_R, ICON_THICK, ICON_INSET = 15, 2.5, 12
 local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
@@ -160,47 +173,151 @@ local function makeIcon(parent, image, color, size, extra)
 	return make("ImageLabel", props, parent)
 end
 
--- Liquid glass: a bright edge that fades around the shape, plus a soft sheen across the surface.
--- Returns the stroke, the sheen frame and the sheen gradient (so buttons can make it shimmer).
-local function glass(frame, radius, strength)
+-- Liquid glass, built like a thick piece of glass instead of a flat sheet:
+--   1. an outer rim that is bright where the light hits (top-left, bottom-right) and dim on the sides
+--   2. a second, softer rim just inside it, so the edge has thickness
+--   3. a small glossy highlight along the top edge
+--   4. a soft shade along the bottom edge, like light passing through
+-- opts: noGloss, noDepth, glossH, glossInset, depthH
+-- Returns the outer stroke and a list of every glass part (so it can be faded in and out).
+local function glass(frame, radius, strength, opts)
 	strength = strength or 1
+	opts = opts or {}
+	local parts = {}
+	local function track(obj, prop)
+		parts[#parts + 1] = { obj, prop, obj[prop] }
+	end
+	local function soft(t)
+		return 1 - (1 - t) * strength
+	end
+	local innerRadius = radius
+	if radius.Scale == 0 then innerRadius = UDim.new(0, math.max(2, radius.Offset - 2)) end
+
+	-- 1) outer rim
 	local stroke = make("UIStroke", {
 		Name = "GlassStroke",
 		Color = WHITE,
-		Thickness = 1.2,
-		Transparency = 0.4,
+		Thickness = 1.6,
+		Transparency = soft(0.3),
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, frame)
 	make("UIGradient", {
-		Rotation = 45,
+		Rotation = 40,
 		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.05),
-			NumberSequenceKeypoint.new(0.4, 0.82),
-			NumberSequenceKeypoint.new(0.75, 0.92),
-			NumberSequenceKeypoint.new(1, 0.5),
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.22, 0.55),
+			NumberSequenceKeypoint.new(0.5, 0.88),
+			NumberSequenceKeypoint.new(0.78, 0.55),
+			NumberSequenceKeypoint.new(1, 0.12),
 		}),
 	}, stroke)
+	track(stroke, "Transparency")
 
-	local sheen = make("Frame", {
-		Name = "Sheen",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = WHITE,
-		BackgroundTransparency = 0,
+	-- 2) inner rim
+	local rim = make("Frame", {
+		Name = "GlassInner",
+		Position = UDim2.fromOffset(2, 2),
+		Size = UDim2.new(1, -4, 1, -4),
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ZIndex = 1,
 	}, frame)
-	corner(sheen, radius)
-	local function soft(t) return 1 - (1 - t) * strength end
-	local gradient = make("UIGradient", {
-		Rotation = 60,
-		Offset = Vector2.new(-0.5, 0),
+	corner(rim, innerRadius)
+	local rimStroke = make("UIStroke", {
+		Color = WHITE,
+		Thickness = 1,
+		Transparency = soft(0.72),
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, rim)
+	make("UIGradient", {
+		Rotation = 220,
 		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, soft(0.82)),
-			NumberSequenceKeypoint.new(0.4, soft(0.95)),
-			NumberSequenceKeypoint.new(1, soft(0.985)),
+			NumberSequenceKeypoint.new(0, 0.1),
+			NumberSequenceKeypoint.new(0.45, 0.85),
+			NumberSequenceKeypoint.new(1, 0.45),
 		}),
-	}, sheen)
-	return stroke, sheen, gradient
+	}, rimStroke)
+	track(rimStroke, "Transparency")
+
+	-- 3) glossy highlight along the top edge
+	if not opts.noGloss then
+		local gloss = make("Frame", {
+			Name = "GlassGloss",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 3),
+			Size = UDim2.new(1, -(opts.glossInset or 18), 0, opts.glossH or 14),
+			BackgroundColor3 = WHITE,
+			BackgroundTransparency = 0,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+		}, frame)
+		corner(gloss, UDim.new(1, 0))
+		make("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, soft(0.8)),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}, gloss)
+		track(gloss, "BackgroundTransparency")
+	end
+
+	-- 4) soft shade along the bottom edge
+	if not opts.noDepth then
+		local depth = make("Frame", {
+			Name = "GlassDepth",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -3),
+			Size = UDim2.new(1, -(opts.glossInset or 18), 0, opts.depthH or 14),
+			BackgroundColor3 = BLACK,
+			BackgroundTransparency = 0,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+		}, frame)
+		corner(depth, UDim.new(1, 0))
+		make("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(1, soft(0.8)),
+			}),
+		}, depth)
+		track(depth, "BackgroundTransparency")
+	end
+
+	return stroke, parts
+end
+
+-- A soft shadow behind something (the glow image recolored black, sliced so resizing never stretches it)
+local function makeShadow(parent, spread, transparency, zindex)
+	local shadow = make("ImageLabel", {
+		Name = "Shadow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, spread * 0.35),
+		Size = UDim2.new(1, spread * 2, 1, spread * 2),
+		BackgroundTransparency = 1,
+		Image = SHADOW_ASSET,
+		ImageColor3 = BLACK,
+		ImageTransparency = transparency,
+		ScaleType = Enum.ScaleType.Stretch,
+		ZIndex = zindex,
+	}, parent)
+	task.spawn(function()
+		local deadline = os.clock() + 5
+		while shadow.Parent and os.clock() < deadline do
+			local ok, size = pcall(function() return shadow.ContentImageSize end)
+			if not ok then return end
+			if size.X > 0 and size.Y > 0 then
+				local sx, sy = size.X * 0.4, size.Y * 0.4
+				shadow.SliceCenter = Rect.new(sx, sy, size.X - sx, size.Y - sy)
+				shadow.SliceScale = math.max(spread, 1) / sx
+				shadow.ScaleType = Enum.ScaleType.Slice
+				return
+			end
+			task.wait(0.05)
+		end
+	end)
+	return shadow
 end
 
 -- Fading groups of things in and out (without blurring text): remember each value, then tween it
@@ -419,7 +536,7 @@ local function loadData()
 		if #scripts > 0 then
 			result.scripts = scripts
 			result.selected = math.clamp(tonumber(raw.selected) or 1, 1, #scripts)
-			result.sidebar = math.clamp(tonumber(raw.sidebar) or 0.28, 0.12, 0.6)
+			result.sidebar = math.clamp(tonumber(raw.sidebar) or 0.28, 0, 0.6)
 		end
 	end
 	return result
@@ -501,6 +618,7 @@ local sizeCur, posCur = startSize, startCenter
 local drag = {}              -- what is being dragged right now: { kind = "move" | "resize" | "divider" | "pill", ... }
 local layoutDirty = true
 local lastSideW = 150
+local sideCur, sideGoal = nil, 0 -- the sidebar width right now, and the width it is easing toward
 local isOpen = false
 local busy = false
 local pillCenter = nil
@@ -522,6 +640,7 @@ local holder = make("Frame", {
 	Visible = false,
 }, screenGui)
 local popScale = make("UIScale", { Name = "PopScale", Scale = 1 }, holder)
+makeShadow(holder, 44, 0.55, 0)
 
 local body = make("Frame", {
 	Name = "Body",
@@ -536,7 +655,7 @@ make("UIGradient", { -- the black background gradient
 	Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(40, 40, 50)),
 	Rotation = 60,
 }, body)
-glass(body, UDim.new(0, CORNER), 0.9)
+glass(body, UDim.new(0, CORNER), 0.9, { noGloss = true, noDepth = true })
 
 -- Title, subtitle and the close button
 local titleLabel = make("TextLabel", {
@@ -569,8 +688,8 @@ local subtitleLabel = make("TextLabel", {
 local closeButton = make("TextButton", {
 	Name = "Close",
 	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -(PAD + 2), 0, 22),
-	Size = UDim2.fromOffset(90, 90),
+	Position = UDim2.new(1, -PAD, 0, 26),
+	Size = UDim2.fromOffset(40, 40),
 	BackgroundColor3 = WHITE,
 	BackgroundTransparency = 1,
 	Text = "",
@@ -579,15 +698,15 @@ local closeButton = make("TextButton", {
 	ZIndex = 4,
 }, body)
 corner(closeButton, UDim.new(1, 0))
-local closeScale = make("UIScale", { Scale = 2 }, closeButton)
-local closeIcon = makeIcon(closeButton, ICON_CLOSE, OFFWHITE, 14, {
+local closeScale = make("UIScale", { Scale = 1 }, closeButton)
+local closeIcon = makeIcon(closeButton, ICON_CLOSE, OFFWHITE, 28, {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.5),
 	ZIndex = 5,
 })
 closeButton.MouseEnter:Connect(function()
 	tween(closeButton, 0.25, { BackgroundTransparency = 0.86 })
-	tween(closeIcon, 0.4, { Rotation = 90, ImageColor3 = Color3.fromRGB(55, 55, 65) }, Enum.EasingStyle.Back)
+	tween(closeIcon, 0.4, { Rotation = 90, ImageColor3 = ERROR_RED }, Enum.EasingStyle.Back)
 end)
 closeButton.MouseLeave:Connect(function()
 	tween(closeButton, 0.3, { BackgroundTransparency = 1 })
@@ -604,20 +723,19 @@ end)
 local sidebar = make("Frame", {
 	Name = "Sidebar",
 	BackgroundColor3 = SIDEBAR_COLOR,
-	BackgroundTransparency = 0.12,
+	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 	ClipsDescendants = true,
 	ZIndex = 2,
 }, body)
-corner(sidebar, UDim.new(0, 20))
-glass(sidebar, UDim.new(0, 20), 0.3)
+corner(sidebar, UDim.new(0, 22))
 
 make("TextLabel", {
 	Name = "SideTitle",
 	Position = UDim2.fromOffset(16, 10),
 	Size = UDim2.new(1, -60, 0, 18),
 	BackgroundTransparency = 1,
-	Text = "Scripts",
+	Text = "SCRIPTS",
 	TextColor3 = SUBTITLE_COLOR,
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -673,7 +791,7 @@ end)
 local listScroll = make("ScrollingFrame", {
 	Name = "List",
 	Position = UDim2.fromOffset(0, 38),
-	Size = UDim2.new(1, 0, 1, -(38 + 34)),
+	Size = UDim2.new(1, 0, 1, -(38 + 10)),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
 	ScrollBarThickness = 0,
@@ -689,24 +807,8 @@ make("UIPadding", {
 	PaddingTop = UDim.new(0, 2),
 	PaddingBottom = UDim.new(0, 4),
 }, listScroll)
-local listBar = makeScrollbar(listScroll, sidebar, 3, 40, 36, 8)
+local listBar = makeScrollbar(listScroll, sidebar, 3, 40, 12, 8)
 
-make("TextLabel", {
-	Name = "Hint",
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.new(0, 14, 1, -6),
-	Size = UDim2.new(1, -28, 0, 26),
-	BackgroundTransparency = 1,
-	Text = "",
-	TextColor3 = SUBTITLE_COLOR,
-	TextTransparency = 0.35,
-	TextSize = 10,
-	TextWrapped = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	TextYAlignment = Enum.TextYAlignment.Bottom,
-	FontFace = UI_FONT,
-	ZIndex = 3,
-}, sidebar)
 
 ----------------------------------------------------------------
 -- Editor (line numbers, colored code, Run and Clear)
@@ -719,8 +821,8 @@ local editorPanel = make("Frame", {
 	ClipsDescendants = true,
 	ZIndex = 2,
 }, body)
-corner(editorPanel, UDim.new(0, 14))
-glass(editorPanel, UDim.new(0, 14), 0.7)
+corner(editorPanel, UDim.new(0, 22))
+glass(editorPanel, UDim.new(0, 22), 0.7, { noGloss = true, noDepth = true })
 
 local lineH
 do
@@ -816,7 +918,7 @@ local function makeActionButton(name, text, width, bg, fg, image, slot)
 	local button = make("TextButton", {
 		Name = name,
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -(10 + slot), 1, -10),
+		Position = UDim2.new(1, -(34 + slot), 1, -10),
 		Size = UDim2.fromOffset(width, 32),
 		BackgroundColor3 = bg,
 		Text = "",
@@ -824,8 +926,9 @@ local function makeActionButton(name, text, width, bg, fg, image, slot)
 		Selectable = false,
 		ZIndex = 8,
 	}, editorPanel)
-	corner(button, UDim.new(0, 11))
-	local _, _, gradient = glass(button, UDim.new(0, 11), 0.8)
+	corner(button, UDim.new(1, 0))
+	local stroke = glass(button, UDim.new(1, 0), 0.9, { glossH = 12, depthH = 10 })
+	local strokeBase = stroke.Transparency
 	local scale = make("UIScale", { Scale = 1 }, button)
 	makeIcon(button, image, fg, 15, {
 		AnchorPoint = Vector2.new(0, 0.5),
@@ -845,11 +948,11 @@ local function makeActionButton(name, text, width, bg, fg, image, slot)
 	}, button)
 	button.MouseEnter:Connect(function()
 		tween(button, 0.2, { BackgroundColor3 = bg:Lerp(WHITE, 0.14) })
-		tween(gradient, 0.6, { Offset = Vector2.new(0.5, 0) }, Enum.EasingStyle.Quint)
+		tween(stroke, 0.25, { Transparency = 0 })
 	end)
 	button.MouseLeave:Connect(function()
 		tween(button, 0.3, { BackgroundColor3 = bg })
-		tween(gradient, 0.6, { Offset = Vector2.new(-0.5, 0) }, Enum.EasingStyle.Quint)
+		tween(stroke, 0.35, { Transparency = strokeBase })
 	end)
 	attachPress(button, scale, 0.93)
 	return button
@@ -988,8 +1091,8 @@ local menu = make("Frame", {
 	Visible = false,
 	ZIndex = 26,
 }, body)
-corner(menu, UDim.new(0, 14))
-glass(menu, UDim.new(0, 14), 1.2)
+corner(menu, UDim.new(0, 22))
+glass(menu, UDim.new(0, 22), 1.1, { glossH = 12, depthH = 12 })
 local menuScale = make("UIScale", { Scale = 1 }, menu)
 
 local function makeMenuOption(text, image, color, y, tint)
@@ -1004,7 +1107,7 @@ local function makeMenuOption(text, image, color, y, tint)
 		Selectable = false,
 		ZIndex = 27,
 	}, menu)
-	corner(option, UDim.new(0, 10))
+	corner(option, UDim.new(0, 14))
 	local scale = make("UIScale", { Scale = 1 }, option)
 	makeIcon(option, image, color, 16, {
 		AnchorPoint = Vector2.new(0, 0.5),
@@ -1039,7 +1142,7 @@ local menuFades = snapshotFor(menu)
 local toast = make("TextButton", {
 	Name = "Toast",
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, HEADER_H + 2),
+	Position = UDim2.new(0.5, 0, 0, -140),
 	Size = UDim2.fromOffset(380, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundColor3 = ERROR_RED,
@@ -1049,14 +1152,14 @@ local toast = make("TextButton", {
 	AutoButtonColor = false,
 	Selectable = false,
 	Visible = false,
-	ZIndex = 20,
-}, body)
-corner(toast, UDim.new(0, 16))
-glass(toast, UDim.new(0, 16), 0.9)
+	ZIndex = 60,
+}, screenGui)
+corner(toast, UDim.new(0, 22))
+glass(toast, UDim.new(0, 22), 0.9, { glossH = 12, depthH = 12 })
 local toastIcon = makeIcon(toast, ICON_ERROR, BLACK, 22, {
 	AnchorPoint = Vector2.new(0, 0.5),
 	Position = UDim2.new(0, 14, 0.5, 0),
-	ZIndex = 22,
+	ZIndex = 62,
 })
 local toastContent = make("Frame", {
 	Name = "Content",
@@ -1064,7 +1167,7 @@ local toastContent = make("Frame", {
 	Size = UDim2.new(1, -60, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1,
-	ZIndex = 21,
+	ZIndex = 61,
 }, toast)
 make("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) }, toastContent)
 make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, toastContent)
@@ -1080,7 +1183,7 @@ local toastText = make("TextLabel", {
 	TextWrapped = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	FontFace = UI_FONT_BOLD,
-	ZIndex = 22,
+	ZIndex = 62,
 }, toastContent)
 local toastLink = make("TextButton", {
 	Name = "Proceed",
@@ -1095,7 +1198,7 @@ local toastLink = make("TextButton", {
 	AutoButtonColor = false,
 	Selectable = false,
 	FontFace = UI_FONT_BOLD,
-	ZIndex = 23,
+	ZIndex = 63,
 }, toastContent)
 local toastFades = snapshotFor(toast)
 
@@ -1124,8 +1227,8 @@ local dialog = make("Frame", {
 	BorderSizePixel = 0,
 	ZIndex = 31,
 }, modal)
-corner(dialog, UDim.new(0, 18))
-glass(dialog, UDim.new(0, 18), 1.1)
+corner(dialog, UDim.new(0, 28))
+glass(dialog, UDim.new(0, 28), 1.1, { glossH = 14, depthH = 14 })
 local dialogScale = make("UIScale", { Scale = 1 }, dialog)
 make("UIPadding", {
 	PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18),
@@ -1176,8 +1279,9 @@ local function makeDialogButton(text, color, xScale, xOffset)
 		Selectable = false,
 		ZIndex = 33,
 	}, dialogRow)
-	corner(button, UDim.new(0, 12))
-	local _, _, gradient = glass(button, UDim.new(0, 12), 0.9)
+	corner(button, UDim.new(1, 0))
+	local stroke = glass(button, UDim.new(1, 0), 0.9, { glossH = 12, depthH = 10 })
+	local strokeBase = stroke.Transparency
 	local scale = make("UIScale", { Scale = 1 }, button)
 	make("TextLabel", {
 		Size = UDim2.fromScale(1, 1),
@@ -1190,11 +1294,11 @@ local function makeDialogButton(text, color, xScale, xOffset)
 	}, button)
 	button.MouseEnter:Connect(function()
 		tween(button, 0.2, { BackgroundColor3 = color:Lerp(WHITE, 0.14) })
-		tween(gradient, 0.6, { Offset = Vector2.new(0.5, 0) }, Enum.EasingStyle.Quint)
+		tween(stroke, 0.25, { Transparency = 0 })
 	end)
 	button.MouseLeave:Connect(function()
 		tween(button, 0.3, { BackgroundColor3 = color })
-		tween(gradient, 0.6, { Offset = Vector2.new(-0.5, 0) }, Enum.EasingStyle.Quint)
+		tween(stroke, 0.35, { Transparency = strokeBase })
 	end)
 	attachPress(button, scale, 0.94)
 	return button
@@ -1217,7 +1321,8 @@ local pill = make("TextButton", {
 	ZIndex = 50,
 }, screenGui)
 corner(pill, UDim.new(1, 0))
-local _, _, pillGradient = glass(pill, UDim.new(1, 0), 1)
+local pillStroke = glass(pill, UDim.new(1, 0), 1, { glossH = 12, depthH = 10 })
+local pillStrokeBase = pillStroke.Transparency
 local pillScale = make("UIScale", { Name = "PillScale", Scale = 1 }, pill)
 make("TextLabel", {
 	Size = UDim2.fromScale(1, 1),
@@ -1230,10 +1335,10 @@ make("TextLabel", {
 }, pill)
 local pillFades = snapshotFor(pill)
 pill.MouseEnter:Connect(function()
-	tween(pillGradient, 0.6, { Offset = Vector2.new(0.5, 0) }, Enum.EasingStyle.Quint)
+	tween(pillStroke, 0.25, { Transparency = 0 })
 end)
 pill.MouseLeave:Connect(function()
-	tween(pillGradient, 0.6, { Offset = Vector2.new(-0.5, 0) }, Enum.EasingStyle.Quint)
+	tween(pillStroke, 0.35, { Transparency = pillStrokeBase })
 end)
 
 ----------------------------------------------------------------
@@ -1245,18 +1350,34 @@ function layout()
 	local contentW = math.max(100, w - PAD * 2)
 	local contentH = math.max(60, h - HEADER_H - FOOT_H)
 	local maxSide = math.max(MIN_SIDEBAR, contentW - MIN_EDITOR - GAP)
-	local sideW = math.floor(math.clamp(data.sidebar * contentW, MIN_SIDEBAR, maxSide))
-	local editorW = math.floor(math.max(80, contentW - sideW - GAP))
-	local cH = math.floor(contentH)
-	lastSideW = sideW
 
+	-- where the sidebar wants to be (0 = hidden, the editor fills the window)
+	sideGoal = 0
+	if data.sidebar > 0 then
+		sideGoal = math.clamp(data.sidebar * contentW, MIN_SIDEBAR, maxSide)
+	end
+	if sideCur == nil then sideCur = sideGoal end
+	lastSideW = sideCur
+
+	local sideW = sideCur
+	local gapNow = GAP * math.clamp(sideW / 24, 0, 1)
+	local cH = math.floor(contentH)
+	local sideInt = math.floor(sideW + 0.5)
+	local gapInt = math.floor(gapNow + 0.5)
+	local editorW = math.floor(math.max(80, contentW - sideW - gapNow))
+
+	sidebar.Visible = sideW > 2
 	sidebar.Position = UDim2.fromOffset(PAD, HEADER_H)
-	sidebar.Size = UDim2.fromOffset(sideW, cH)
-	editorPanel.Position = UDim2.fromOffset(PAD + sideW + GAP, HEADER_H)
+	sidebar.Size = UDim2.fromOffset(sideInt, cH)
+	editorPanel.Position = UDim2.fromOffset(PAD + sideInt + gapInt, HEADER_H)
 	editorPanel.Size = UDim2.fromOffset(editorW, cH)
-	divider.Position = UDim2.fromOffset(PAD + sideW + GAP / 2, HEADER_H + cH / 2)
-	divider.Size = UDim2.fromOffset(GAP + 8, cH)
-	toast.Size = UDim2.fromOffset(math.floor(math.clamp(w - 60, 220, 480)), 0)
+
+	-- the divider stays grabbable even when the sidebar is hidden (it sits just inside the editor)
+	local pushIn = (1 - math.clamp(sideW / 24, 0, 1)) * 9
+	divider.Position = UDim2.fromOffset(PAD + sideW + gapNow / 2 + pushIn, HEADER_H + cH / 2)
+	divider.Size = UDim2.fromOffset(18, cH)
+
+	if sideW < 40 and menu.Visible then closeMenu() end
 end
 
 ----------------------------------------------------------------
@@ -1670,8 +1791,8 @@ function hideToast()
 	if not toast.Visible then return end
 	local token = toastToken
 	fadeGroup(toastFades, false, 0.2)
-	tween(toast, 0.25, { Position = UDim2.new(0.5, -18, 0, HEADER_H + 2) }, Enum.EasingStyle.Quint)
-	task.delay(0.25, function()
+	tween(toast, 0.3, { Position = UDim2.new(0.5, 0, 0, -140) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+	task.delay(0.3, function()
 		if token == toastToken then toast.Visible = false end
 	end)
 end
@@ -1683,10 +1804,11 @@ function showToast(message, onProceed)
 	toastText.Text = message
 	toastLink.Visible = onProceed ~= nil
 
+	toast.Size = UDim2.fromOffset(math.floor(math.clamp(viewport().X - 32, 220, 460)), 0)
 	toast.Visible = true
-	toast.Position = UDim2.new(0.5, -28, 0, HEADER_H + 2) -- slides in from the left
+	toast.Position = UDim2.new(0.5, 0, 0, -140) -- slides down from the top of the screen
 	setGroup(toastFades, 1)
-	tween(toast, 0.45, { Position = UDim2.new(0.5, 0, 0, HEADER_H + 2) }, Enum.EasingStyle.Back)
+	tween(toast, 0.5, { Position = UDim2.new(0.5, 0, 0, TOAST_TOP) }, Enum.EasingStyle.Back)
 	fadeGroup(toastFades, true, 0.25)
 
 	task.delay(10, function()
@@ -1794,14 +1916,16 @@ local function createItem(index, entry, animate)
 		LayoutOrder = index,
 		Size = UDim2.new(1, 0, 0, animate and 0 or ITEM_H),
 		BackgroundColor3 = WHITE,
-		BackgroundTransparency = selected and 0.9 or 1,
+		BackgroundTransparency = selected and 0.94 or 1,
 		Text = "",
 		AutoButtonColor = false,
 		Selectable = false,
 		ClipsDescendants = true,
 		ZIndex = 4,
 	}, listScroll)
-	corner(item, UDim.new(0, 11))
+	corner(item, UDim.new(0, 14))
+	local _, glassParts = glass(item, UDim.new(0, 14), 1.1, { glossH = 10, glossInset = 22, depthH = 10 })
+	if not selected then setGroup(glassParts, 1) end
 
 	local accent = make("Frame", {
 		Name = "Accent",
@@ -1851,7 +1975,7 @@ local function createItem(index, entry, animate)
 		ZIndex = 5,
 	}, item)
 
-	itemRefs[index] = { item = item, accent = accent, icon = fileIcon, name = nameLabel }
+	itemRefs[index] = { item = item, accent = accent, icon = fileIcon, name = nameLabel, glass = glassParts }
 
 	item.MouseEnter:Connect(function()
 		if index ~= data.selected then tween(item, 0.2, { BackgroundTransparency = 0.94 }) end
@@ -1895,7 +2019,8 @@ end
 function applySelection()
 	for index, ref in pairs(itemRefs) do
 		local selected = index == data.selected
-		tween(ref.item, 0.25, { BackgroundTransparency = selected and 0.9 or 1 })
+		tween(ref.item, 0.25, { BackgroundTransparency = selected and 0.94 or 1 })
+		fadeGroup(ref.glass, selected, 0.3)
 		tween(ref.accent, 0.3, { BackgroundTransparency = selected and 0.15 or 1 })
 		tween(ref.name, 0.25, { TextColor3 = selected and OFFWHITE or SUBTITLE_COLOR })
 		tween(ref.icon, 0.25, { ImageTransparency = selected and 0.05 or 0.35 })
@@ -2025,7 +2150,46 @@ function beginRename(index)
 	end)
 end
 
--- The "Are You Sure" popup
+-- The "Are You Sure" popup. It uses the Popup library; the built-in popup below is only a backup
+-- for when the library can't be loaded.
+local popupLib = nil
+local function getPopup()
+	if popupLib ~= nil then return popupLib or nil end
+	local ok, lib = pcall(function()
+		return loadstring(game:HttpGet(POPUP_URL))()
+	end)
+	popupLib = (ok and lib) or false
+	return popupLib or nil
+end
+
+-- Deletes a script (with a little shrink animation)
+local function deleteEntry(entry)
+	local index = table.find(data.scripts, entry)
+	if not index then return end
+
+	local ref = itemRefs[index]
+	if ref then
+		tween(ref.item, 0.25, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, Enum.EasingStyle.Quint)
+		task.wait(0.26)
+	end
+
+	index = table.find(data.scripts, entry) -- the list may have changed while it animated
+	if not index then return end
+	table.remove(data.scripts, index)
+	if #data.scripts == 0 then
+		data.scripts[1] = { name = "Script 1.lua", code = "" }
+		data.selected = 1
+	elseif index < data.selected then
+		data.selected -= 1
+	elseif index == data.selected then
+		data.selected = math.min(index, #data.scripts)
+	end
+	buildList()
+	loadEditorText()
+	scheduleSave()
+end
+
+-- backup popup
 local deleteIndex = nil
 local modalToken = 0
 
@@ -2043,10 +2207,32 @@ end
 function openDeletePopup(index)
 	local entry = data.scripts[index]
 	if not entry then return end
+
+	local lib = getPopup()
+	if lib then
+		local ok = pcall(function()
+			lib.new({
+				title = "Are You Sure?",
+				content = ("Are you sure you want to delete %s?"):format(entry.name),
+				options = {
+					{ text = "Cancel", style = "neutral" },
+					{
+						text = "Delete",
+						style = "danger",
+						callback = function()
+							task.spawn(deleteEntry, entry)
+						end,
+					},
+				},
+			})
+		end)
+		if ok then return end
+	end
+
+	-- backup popup
 	modalToken += 1
 	deleteIndex = index
 	dialogBody.Text = ("Are you sure you want to delete %s?"):format(entry.name)
-
 	modal.Visible = true
 	dialogScale.Scale = 0.88
 	setGroup(modalFades, 1)
@@ -2057,28 +2243,9 @@ end
 cancelButton.Activated:Connect(closePopup)
 modal.Activated:Connect(closePopup)
 confirmButton.Activated:Connect(function()
-	local index = deleteIndex
+	local entry = deleteIndex and data.scripts[deleteIndex]
 	closePopup()
-	if not index or not data.scripts[index] then return end
-
-	local ref = itemRefs[index]
-	if ref then
-		tween(ref.item, 0.25, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, Enum.EasingStyle.Quint)
-		task.wait(0.26)
-	end
-
-	table.remove(data.scripts, index)
-	if #data.scripts == 0 then
-		data.scripts[1] = { name = "Script 1.lua", code = "" }
-		data.selected = 1
-	elseif index < data.selected then
-		data.selected -= 1
-	elseif index == data.selected then
-		data.selected = math.min(index, #data.scripts)
-	end
-	buildList()
-	loadEditorText()
-	scheduleSave()
+	if entry then task.spawn(deleteEntry, entry) end
 end)
 
 ----------------------------------------------------------------
@@ -2122,7 +2289,7 @@ end)
 -- Divider: changes how wide the sidebar is compared to the editor
 divider.InputBegan:Connect(function(input)
 	if not isPress(input) or drag.kind or busy then return end
-	begin("divider", input, { startSide = lastSideW })
+	begin("divider", input, { startSide = sideCur or lastSideW })
 	tween(dividerPill, 0.2, { BackgroundTransparency = 0.25, Size = UDim2.fromOffset(4, 50) }, Enum.EasingStyle.Back)
 	input.Changed:Connect(function()
 		if input.UserInputState == Enum.UserInputState.End then
@@ -2155,7 +2322,13 @@ connections[#connections + 1] = UserInputService.InputChanged:Connect(function(i
 		posTarget = drag.topLeft + newSize / 2 -- the top-left corner stays put
 	elseif kind == "divider" then
 		local contentW = math.max(100, sizeCur.X - PAD * 2)
-		data.sidebar = math.clamp((drag.startSide + delta.X) / contentW, 0.12, 0.6)
+		local maxSide = math.max(MIN_SIDEBAR, contentW - MIN_EDITOR - GAP)
+		local raw = drag.startSide + delta.X
+		if raw < MIN_SIDEBAR * 0.5 then
+			data.sidebar = 0 -- all the way over: the sidebar hides and the editor fills the window
+		else
+			data.sidebar = math.clamp(raw, MIN_SIDEBAR, maxSide) / contentW
+		end
 		layoutDirty = true
 	elseif kind == "pill" then
 		if delta.Magnitude > 6 then drag.moved = true end
@@ -2174,7 +2347,47 @@ fadeValue.Changed:Connect(function(alpha)
 	end
 end)
 
+-- The floating pill (shown while the window is closed). It uses the Pill library;
+-- the built-in pill is only a backup for when the library can't be loaded.
+local libPill = nil
+local libPillTried = false
+local libPillShown = false
+
+local function getLibPill()
+	if libPill then return libPill end
+	if libPillTried then return nil end
+	libPillTried = true
+	local ok, created = pcall(function()
+		local Pill = loadstring(game:HttpGet(PILL_URL))()
+		local made = Pill.new({
+			title = PILL_TITLE,
+			subtitle = PILL_SUBTITLE,
+			icon = PILL_ICON,
+		})
+		made.onClick = function()
+			libPillShown = false
+			task.spawn(setOpen, true) -- reopen the window
+			made:Hide() -- keep this
+		end
+		return made
+	end)
+	if ok and created then libPill = created end
+	return libPill
+end
+
 local function showPill()
+	local lib = getLibPill()
+	if lib then
+		local ok = pcall(function()
+			lib:Show()
+		end)
+		if ok then
+			libPillShown = true
+			return
+		end
+	end
+
+	-- backup pill
 	if not pillCenter then
 		pillCenter = Vector2.new(viewport().X / 2, 44)
 	end
@@ -2186,11 +2399,18 @@ local function showPill()
 end
 
 local function hidePill()
-	if not pill.Visible then return end
-	tween(pillScale, 0.25, { Scale = 0.6 }, Enum.EasingStyle.Quad)
-	fadeGroup(pillFades, false, 0.22)
-	task.wait(0.25)
-	pill.Visible = false
+	if libPillShown and libPill then
+		libPillShown = false
+		pcall(function()
+			libPill:Hide()
+		end)
+	end
+	if pill.Visible then
+		tween(pillScale, 0.25, { Scale = 0.6 }, Enum.EasingStyle.Quad)
+		fadeGroup(pillFades, false, 0.22)
+		task.wait(0.25)
+		pill.Visible = false
+	end
 end
 
 function setOpen(open)
@@ -2210,6 +2430,7 @@ function setOpen(open)
 	else
 		fadeList = snapshotFor(holder)
 		fadeValue.Value = 0
+		hideToast()
 		tween(popScale, 0.3, { Scale = 0.92 }, Enum.EasingStyle.Quint)
 		local fade = tween(fadeValue, 0.28, { Value = 1 }, Enum.EasingStyle.Quad)
 		fade.Completed:Wait()
@@ -2250,6 +2471,16 @@ connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
 
 	holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
 	holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
+
+	if sideCur then
+		if math.abs(sideGoal - sideCur) > 0.3 then
+			sideCur += (sideGoal - sideCur) * (1 - math.exp(-dt * 16))
+			layoutDirty = true
+		elseif sideCur ~= sideGoal then
+			sideCur = sideGoal
+			layoutDirty = true
+		end
+	end
 
 	local key = math.floor(sizeCur.X + 0.5) * 8192 + math.floor(sizeCur.Y + 0.5)
 	if key ~= lastLayoutKey or layoutDirty then
