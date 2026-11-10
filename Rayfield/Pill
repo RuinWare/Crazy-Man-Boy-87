@@ -21,7 +21,7 @@ local variables = {
     brandFont = function(weight) return Font.new("rbxasset://fonts/families/GothamSSm.json", weight) end,
 }
 
-local constants = { zIndex = { restoreContent = 10, restoreInteract = 20 } }
+local constants = { zIndex = { restoreContent = 2147483646, restoreInteract = 2147483647 } }
 local locale = { t = function(s) return s end }
 local hapticEngine = { click = function() end }
 
