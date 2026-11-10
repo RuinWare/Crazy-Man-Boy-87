@@ -16,7 +16,7 @@ local variables = {
     httpService      = HttpService,
 }
 
-local constants = { displayOrder = { popup = 100 } }
+local constants = { displayOrder = { popup = 2147483647 } }
 local locale = { t = function(s) return tostring(s or "") end, resolve = function(s) return tostring(s or "") end }
 local log = { warn = function(...) warn(...) end, print = function(...) print(...) end }
 local hapticEngine = { click = function() end, notify = function() end }
