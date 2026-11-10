@@ -1,9 +1,0 @@
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
-
-local window = Rayfield:CreateWindow({
-    name = "RuinWare Client",
-    subtitle = "Universal",
-    sidebarLayout = true,
-    theme = "default",
-})
-
