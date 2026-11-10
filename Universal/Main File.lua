@@ -53,7 +53,7 @@ end,
 tab:CreateSlider({
     name = "Speed:",
     flag = "SpeedSlider",
-    range = {16, 200},
+    range = {16, 2000},
     increment = 1,
     currentValue = 16,
     callback = function(v) SPEEDCHANGER_SLIDERQ = v end,
