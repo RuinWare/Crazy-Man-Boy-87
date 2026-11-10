@@ -53,7 +53,7 @@ local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 local TextService = game:GetService("TextService")
 
-local TAG = "DraggableBoxGui" -- same tag as the mobile buttons, so DestroyAllGuis / DeleteGuiByFlag work on this too
+local TAG = "RWEXECUTOR" -- same tag as the mobile buttons, so DestroyAllGuis / DeleteGuiByFlag work on this too
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -83,8 +83,8 @@ local MENU_W, MENU_H = 138, 82
 local BAR_DISTANCE = 8
 local BAR_HIT = Vector2.new(72, 22)
 local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2
-local BAR_SIZE = UDim2.fromOffset(51, 3)
-local BAR_SIZE_ACTIVE = UDim2.fromOffset(61, 4)
+local BAR_SIZE = UDim2.fromOffset(142, 3)
+local BAR_SIZE_ACTIVE = UDim2.fromOffset(153, 4)
 local BAR_IDLE = 0.55
 local ICON_R, ICON_THICK, ICON_INSET = 15, 2.5, 12
 local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
@@ -568,7 +568,7 @@ local screenGui = make("ScreenGui", {
 	Name = randomName(20),
 	ResetOnSpawn = false,
 	IgnoreGuiInset = true,
-	DisplayOrder = 2147483647, -- above every other GUI
+	DisplayOrder = 2147483646, -- above every other GUI
 	OnTopOfCoreBlur = true,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 }, nil)
