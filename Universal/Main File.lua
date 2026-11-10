@@ -17,6 +17,7 @@ local window = Rayfield:CreateWindow({
 MAIN
 ===========================
 ]]--
+local tab = window:CreateTab({ name = "Main", icon = 83935746771599 })
 
 tab:CreateDivider({ text = "Player" })
 
