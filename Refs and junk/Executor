@@ -1,12 +1,10 @@
--- Code Runner
-
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-local TITLE = "Code Runner"
-local SUBTITLE = "Write, run and save Lua"
-local FLAG = "CodeRunner"                           -- name of this window (DeleteGuiByFlag can remove it)
-local SAVE_FILE = "CodeRunner_Scripts.json"         -- where your scripts are saved
+local TITLE = "RuinWare Executor"
+local SUBTITLE = "Universal"
+local FLAG = "RWEXECUTOR"                           -- name of this window (DeleteGuiByFlag can remove it)
+local SAVE_FILE = "RuinWare_Executor_Scripts.json"         -- where your scripts are saved
 local START_SIZE = Vector2.new(580, 380)
 local MIN_SIZE = Vector2.new(440, 300)
 local MAX_SIZE = Vector2.new(1000, 720)
@@ -17,7 +15,7 @@ local TITLE_COLOR = Color3.fromRGB(245, 245, 245)   -- off-white, because black 
 local SUBTITLE_COLOR = Color3.fromRGB(140, 140, 150)
 local SIDEBAR_COLOR = Color3.fromRGB(0, 0, 0)       -- full black
 local EDITOR_COLOR = SUBTITLE_COLOR:Lerp(Color3.new(0, 0, 0), 0.84) -- the subtitle gray, darkened so code is readable
-local CODE_SIZE = 14
+local CODE_SIZE = 11
 local SCREEN_MARGIN = 6
 local DRAG_FOLLOW_SPEED = 9                         -- lower = the window trails the drag bar more
 local RESIZE_FOLLOW_SPEED = 26
@@ -2366,7 +2364,9 @@ local function getLibPill()
 		})
 		made.onClick = function()
 			libPillShown = false
-			task.spawn(setOpen, true) -- reopen the window
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/GuiDeleteExecutor"))()
+            task.wait(0.1)
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Executor"))()
 			made:Hide() -- keep this
 		end
 		return made
