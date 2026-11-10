@@ -39,8 +39,15 @@ local speedEnabled = false
 tab:CreateToggle({
     name = "Speed Changer",
     flag = "SpeedChanger",
-    value = false,
-    callback = function(v) speedEnabled = v end,
+    currentValue = false,
+    callback = function(v)
+    speedEnabled = v
+    if not v then
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 16 end
+    end
+end,
 })
 
 tab:CreateSlider({
@@ -48,17 +55,18 @@ tab:CreateSlider({
     flag = "SpeedSlider",
     range = {16, 200},
     increment = 1,
-    value = 16,
+    currentValue = 16,
     callback = function(v) SPEEDCHANGER_SLIDERQ = v end,
 })
 
 RunService.Heartbeat:Connect(function()
+    if not speedEnabled then return end
     local char = game.Players.LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then
-        hum.WalkSpeed = speedEnabled and SPEEDCHANGER_SLIDERQ or 16
-           end
-     end)
+        hum.WalkSpeed = SPEEDCHANGER_SLIDERQ
+         end
+    end)
 end
 
 --[[
@@ -68,6 +76,8 @@ FLY
 ]]--
 
 do
+    local RunService = game:GetService("RunService")
+    local player = game.Players.LocalPlayer
     local flyEnabled = false
     local flySpeed = 100
     local flyHum, flyRoot
