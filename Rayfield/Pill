@@ -223,6 +223,7 @@ function Pill:_build()
     self.screenGui.IgnoreGuiInset = true
     self.screenGui.ResetOnSpawn = false
     self.screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    self.screenGui.DisplayOrder = 2147483647
     self.screenGui.Parent = variables.guiContainer
 
     -- Exact size (185x50) and starting position from your window.lua script
