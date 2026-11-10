@@ -1,16 +1,30 @@
--- ima obf this rq
-
+--!nonstrict
+-- ============================================================================
+-- Rayfield Popup (CoreGui Version)
+-- ============================================================================
 local Players          = game:GetService("Players")
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService      = game:GetService("HttpService")
 local TextService      = game:GetService("TextService")
+local CoreGui          = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Safe CoreGui fallback (in case an executor blocks CoreGui)
+local guiContainer = CoreGui
+pcall(function()
+    local test = Instance.new("ScreenGui")
+    test.Parent = CoreGui
+    test:Destroy()
+end)
+-- If pcall fails, it falls back to PlayerGui
+local success, _ = pcall(function() return CoreGui:GetChildren() end)
+if not success then guiContainer = PlayerGui end
+
 local variables = {
-    guiContainer     = PlayerGui,
+    guiContainer     = guiContainer,
     tweenService     = TweenService,
     userInputService = UserInputService,
     httpService      = HttpService,
@@ -379,7 +393,6 @@ function Popup:_buildButton(parent, option, order)
     elseif style == "danger" then
         restColor, hoverColor, edgeColor, strokeShown = window.theme.ErrorColor, window.theme.ErrorStrokeColor, window.theme.ErrorStrokeColor, 0
     elseif style == "success" then
-        -- Added "success" style (Green)
         restColor, hoverColor, edgeColor, strokeShown = Color3.fromRGB(40, 167, 69), Color3.fromRGB(50, 187, 79), Color3.fromRGB(50, 187, 79), 0.1
     else
         restColor, hoverColor, edgeColor, strokeShown = window.theme.NeutralButton, window.theme.NeutralButtonHover, window.theme.NeutralButtonStroke, 0.85
