@@ -5,14 +5,17 @@ local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
 
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- ============================================================================
--- MOCK UTILITIES
--- ============================================================================
+-- Safe CoreGui fallback
+local guiContainer = CoreGui
+local success, _ = pcall(function() return CoreGui:GetChildren() end)
+if not success then guiContainer = PlayerGui end
+
 local variables = {
-    guiContainer = PlayerGui,
+    guiContainer = guiContainer,
     tweenService = TweenService,
     userInputService = UserInputService,
     guiService = GuiService,
@@ -21,7 +24,7 @@ local variables = {
     brandFont = function(weight) return Font.new("rbxasset://fonts/families/GothamSSm.json", weight) end,
 }
 
-local constants = { zIndex = { restoreContent = 2147483646, restoreInteract = 2147483647 } }
+local constants = { zIndex = { restoreContent = 10, restoreInteract = 20 } }
 local locale = { t = function(s) return s end }
 local hapticEngine = { click = function() end }
 
@@ -194,7 +197,6 @@ local Pill = {}
 Pill.__index = Pill
 
 function Pill.new(props)
-    -- Automatically convert numeric ID to string if provided as a number
     local iconId = props.icon or 10734895456
     if type(iconId) == "number" then
         iconId = "rbxassetid://" .. tostring(iconId)
@@ -224,13 +226,12 @@ function Pill:_build()
     self.screenGui.ResetOnSpawn = false
     self.screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     self.screenGui.DisplayOrder = 2147483647
-    self.screenGui.Parent = variables.guiContainer
+    self.screenGui.Parent = variables.guiContainer -- <--- NOW USES COREGUI
 
-    -- Exact size (185x50) and starting position from your window.lua script
     self.main = self:Create("Frame", {
         Name = "Pill",
         Size = UDim2.fromOffset(185, 50),
-        Position = UDim2.new(0.5, 0, 0, 45), -- Top center, slightly down
+        Position = UDim2.new(0.5, 0, 0, 45),
         AnchorPoint = Vector2.new(0.5, 0.5),
         BackgroundColor3 = Color3.fromRGB(22, 22, 24),
         BackgroundTransparency = 1,
