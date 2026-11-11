@@ -5114,6 +5114,85 @@ M     A     P          (     T     A     B     )
 local MapTab = window:CreateTab({ name = "Map", icon = 78731952302365 })
 
 --[[
+===========================
+REMOVE CAMPING ZONES
+===========================
+]]--
+
+do
+    local SafeZones = nil
+    local enabled = false
+    local savedClones = {}
+
+    local function getSafeZones()
+        if SafeZones and SafeZones.Parent then return SafeZones end
+        local map = workspace:FindFirstChild("Map")
+        if not map then return nil end
+        SafeZones = map:FindFirstChild("SafeZones")
+        return SafeZones
+    end
+
+    local function snapshotAndRemove()
+        local sz = getSafeZones()
+        if not sz then return end
+        for _, child in ipairs(sz:GetChildren()) do
+            table.insert(savedClones, child:Clone())
+            child:Destroy()
+        end
+    end
+
+    local function restore()
+        local sz = getSafeZones()
+        if not sz then
+            savedClones = {}
+            return
+        end
+        for _, clone in ipairs(savedClones) do
+            if clone then
+                pcall(function() clone.Parent = sz end)
+            end
+        end
+        table.clear(savedClones)
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not enabled then return end
+        local sz = getSafeZones()
+        if not sz then return end
+        for _, child in ipairs(sz:GetChildren()) do
+            table.insert(savedClones, child:Clone())
+            child:Destroy()
+        end
+    end)
+
+    MapTab:CreateDivider()
+
+    MapTab:CreateToggle({
+        name = "Remove Camping Zones",
+        currentValue = false,
+        flag = "RemoveCampingZones_Toggle",
+        callback = function(v)
+            enabled = v
+            if v then
+                snapshotAndRemove()
+            else
+                restore()
+            end
+        end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["RemoveCampingZones"] = function(v)
+        enabled = v
+        if v then
+            snapshotAndRemove()
+        else
+            restore()
+        end
+    end
+end
+
+--[[
 ============================================================================
 
 S     C     P               (     T     A     B     )
