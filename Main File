@@ -4190,7 +4190,7 @@ local function sendNotify()
         triggered = false
     end)
 
-    tab:CreateDivider()
+    tab:CreateDivider({ text = "Streak" })
 
     tab:CreateToggle({
         name = "Auto Streak Saver",
@@ -4480,7 +4480,7 @@ do
         -- Camera auto-reverts next frame because the game overwrites cam.CFrame itself
     end
 
-    tab:CreateDivider()
+    tab:CreateDivider({ Camara })
 
     tab:CreateToggle({
         name = "Camera Offset Changer",
@@ -4524,6 +4524,92 @@ do
 
     _G.RWCallbacks = _G.RWCallbacks or {}
     _G.RWCallbacks["CamOffset"] = function(v)
+        enabled = v
+        if v then start() else stop() end
+    end
+end
+
+-- pos
+
+do
+    local enabled = false
+    local offsetX = 0
+    local offsetY = 0
+    local offsetZ = 0
+    local bindName = "CameraPositionChanger"
+    local bound = false
+
+    local function applyPosition()
+        if not enabled then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        -- 1 slider unit = 0.1 studs
+        local sx = offsetX * 0.1
+        local sy = offsetY * 0.1
+        local sz = offsetZ * 0.1
+
+        -- Local-space offset: X = camera right, Y = camera up, Z = camera forward
+        cam.CFrame = cam.CFrame * CFrame.new(sx, sy, sz)
+    end
+
+    local function start()
+        if bound then return end
+        bound = true
+        RunService:BindToRenderStep(bindName, Enum.RenderPriority.Camera.Value + 1, applyPosition)
+    end
+
+    local function stop()
+        if bound then
+            pcall(function() RunService:UnbindFromRenderStep(bindName) end)
+            bound = false
+        end
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Camera Position Changer",
+        currentValue = false,
+        flag = "CamPos_Toggle",
+        callback = function(v)
+            enabled = v
+            if v then start() else stop() end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "X",
+        range = {-100, 100},
+        increment = 0.1,
+        suffix = "ms",
+        currentValue = 0,
+        flag = "CamPos_X",
+        callback = function(v) offsetX = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Y",
+        range = {-100, 100},
+        increment = 0.1,
+        suffix = "ms",
+        currentValue = 0,
+        flag = "CamPos_Y",
+        callback = function(v) offsetY = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Z",
+        range = {-100, 100},
+        increment = 0.1,
+        suffix = "ms",
+        currentValue = 0,
+        flag = "CamPos_Z",
+        callback = function(v) offsetZ = v end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["CamPos"] = function(v)
         enabled = v
         if v then start() else stop() end
     end
