@@ -2718,8 +2718,8 @@ G changer
 
 do
     local gravityEnabled = false
-    local gravityValue = 196.2
-    local DEFAULT_GRAVITY = 196.2
+    local gravityValue = 98.1
+    local DEFAULT_GRAVITY = 98.1
 
     tab:CreateDivider()
 
@@ -2746,7 +2746,7 @@ _G.RWCallbacks["GravityChanger"] = function(v) gravityEnabled = v; workspace.Gra
         range = {0, 1000},
         increment = 0.1,
         suffix = "",
-        currentValue = 196.2,
+        currentValue = 98.1,
         flag = "GravityChanger_Slider",
         callback = function(v)
             gravityValue = v
