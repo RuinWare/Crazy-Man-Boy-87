@@ -4437,6 +4437,100 @@ end
 
 --[[
 ===========================
+Cam offset changer
+===========================
+]]--
+
+do
+    local enabled = false
+    local pitch = 0
+    local yaw = 0
+    local roll = 0
+    local bindName = "CameraOffsetChanger"
+    local bound = false
+
+    local function offsetCamera()
+        if not enabled then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        local offset = CFrame.fromEulerAnglesYXZ(
+            math.rad(pitch),
+            math.rad(yaw),
+            math.rad(roll)
+        )
+
+        -- Keep the position, add rotation on top of whatever the game set this frame
+        local base = cam.CFrame
+        cam.CFrame = CFrame.new(base.Position) * base.Rotation * offset
+    end
+
+    local function start()
+        if bound then return end
+        bound = true
+        -- Camera priority + 1 runs AFTER the game's camera update, BEFORE render
+        RunService:BindToRenderStep(bindName, Enum.RenderPriority.Camera.Value + 1, offsetCamera)
+    end
+
+    local function stop()
+        if bound then
+            pcall(function() RunService:UnbindFromRenderStep(bindName) end)
+            bound = false
+        end
+        -- Camera auto-reverts next frame because the game overwrites cam.CFrame itself
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Camera Offset Changer",
+        currentValue = false,
+        flag = "CamOffset_Toggle",
+        callback = function(v)
+            enabled = v
+            if v then start() else stop() end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Pitch",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        currentValue = 0,
+        flag = "CamOffset_Pitch",
+        callback = function(v) pitch = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Yaw",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        currentValue = 0,
+        flag = "CamOffset_Yaw",
+        callback = function(v) yaw = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Roll",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        currentValue = 0,
+        flag = "CamOffset_Roll",
+        callback = function(v) roll = v end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["CamOffset"] = function(v)
+        enabled = v
+        if v then start() else stop() end
+    end
+end
+
+--[[
+===========================
 GAMEPLAY
 ===========================
 ]]--
