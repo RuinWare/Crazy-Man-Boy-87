@@ -1956,7 +1956,7 @@ do
     local downedDashSpeed = 55.5
 
     local ddHum, ddRoot
-    local cachedBm
+    local anchorPart, weldConstraint, cachedBm
     local UpdateCharacterDataRegistry
 
     local function getRemote()
@@ -1971,15 +1971,62 @@ do
         return UpdateCharacterDataRegistry
     end
 
+    local function cleanup()
+        if weldConstraint then
+            pcall(function() weldConstraint:Destroy() end)
+            weldConstraint = nil
+        end
+        if anchorPart then
+            pcall(function() anchorPart:Destroy() end)
+            anchorPart = nil
+        end
+        if cachedBm and cachedBm.Parent then
+            pcall(function() cachedBm.Enabled = true end)
+        end
+        cachedBm = nil
+    end
+
+    local function activate(root)
+        if not root or not root.Parent then return end
+        cleanup()
+
+        anchorPart = Instance.new("Part")
+        anchorPart.Name = "DownedDashAnchor"
+        anchorPart.Size = Vector3.new(2, 2, 2)
+        anchorPart.Transparency = 1
+        anchorPart.CanCollide = false
+        anchorPart.CanQuery = false
+        anchorPart.CanTouch = false
+        anchorPart.Anchored = true
+        anchorPart.Massless = true
+        anchorPart.CFrame = root.CFrame
+        anchorPart.Parent = workspace
+
+        weldConstraint = Instance.new("WeldConstraint")
+        weldConstraint.Name = "DownedDashWeld"
+        weldConstraint.Part0 = root
+        weldConstraint.Part1 = anchorPart
+        weldConstraint.Parent = root
+
+        -- Also disable the BaseMover constraint as backup — the weld pins the
+        -- HRP but the constraint will still try to apply velocity and jitter
+        local bm = root:FindFirstChild("LinearVelocity")
+        if bm and bm:IsA("LinearVelocity") then
+            cachedBm = bm
+            pcall(function() bm.Enabled = false end)
+        end
+    end
+
     local function ddAttach(char)
         ddHum = char:WaitForChild("Humanoid")
         ddRoot = char:WaitForChild("HumanoidRootPart")
         downedDashActive = false
-        cachedBm = nil
+        cleanup()
     end
 
     if player.Character then task.spawn(ddAttach, player.Character) end
     player.CharacterAdded:Connect(function(c) task.spawn(ddAttach, c) end)
+    player.CharacterRemoving:Connect(function() cleanup() end)
 
     local function hasState(args, target, depth)
         depth = depth or 0
@@ -2004,23 +2051,23 @@ do
                 local args = {...}
                 if hasState(args, "Downed") then
                     downedDashActive = true
+                    if ddRoot then activate(ddRoot) end
                 elseif hasState(args, "Idle") then
                     downedDashActive = false
+                    cleanup()
                 end
             end
         end
         return oldNamecall(self, ...)
     end)
 
-    RunService.PreSimulation:Connect(function(dt)
-        if not downedDashEnabled or not downedDashActive then
-            if cachedBm and cachedBm.Parent and not cachedBm.Enabled then
-                pcall(function() cachedBm.Enabled = true end)
-            end
+    RunService.Heartbeat:Connect(function(dt)
+        if not downedDashEnabled or not downedDashActive then return end
+        if not anchorPart or not anchorPart.Parent then
+            if ddRoot then activate(ddRoot) end
             return
         end
-        if not ddHum or not ddRoot or not ddRoot.Parent then return end
-        if ddHum.Health <= 0 then return end
+        if not ddRoot or not ddRoot.Parent then return end
 
         local cam = workspace.CurrentCamera
         if not cam then return end
@@ -2029,19 +2076,7 @@ do
         if dir.Magnitude > 0.001 then dir = dir.Unit end
 
         local speed = downedDashSpeed * 0.5
-
-        if not cachedBm or not cachedBm.Parent then
-            cachedBm = ddRoot:FindFirstChild("LinearVelocity")
-        end
-        if cachedBm then
-            pcall(function() cachedBm.Enabled = false end)
-        end
-
-        ddRoot.AssemblyLinearVelocity = Vector3.new(
-            dir.X * speed,
-            ddRoot.AssemblyLinearVelocity.Y,
-            dir.Z * speed
-        )
+        anchorPart.CFrame = anchorPart.CFrame + dir * speed * dt
     end)
 
     tab:CreateDivider()
@@ -2054,9 +2089,7 @@ do
             downedDashEnabled = v
             if not v then
                 downedDashActive = false
-                if cachedBm and cachedBm.Parent then
-                    pcall(function() cachedBm.Enabled = true end)
-                end
+                cleanup()
             end
         end,
     })
@@ -2076,9 +2109,7 @@ do
         downedDashEnabled = v
         if not v then
             downedDashActive = false
-            if cachedBm and cachedBm.Parent then
-                pcall(function() cachedBm.Enabled = true end)
-            end
+            cleanup()
         end
     end
 end
