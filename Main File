@@ -1952,40 +1952,81 @@ do
 	local defibEnabled = false
 	local defibRange = 10
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Players = game:GetService("Players")
+	local LP = Players.LocalPlayer
 
-	-- Target the ModuleScript directly
-	local Tools = ReplicatedStorage:WaitForChild("Tools", 10)
-	local defibScript = Tools and Tools:FindFirstChild("Defibrillator")
-
-	-- Safely require and update the module
-	local function updateDefibRange(targetRange)
-		if not defibScript then return end
-		local ok, data = pcall(require, defibScript)
+	-- Helper to find the ModuleScript
+	local function getDefibModule()
+		local tools = ReplicatedStorage:FindFirstChild("Tools")
+		if not tools then return nil end
 		
-		if ok and type(data) == "table" then
-			-- Deep traverse the table structure to find the Range field safely
-			local ok2, err = pcall(function()
-				local tasks = data.Tasks
-				if tasks and tasks[1] then
-					local funcs = tasks[1].Functions
-					if funcs and funcs[1] then
-						local acts = funcs[1].Activations
-						if acts and acts[1] then
-							local methods = acts[1].Methods
-							if methods and methods[1] then
-								local info = methods[1].Info
-								if info then
-									info.Range = targetRange
-								end
-							end
+		local defib = tools:FindFirstChild("Defibrillator")
+		if not defib then return nil end
+		
+		-- If it IS the module script, return it.
+		if defib:IsA("ModuleScript") then return defib end
+		
+		-- If it's a Tool, find the ModuleScript inside.
+		for _, child in ipairs(defib:GetChildren()) do
+			if child:IsA("ModuleScript") then return child end
+		end
+		return nil
+	end
+
+	-- Helper to modify the specific table
+	local function modifyData(data, targetRange)
+		local ok, err = pcall(function()
+			local tasks = data.Tasks
+			if tasks and tasks[1] then
+				local funcs = tasks[1].Functions
+				if funcs and funcs[1] then
+					local acts = funcs[1].Activations
+					if acts and acts[1] then
+						local methods = acts[1].Methods
+						if methods and methods[1] and methods[1].Info then
+							methods[1].Info.Range = targetRange
 						end
 					end
 				end
-			end)
+			end
+		end)
+		return ok, err
+	end
+
+	-- Helper to update the main module AND any backpack clones
+	local function applyDefibRange(targetRange)
+		local mainModule = getDefibModule()
+		local targets = {}
+
+		if mainModule then
+			table.insert(targets, mainModule)
+		end
+
+		-- Find active tools in backpack/character (games often deep-clone tools)
+		local function scanContainer(container)
+			for _, item in ipairs(container:GetChildren()) do
+				if item.Name == "Defibrillator" and item:IsA("Tool") then
+					for _, child in ipairs(item:GetChildren()) do
+						if child:IsA("ModuleScript") then
+							table.insert(targets, child)
+						end
+					end
+				end
+			end
+		end
+
+		if LP:FindFirstChild("Backpack") then scanContainer(LP.Backpack) end
+		if LP.Character then scanContainer(LP.Character) end
+
+		-- Apply changes to every found target
+		for _, script in ipairs(targets) do
+			local ok, data = pcall(require, script)
+			if ok and type(data) == "table" then
+				modifyData(data, targetRange)
+			end
 		end
 	end
 
-	-- UI Elements
 	tab:CreateDivider()
 
 	tab:CreateToggle({
@@ -1993,12 +2034,15 @@ do
 		value = false,
 		callback = function(v)
 			defibEnabled = v
+			if not v then
+				applyDefibRange(10) -- Reset instantly on off
+			end
 		end,
 	})
 
 	tab:CreateSlider({
 		name = "Range:",
-		range = {10, 400},
+		range = {10, 4000000000},
 		increment = 1,
 		suffix = "",
 		currentValue = 10,
@@ -2007,22 +2051,12 @@ do
 		end,
 	})
 
-	-- Update loop (enforces the module changes every tick)
+	-- Constant enforcement loop
 	task.spawn(function()
 		while true do
-			-- If the script hasn't been found yet, try to find it
-			if not defibScript then
-				local t = ReplicatedStorage:FindFirstChild("Tools")
-				if t then defibScript = t:FindFirstChild("Defibrillator") end
-			end
-
-			-- Apply the range logic
-			if defibScript then
-				local currentRange = defibEnabled and defibRange or 10
-				updateDefibRange(currentRange)
-			end
-
-			task.wait() -- Yields every frame
+			local currentRange = defibEnabled and defibRange or 10
+			applyDefibRange(currentRange)
+			task.wait(0.1) -- Slightly slower than per-frame to prevent lag, still instant
 		end
 	end)
 end
