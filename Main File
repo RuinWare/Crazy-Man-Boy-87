@@ -1,4 +1,4 @@
-local SHARED_PATHS = {
+_G.SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","DogSet","Emotes"},
@@ -2890,8 +2890,8 @@ G changer
 
 do
     local gravityEnabled = false
-    local gravityValue = 98.1
-    local DEFAULT_GRAVITY = 98.1
+    local gravityValue = 50
+    local DEFAULT_GRAVITY = 50
 
     tab:CreateDivider()
 
@@ -2915,10 +2915,10 @@ _G.RWCallbacks["GravityChanger"] = function(v) gravityEnabled = v; workspace.Gra
     tab:CreateSlider({
         name = "Gravity",
 		icon = 120597962040224,
-        range = {0, 1000},
+        range = {0, 800},
         increment = 0.1,
         suffix = "",
-        currentValue = 98.1,
+        currentValue = 50,
         flag = "GravityChanger_Slider",
         callback = function(v)
             gravityValue = v
