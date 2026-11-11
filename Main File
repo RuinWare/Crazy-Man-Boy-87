@@ -1957,171 +1957,32 @@ do
 	local Tools = ReplicatedStorage:WaitForChild("Tools", 10)
 	local defibScript = Tools and Tools:FindFirstChild("Defibrillator")
 
-	-- Function to generate the script source with the new range
-	local function getDefibSource(rangeVal)
-		local source = [[
-local v1 = {
-    ["RequiresOwnedItem"] = true,
-    ["KeybindInfo"] = nil,
-    ["Adjustments"] = nil,
-    ["Actions"] = nil,
-    ["HUD"] = nil,
-    ["Tasks"] = nil,
-    ["KeybindInfo"] = {
-        ["EquipKeybind"] = "Defibrillator",
-        ["UnequipKeybind"] = "Melee"
-    },
-    ["Adjustments"] = {
-        ["AnimationRootStraight"] = true,
-        ["ToolViewbob"] = true,
-        ["RememberEquip"] = false,
-        ["ViewmodelOffset"] = nil,
-        ["TurnWaist"] = true,
-        ["ViewmodelOffset"] = CFrame.new(0, 0, 0)
-    },
-    ["Actions"] = {
-        ["ADS"] = {
-            ["Enabled"] = true,
-            ["Zoom"] = 0.7
-        }
-    },
-    ["HUD"] = {
-        ["CrosshairType"] = "Melee",
-        ["Name"] = "Defibrillator",
-        ["Icon"] = "rbxassetid://14426580163",
-        ["ShowAmount"] = true,
-        ["UseUsableHUD"] = true,
-        ["MobileVisible"] = false,
-        ["ManuallyEquip"] = false
-    }
-}
-local v2 = {}
-local v3 = {
-    ["ResourceInfo"] = {
-        ["Type"] = "None"
-    },
-    ["MethodReferences"] = {
-        ["Revive"] = {
-            ["Type"] = "Revive"
-        }
-    }
-}
-local v4 = {}
-local v5 = {
-    ["Keybinds"] = { "Primary" }
-}
-local v6 = {}
-local v7 = {
-    ["ActivationRequirement"] = "Down",
-    ["CanHoldDown"] = false,
-    ["Methods"] = nil,
-    ["Methods"] = {
-        {
-            ["MethodReferencing"] = "Revive",
-            ["VisualName"] = "Revive",
-            ["Info"] = nil,
-            ["CooldownInfo"] = nil,
-            ["Requirements"] = nil,
-            ["Priority"] = 1,
-            ["GlobalPriority"] = 2,
-            ["ItemUseIncrement"] = nil,
-            ["Info"] = {
-                ["Range"] = RANGE_PLACEHOLDER,
-                ["Cooldown"] = 1.2
-            },
-            ["CooldownInfo"] = {
-                ["Unequip"] = true,
-                ["CanUnequip"] = false
-            },
-            ["Requirements"] = {
-                ["ReviveTarget"] = true
-            },
-            ["ItemUseIncrement"] = { "Defibrillator", -1 }
-        },
-        {
-            ["MethodReferencing"] = "Revive",
-            ["VisualName"] = "ReviveFail",
-            ["Info"] = nil,
-            ["Requirements"] = nil,
-            ["Priority"] = 0,
-            ["GlobalPriority"] = 2,
-            ["Ignore"] = true,
-            ["Info"] = {
-                ["Range"] = 0,
-                ["Cooldown"] = 0.3
-            },
-            ["Requirements"] = {}
-        }
-    }
-}
-__set_list(v6, 1, {v7})
-v5.Activations = v6
-__set_list(v4, 1, {v5})
-v3.Functions = v4
-local v8 = {}
-local v9 = {
-    ["Phrase"] = "Equip",
-    ["Methods"] = nil,
-    ["Methods"] = {
-        {
-            ["Method"] = "Equip",
-            ["VisualName"] = "Equip",
-            ["Info"] = nil,
-            ["CooldownInfo"] = nil,
-            ["Requirements"] = nil,
-            ["Priority"] = 1,
-            ["GlobalPriority"] = 3,
-            ["Info"] = {
-                ["Cooldown"] = 0.6
-            },
-            ["CooldownInfo"] = {},
-            ["Requirements"] = {}
-        }
-    }
-}
-local v10 = {
-    ["Phrase"] = "Unequip",
-    ["Methods"] = nil,
-    ["Methods"] = {
-        {
-            ["MethodReferencing"] = "Unequip",
-            ["VisualName"] = "Unequip",
-            ["Info"] = nil,
-            ["Requirements"] = nil,
-            ["Priority"] = 1,
-            ["GlobalPriority"] = 101,
-            ["Info"] = {
-                ["Cooldown"] = 0.3
-            },
-            ["Requirements"] = {}
-        }
-    }
-}
-local v11 = {
-    ["Phrase"] = "Update",
-    ["Methods"] = nil,
-    ["Methods"] = {
-        {
-            ["Method"] = "Update",
-            ["VisualName"] = "Update",
-            ["Info"] = nil,
-            ["Requirements"] = nil,
-            ["Priority"] = 1,
-            ["GlobalPriority"] = 1,
-            ["Info"] = {
-                ["Cooldown"] = 0
-            },
-            ["Requirements"] = {}
-        }
-    }
-}
-__set_list(v8, 1, {v9, v10, v11})
-v3.AutomaticFunctions = v8
-__set_list(v2, 1, {v3})
-v1.Tasks = v2
-return v1
-]]
-		return string.gsub(source, "RANGE_PLACEHOLDER", tostring(rangeVal))
+	-- Safely require and update the module
+	local function updateDefibRange(targetRange)
+		if not defibScript then return end
+		local ok, data = pcall(require, defibScript)
+		
+		if ok and type(data) == "table" then
+			-- Deep traverse the table structure to find the Range field safely
+			local ok2, err = pcall(function()
+				local tasks = data.Tasks
+				if tasks and tasks[1] then
+					local funcs = tasks[1].Functions
+					if funcs and funcs[1] then
+						local acts = funcs[1].Activations
+						if acts and acts[1] then
+							local methods = acts[1].Methods
+							if methods and methods[1] then
+								local info = methods[1].Info
+								if info then
+									info.Range = targetRange
+								end
+							end
+						end
+					end
+				end
+			end)
+		end
 	end
 
 	-- UI Elements
@@ -2146,31 +2007,22 @@ return v1
 		end,
 	})
 
-	-- Update loop (enforces the script changes every tick)
+	-- Update loop (enforces the module changes every tick)
 	task.spawn(function()
-		local lastSource = ""
 		while true do
+			-- If the script hasn't been found yet, try to find it
+			if not defibScript then
+				local t = ReplicatedStorage:FindFirstChild("Tools")
+				if t then defibScript = t:FindFirstChild("Defibrillator") end
+			end
+
+			-- Apply the range logic
 			if defibScript then
 				local currentRange = defibEnabled and defibRange or 10
-				local newSource = getDefibSource(currentRange)
-				
-				-- Only update if the source actually changed to save performance
-				if newSource ~= lastSource then
-					local success, err = pcall(function()
-						defibScript.Source = newSource
-					end)
-					if success then
-						lastSource = newSource
-					end
-				end
-			else
-				-- In case the Tools folder or script streams in late
-				local Tools = ReplicatedStorage:FindFirstChild("Tools")
-				if Tools then
-					defibScript = Tools:FindFirstChild("Defibrillator")
-				end
+				updateDefibRange(currentRange)
 			end
-			task.wait() -- Yields every frame (tick)
+
+			task.wait() -- Yields every frame
 		end
 	end)
 end
