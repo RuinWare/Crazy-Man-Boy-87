@@ -1952,61 +1952,62 @@ do
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
     local downedDashEnabled = false
-    local downedDashActive = false
     local downedDashSpeed = 55.5
 
-    local ddRay = RaycastParams.new()
-    ddRay.FilterType = Enum.RaycastFilterType.Exclude
-
     local ddHum, ddRoot
+    local cachedService, cachedCharacter
+
+    local CharacterServiceModule = ReplicatedStorage:FindFirstChild("Services")
+    if CharacterServiceModule then
+        CharacterServiceModule = CharacterServiceModule:FindFirstChild("Asset")
+        if CharacterServiceModule then
+            CharacterServiceModule = CharacterServiceModule:FindFirstChild("CharacterService")
+        end
+    end
+
+    local function getService()
+        if cachedService then return cachedService end
+        if not CharacterServiceModule then return nil end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
+    end
+
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            return char
+        end
+        return nil
+    end
+
+    local function isDowned()
+        local char = getCharacter()
+        if not char then return false end
+        if char.Data and char.Data.Downed == true then return true end
+        if char.State and char.State.State == "Downed" then return true end
+        if char.CurrentStateInfo and char.CurrentStateInfo.State == "Downed" then return true end
+        return false
+    end
 
     local function ddAttach(char)
         ddHum = char:WaitForChild("Humanoid")
         ddRoot = char:WaitForChild("HumanoidRootPart")
-        ddRay.FilterDescendantsInstances = {char}
-        downedDashActive = false
+        cachedCharacter = nil
     end
 
     if player.Character then task.spawn(ddAttach, player.Character) end
     player.CharacterAdded:Connect(function(c) task.spawn(ddAttach, c) end)
 
-    -- Lazy-resolve the event path so a missing segment doesn't block the script
-    local UpdateCharacterDataRegistry = nil
-    task.spawn(function()
-        local remotes = ReplicatedStorage:WaitForChild("Remotes", 30)
-        if not remotes then return end
-        local registry = remotes:WaitForChild("Registry", 30)
-        if not registry then return end
-        UpdateCharacterDataRegistry = registry:WaitForChild("UpdateCharacterDataRegistry", 30)
-    end)
-
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        if getnamecallmethod() == "FireServer" and self == UpdateCharacterDataRegistry then
-            if downedDashEnabled then
-                local args = {...}
-                for _, a in ipairs(args) do
-                    if type(a) == "table" then
-                        for _, v in pairs(a) do
-                            if type(v) == "string" then
-                                if v == "Downed" then
-                                    downedDashActive = true
-                                elseif v == "Idle" then
-                                    downedDashActive = false
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        return oldNamecall(self, ...)
-    end)
-
-    RunService.Heartbeat:Connect(function(dt)
-        if not downedDashEnabled or not downedDashActive then return end
+    RunService.PreSimulation:Connect(function(dt)
+        if not downedDashEnabled then return end
         if not ddHum or not ddRoot or not ddRoot.Parent then return end
         if ddHum.Health <= 0 then return end
+        if not isDowned() then return end
 
         local cam = workspace.CurrentCamera
         if not cam then return end
@@ -2016,17 +2017,18 @@ do
         if dir.Magnitude > 0.001 then dir = dir.Unit end
 
         local speed = downedDashSpeed * 0.5
-        ddRoot.CFrame = ddRoot.CFrame + dir * speed * dt
+        local vel = Vector3.new(dir.X * speed, 0, dir.Z * speed)
 
-        if ddHum.FloorMaterial ~= Enum.Material.Air then
-            local result = workspace:Raycast(ddRoot.Position, Vector3.new(0, -10, 0), ddRay)
-            if result then
-                local angle = math.deg(math.acos(result.Normal.Unit.Y))
-                if angle <= 8 then
-                    ddHum:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
-            end
+        -- Override the BaseMover LinearVelocity constraint (this is what the Downed state uses to drive movement)
+        local bm = ddRoot:FindFirstChild("LinearVelocity")
+        if bm and bm:IsA("LinearVelocity") then
+            pcall(function()
+                bm.VectorVelocity = vel
+            end)
         end
+
+        -- Backup: direct velocity
+        ddRoot.AssemblyLinearVelocity = Vector3.new(vel.X, ddRoot.AssemblyLinearVelocity.Y, vel.Z)
     end)
 
     tab:CreateDivider()
@@ -2035,10 +2037,7 @@ do
         name = "Downed Dash",
         currentValue = false,
         flag = "DownedDash_Toggle",
-        callback = function(v)
-            downedDashEnabled = v
-            if not v then downedDashActive = false end
-        end,
+        callback = function(v) downedDashEnabled = v end,
     })
 
     tab:CreateSlider({
@@ -2052,10 +2051,7 @@ do
     })
 
     _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["DownedDash"] = function(v)
-        downedDashEnabled = v
-        if not v then downedDashActive = false end
-    end
+    _G.RWCallbacks["DownedDash"] = function(v) downedDashEnabled = v end
 end
 
 --[[
