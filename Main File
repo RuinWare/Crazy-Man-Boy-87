@@ -4226,7 +4226,7 @@ do
         while tick() - start < lagDuration do end
     end
 
-    tab:CreateDivider()
+    tab:CreateDivider({ text = "Trimping" })
 
     tab:CreateButton({
         name = "Lag Switch",
@@ -5121,8 +5121,10 @@ REMOVE CAMPING ZONES
 
 do
     local SafeZones = nil
+    local SafeSpotGui = nil
     local enabled = false
     local savedClones = {}
+    local savedSafeSpot = nil
 
     local function getSafeZones()
         if SafeZones and SafeZones.Parent then return SafeZones end
@@ -5132,36 +5134,91 @@ do
         return SafeZones
     end
 
+    local function getSafeSpot()
+        if SafeSpotGui and SafeSpotGui.Parent then return SafeSpotGui end
+        local pg = player:FindFirstChild("PlayerGui")
+        if not pg then return nil end
+        local game_ = pg:FindFirstChild("Game")
+        if not game_ then return nil end
+        local hud = game_:FindFirstChild("HUD")
+        if not hud then return nil end
+        local overlay = hud:FindFirstChild("Overlay")
+        if not overlay then return nil end
+        local vignettes = overlay:FindFirstChild("Vignettes")
+        if not vignettes then return nil end
+        SafeSpotGui = vignettes:FindFirstChild("SafeSpot")
+        return SafeSpotGui
+    end
+
     local function snapshotAndRemove()
         local sz = getSafeZones()
-        if not sz then return end
-        for _, child in ipairs(sz:GetChildren()) do
-            table.insert(savedClones, child:Clone())
-            child:Destroy()
+        if sz then
+            for _, child in ipairs(sz:GetChildren()) do
+                table.insert(savedClones, child:Clone())
+                child:Destroy()
+            end
+        end
+
+        local spot = getSafeSpot()
+        if spot and not savedSafeSpot then
+            savedSafeSpot = spot:Clone()
+            spot:Destroy()
         end
     end
 
     local function restore()
         local sz = getSafeZones()
-        if not sz then
-            savedClones = {}
-            return
-        end
-        for _, clone in ipairs(savedClones) do
-            if clone then
-                pcall(function() clone.Parent = sz end)
+        if sz then
+            for _, clone in ipairs(savedClones) do
+                if clone then
+                    pcall(function() clone.Parent = sz end)
+                end
             end
         end
         table.clear(savedClones)
+
+        if savedSafeSpot then
+            local spotParent = getSafeSpot()
+            if not spotParent then
+                local pg = player:FindFirstChild("PlayerGui")
+                if pg then
+                    local game_ = pg:FindFirstChild("Game")
+                    if game_ then
+                        local hud = game_:FindFirstChild("HUD")
+                        if hud then
+                            local overlay = hud:FindFirstChild("Overlay")
+                            if overlay then
+                                local vignettes = overlay:FindFirstChild("Vignettes")
+                                if vignettes then
+                                    pcall(function() savedSafeSpot.Parent = vignettes end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            savedSafeSpot = nil
+            SafeSpotGui = nil
+        end
     end
 
     RunService.Heartbeat:Connect(function()
         if not enabled then return end
+
         local sz = getSafeZones()
-        if not sz then return end
-        for _, child in ipairs(sz:GetChildren()) do
-            table.insert(savedClones, child:Clone())
-            child:Destroy()
+        if sz then
+            for _, child in ipairs(sz:GetChildren()) do
+                table.insert(savedClones, child:Clone())
+                child:Destroy()
+            end
+        end
+
+        local spot = getSafeSpot()
+        if spot and not savedSafeSpot then
+            savedSafeSpot = spot:Clone()
+            spot:Destroy()
+        elseif spot then
+            spot:Destroy()
         end
     end)
 
