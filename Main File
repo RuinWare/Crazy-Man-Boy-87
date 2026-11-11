@@ -1944,13 +1944,13 @@ end
 
 --[[
 ===========================
-DEFIBRILLATOR HITBOX EXPANDER
+DEFIBRILLATOR COOLDOWN
 ===========================
 ]]--
 
 do
-	local defibEnabled = false
-	local defibRange = 10
+	local cooldownEnabled = false
+	local cooldownTime = 1.2
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local Players = game:GetService("Players")
 	local LP = Players.LocalPlayer
@@ -1963,10 +1963,8 @@ do
 		local defib = tools:FindFirstChild("Defibrillator")
 		if not defib then return nil end
 		
-		-- If it IS the module script, return it.
 		if defib:IsA("ModuleScript") then return defib end
 		
-		-- If it's a Tool, find the ModuleScript inside.
 		for _, child in ipairs(defib:GetChildren()) do
 			if child:IsA("ModuleScript") then return child end
 		end
@@ -1974,7 +1972,7 @@ do
 	end
 
 	-- Helper to modify the specific table
-	local function modifyData(data, targetRange)
+	local function modifyData(data, targetTime, isEnabled)
 		local ok, err = pcall(function()
 			local tasks = data.Tasks
 			if tasks and tasks[1] then
@@ -1984,7 +1982,12 @@ do
 					if acts and acts[1] then
 						local methods = acts[1].Methods
 						if methods and methods[1] and methods[1].Info then
-							methods[1].Info.Range = targetRange
+							if isEnabled then
+								methods[1].Info.Cooldown = targetTime
+							else
+								-- Revert to default if turned off
+								methods[1].Info.Cooldown = 1.2 
+							end
 						end
 					end
 				end
@@ -1994,7 +1997,7 @@ do
 	end
 
 	-- Helper to update the main module AND any backpack clones
-	local function applyDefibRange(targetRange)
+	local function applyDefibCooldown(targetTime, isEnabled)
 		local mainModule = getDefibModule()
 		local targets = {}
 
@@ -2002,7 +2005,6 @@ do
 			table.insert(targets, mainModule)
 		end
 
-		-- Find active tools in backpack/character (games often deep-clone tools)
 		local function scanContainer(container)
 			for _, item in ipairs(container:GetChildren()) do
 				if item.Name == "Defibrillator" and item:IsA("Tool") then
@@ -2018,45 +2020,44 @@ do
 		if LP:FindFirstChild("Backpack") then scanContainer(LP.Backpack) end
 		if LP.Character then scanContainer(LP.Character) end
 
-		-- Apply changes to every found target
 		for _, script in ipairs(targets) do
 			local ok, data = pcall(require, script)
 			if ok and type(data) == "table" then
-				modifyData(data, targetRange)
+				modifyData(data, targetTime, isEnabled)
 			end
 		end
 	end
 
+	-- UI Elements
 	tab:CreateDivider()
 
 	tab:CreateToggle({
-		name = "Defibrillator Hitbox Expander",
+		name = "Defibrillator Cooldown Changer",
 		value = false,
 		callback = function(v)
-			defibEnabled = v
+			cooldownEnabled = v
 			if not v then
-				applyDefibRange(10) -- Reset instantly on off
+				applyDefibCooldown(1.2, false) -- Instantly revert on off
 			end
 		end,
 	})
 
 	tab:CreateSlider({
-		name = "Range:",
-		range = {10, 4000000000},
-		increment = 1,
-		suffix = "",
-		currentValue = 10,
+		name = "Time",
+		range = {0.0, 3.0},
+		increment = 0.1,
+		suffix = "s",
+		currentValue = 1.2,
 		callback = function(v)
-			defibRange = v
+			cooldownTime = v
 		end,
 	})
 
 	-- Constant enforcement loop
 	task.spawn(function()
 		while true do
-			local currentRange = defibEnabled and defibRange or 10
-			applyDefibRange(currentRange)
-			task.wait(0.1) -- Slightly slower than per-frame to prevent lag, still instant
+			applyDefibCooldown(cooldownTime, cooldownEnabled)
+			task.wait(0.1) 
 		end
 	end)
 end
