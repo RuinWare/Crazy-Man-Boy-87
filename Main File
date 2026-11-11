@@ -1943,126 +1943,6 @@ do
 end
 
 --[[
-===========================
-DEFIBRILLATOR COOLDOWN
-===========================
-]]--
-
-do
-	local cooldownEnabled = false
-	local cooldownTime = 1.2
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local Players = game:GetService("Players")
-	local LP = Players.LocalPlayer
-
-	-- Helper to find the ModuleScript
-	local function getDefibModule()
-		local tools = ReplicatedStorage:FindFirstChild("Tools")
-		if not tools then return nil end
-		
-		local defib = tools:FindFirstChild("Defibrillator")
-		if not defib then return nil end
-		
-		if defib:IsA("ModuleScript") then return defib end
-		
-		for _, child in ipairs(defib:GetChildren()) do
-			if child:IsA("ModuleScript") then return child end
-		end
-		return nil
-	end
-
-	-- Helper to modify the specific table
-	local function modifyData(data, targetTime, isEnabled)
-		local ok, err = pcall(function()
-			local tasks = data.Tasks
-			if tasks and tasks[1] then
-				local funcs = tasks[1].Functions
-				if funcs and funcs[1] then
-					local acts = funcs[1].Activations
-					if acts and acts[1] then
-						local methods = acts[1].Methods
-						if methods and methods[1] and methods[1].Info then
-							if isEnabled then
-								methods[1].Info.Cooldown = targetTime
-							else
-								-- Revert to default if turned off
-								methods[1].Info.Cooldown = 1.2 
-							end
-						end
-					end
-				end
-			end
-		end)
-		return ok, err
-	end
-
-	-- Helper to update the main module AND any backpack clones
-	local function applyDefibCooldown(targetTime, isEnabled)
-		local mainModule = getDefibModule()
-		local targets = {}
-
-		if mainModule then
-			table.insert(targets, mainModule)
-		end
-
-		local function scanContainer(container)
-			for _, item in ipairs(container:GetChildren()) do
-				if item.Name == "Defibrillator" and item:IsA("Tool") then
-					for _, child in ipairs(item:GetChildren()) do
-						if child:IsA("ModuleScript") then
-							table.insert(targets, child)
-						end
-					end
-				end
-			end
-		end
-
-		if LP:FindFirstChild("Backpack") then scanContainer(LP.Backpack) end
-		if LP.Character then scanContainer(LP.Character) end
-
-		for _, script in ipairs(targets) do
-			local ok, data = pcall(require, script)
-			if ok and type(data) == "table" then
-				modifyData(data, targetTime, isEnabled)
-			end
-		end
-	end
-
-	-- UI Elements
-	tab:CreateDivider()
-
-	tab:CreateToggle({
-		name = "Defibrillator Cooldown Changer",
-		value = false,
-		callback = function(v)
-			cooldownEnabled = v
-			if not v then
-				applyDefibCooldown(1.2, false) -- Instantly revert on off
-			end
-		end,
-	})
-
-	tab:CreateSlider({
-		name = "Time",
-		range = {0.0, 3.0},
-		increment = 0.1,
-		suffix = "s",
-		currentValue = 1.2,
-		callback = function(v)
-			cooldownTime = v
-		end,
-	})
-
-	-- Constant enforcement loop
-	task.spawn(function()
-		while true do
-			applyDefibCooldown(cooldownTime, cooldownEnabled)
-			task.wait(0.1) 
-		end
-	end)
-end
-
---[[
 ============================================================================
 F JUMP
 ============================================================================
@@ -4552,6 +4432,148 @@ tab:CreateToggle({
 		getgenv().OIAAS = value
 		_G.OIAAS = value
       end,
+    })
+end
+
+--[[
+===========================
+GAMEPLAY
+===========================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    -- ========================================
+    -- EDIT THESE DEFAULTS IF THE "OFF" STATE
+    -- DOESN'T MATCH WHAT THE GAME EXPECTS
+    -- ========================================
+    local DEFAULT_VIEWBOB          = false
+    local DEFAULT_SPRINT_VIEWMODEL = false
+    local DEFAULT_LEGACY_CAMERA    = false
+    local DEFAULT_POV_SCROLL       = false
+    local DEFAULT_BOOMBOX_VOLUME   = 100
+    -- ========================================
+
+    local function getSetSetting()
+        local shared = ReplicatedStorage:FindFirstChild("Shared")
+        if not shared then return nil end
+        local ud = shared:FindFirstChild("UserData")
+        if not ud then return nil end
+        local remotes = ud:FindFirstChild("Remotes")
+        if not remotes then return nil end
+        return remotes:FindFirstChild("SetSetting")
+    end
+
+    local function setSetting(key, value)
+        local remote = getSetSetting()
+        if not remote then return end
+        pcall(function()
+            remote:FireServer(key, value)
+        end)
+    end
+
+    tab:CreateDivider({ text = "Gameplay" })
+
+    tab:CreateSlider({
+        name = "Lobby Music",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        currentValue = 100,
+        flag = "Setting_LobbyMusic",
+        callback = function(v) setSetting("LobbyMusicVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Game Music",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        currentValue = 100,
+        flag = "Setting_GameMusic",
+        callback = function(v) setSetting("GameMusicVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Nextbot Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        currentValue = 100,
+        flag = "Setting_NextbotVolume",
+        callback = function(v) setSetting("NextbotVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Emote Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        currentValue = 100,
+        flag = "Setting_EmoteVolume",
+        callback = function(v) setSetting("EmoteVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Carry Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        currentValue = 100,
+        flag = "Setting_CarryVolume",
+        callback = function(v) setSetting("CarryVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Click Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        currentValue = 100,
+        flag = "Setting_InterfaceVolume",
+        callback = function(v) setSetting("InterfaceVolume", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Viewbob",
+        currentValue = DEFAULT_VIEWBOB,
+        flag = "Setting_Viewbob",
+        callback = function(v) setSetting("Viewbob", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Sprint Viewmodel",
+        currentValue = DEFAULT_SPRINT_VIEWMODEL,
+        flag = "Setting_SprintViewmodel",
+        callback = function(v) setSetting("SprintViewmodel", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Legacy Camera",
+        currentValue = DEFAULT_LEGACY_CAMERA,
+        flag = "Setting_LegacyCamera",
+        callback = function(v) setSetting("LegacyCamera", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "POV Scroll",
+        currentValue = DEFAULT_POV_SCROLL,
+        flag = "Setting_POVScroll",
+        callback = function(v) setSetting("POVScroll", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Mute Boomboxs",
+        currentValue = false,
+        flag = "Setting_MuteBoomboxs",
+        callback = function(v)
+            if v then
+                setSetting("BoomboxVolume", 0)
+            else
+                setSetting("BoomboxVolume", DEFAULT_BOOMBOX_VOLUME)
+            end
+        end,
     })
 end
 
