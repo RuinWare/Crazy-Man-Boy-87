@@ -2125,9 +2125,9 @@ return v1
 	end
 
 	-- UI Elements
-	VisTab:CreateDivider()
+	tab:CreateDivider()
 
-	VisTab:CreateToggle({
+	tab:CreateToggle({
 		name = "Defibrillator Hitbox Expander",
 		value = false,
 		callback = function(v)
@@ -2135,7 +2135,7 @@ return v1
 		end,
 	})
 
-	VisTab:CreateSlider({
+	tab:CreateSlider({
 		name = "Range:",
 		range = {10, 400},
 		increment = 1,
