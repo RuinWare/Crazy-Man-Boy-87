@@ -1928,8 +1928,6 @@ end
         end
     end)
 
-    tab:CreateDivider()
-
     tab:CreateToggle({
         name = "Pixel Surf",
 		icon = 76201258239230,
@@ -2090,8 +2088,6 @@ do
         local speed = downedDashSpeed * 0.5
         anchorPart.CFrame = anchorPart.CFrame + dir * speed * dt
     end)
-
-    tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Downed Dash",
@@ -2545,8 +2541,6 @@ RunService.Heartbeat:Connect(function(dt)
     iaRoot.CFrame = iaRoot.CFrame + Vector3.new(wishDir.X * speed * dt, 0, wishDir.Z * speed * dt)
 end)
 
-tab:CreateDivider()
-
 tab:CreateToggle({
     name = "Instant Acceleration",
     icon = 99352190313338,
@@ -2895,86 +2889,6 @@ _G.RWCallbacks["JumpCap"] = function(v) jumpCapEnabled = v; if not v then fireJu
 end
 
 --[[
-===========================
-UNLOCK JUMP
-===========================
-]]--
-
-do
-	local jumpEnabled = false
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local RunService = game:GetService("RunService")
-	
-	local cachedData = nil
-
-	-- Helper to safely locate the CharacterService module
-	local function getCharacterService()
-		local services = ReplicatedStorage:FindFirstChild("Services")
-		if not services then return nil end
-		
-		local asset = services:FindFirstChild("Asset")
-		if not asset then return nil end
-		
-		local charService = asset:FindFirstChild("CharacterService")
-		if not charService then return nil end
-		
-		if charService:IsA("ModuleScript") then
-			return charService
-		else
-			return charService:FindFirstChildWhichIsA("ModuleScript")
-		end
-	end
-
-	-- Recursive function to search the table and flip the values
-	local function forceUnlockJump(tbl, visited)
-		visited = visited or {}
-		if visited[tbl] then return end
-		visited[tbl] = true
-
-		for k, v in pairs(tbl) do
-			if type(v) == "table" then
-				forceUnlockJump(v, visited)
-			elseif type(k) == "string" then
-				if (k == "CanJump" or k == "JumpButtonVisible") and v == false then
-					tbl[k] = true
-				end
-			end
-		end
-	end
-
-	tab:CreateDivider()
-
-	tab:CreateToggle({
-		name = "Unlock Jump in All States",
-		value = false,
-		callback = function(v)
-			jumpEnabled = v
-		end,
-	})
-
-	-- Update EVERY FRAME (using Heartbeat)
-	RunService.Heartbeat:Connect(function()
-		if jumpEnabled then
-			-- If we haven't grabbed the data yet, do it now
-			if not cachedData then
-				local charService = getCharacterService()
-				if charService then
-					local ok, data = pcall(require, charService)
-					if ok and type(data) == "table" then
-						cachedData = data
-					end
-				end
-			end
-			
-			-- If we have the data, force the jump states every frame
-			if cachedData then
-				forceUnlockJump(cachedData)
-			end
-		end
-	end)
-end
-
---[[
 ============================================================================
 G changer
 ============================================================================
@@ -3099,6 +3013,162 @@ _G.RWCallbacks["JumpHeight"] = function(v) jumpHeightEnabled = v; if jhHum then 
         flag = "JumpHeight_Slider",
         callback = function(v) jumpHeightValue = v end,
     })
+end
+
+--[[
+===========================
+UNLOCK JUMP
+===========================
+]]--
+
+do
+	local jumpEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local RunService = game:GetService("RunService")
+	
+	local cachedData = nil
+
+	-- Helper to safely locate the CharacterService module
+	local function getCharacterService()
+		local services = ReplicatedStorage:FindFirstChild("Services")
+		if not services then return nil end
+		
+		local asset = services:FindFirstChild("Asset")
+		if not asset then return nil end
+		
+		local charService = asset:FindFirstChild("CharacterService")
+		if not charService then return nil end
+		
+		if charService:IsA("ModuleScript") then
+			return charService
+		else
+			return charService:FindFirstChildWhichIsA("ModuleScript")
+		end
+	end
+
+	-- Recursive function to search the table and flip the values
+	local function forceUnlockJump(tbl, visited)
+		visited = visited or {}
+		if visited[tbl] then return end
+		visited[tbl] = true
+
+		for k, v in pairs(tbl) do
+			if type(v) == "table" then
+				forceUnlockJump(v, visited)
+			elseif type(k) == "string" then
+				if (k == "CanJump" or k == "JumpButtonVisible") and v == false then
+					tbl[k] = true
+				end
+			end
+		end
+	end
+
+	tab:CreateDivider({ text = "Unlock" })
+
+	tab:CreateToggle({
+		name = "Unlock Jump in All States",
+		value = false,
+		callback = function(v)
+			jumpEnabled = v
+		end,
+	})
+
+	-- Update EVERY FRAME (using Heartbeat)
+	RunService.Heartbeat:Connect(function()
+		if jumpEnabled then
+			-- If we haven't grabbed the data yet, do it now
+			if not cachedData then
+				local charService = getCharacterService()
+				if charService then
+					local ok, data = pcall(require, charService)
+					if ok and type(data) == "table" then
+						cachedData = data
+					end
+				end
+			end
+			
+			-- If we have the data, force the jump states every frame
+			if cachedData then
+				forceUnlockJump(cachedData)
+			end
+		end
+	end)
+end
+
+--[[
+===========================
+UNLOCK TOOLS
+===========================
+]]--
+
+do
+	local toolsEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local RunService = game:GetService("RunService")
+	
+	local cachedData = nil
+
+	-- Helper to safely locate the CharacterService module
+	local function getCharacterService()
+		local services = ReplicatedStorage:FindFirstChild("Services")
+		if not services then return nil end
+		
+		local asset = services:FindFirstChild("Asset")
+		if not asset then return nil end
+		
+		local charService = asset:FindFirstChild("CharacterService")
+		if not charService then return nil end
+		
+		if charService:IsA("ModuleScript") then
+			return charService
+		else
+			return charService:FindFirstChildWhichIsA("ModuleScript")
+		end
+	end
+
+	-- Recursive function to search the table and flip the values
+	local function forceUnlockTools(tbl, visited)
+		visited = visited or {}
+		if visited[tbl] then return end
+		visited[tbl] = true
+
+		for k, v in pairs(tbl) do
+			if type(v) == "table" then
+				forceUnlockTools(v, visited)
+			elseif type(k) == "string" then
+				if k == "CanUseTools" and v == false then
+					tbl[k] = true
+				end
+			end
+		end
+	end
+
+	tab:CreateToggle({
+		name = "Unlock Tools in All States",
+		value = false,
+		callback = function(v)
+			toolsEnabled = v
+		end,
+	})
+
+	-- Update EVERY FRAME (using Heartbeat)
+	RunService.Heartbeat:Connect(function()
+		if toolsEnabled then
+			if not cachedData then
+				local charService = getCharacterService()
+				if charService then
+					local ok, data = pcall(require, charService)
+					if ok and type(data) == "table" then
+						cachedData = data
+					end
+				end
+			end
+			
+			if cachedData then
+				forceUnlockTools(cachedData)
+			end
+		end
+	end)
 end
 
 --[[
@@ -3393,8 +3463,6 @@ do
 		end
 		modifiedEmotes = {}
 	end
-
-	tab:CreateDivider()
 
 	tab:CreateToggle({
 		name = "Emote Walk",
@@ -3840,6 +3908,8 @@ _G.ESPEEDDASH = 30
 getgenv().ESPEEDDASH = 30
 _G.ANGLEEDASH = 8
 getgenv().ANGLEEDASH = 8
+
+tab:CreateDivider()
 
 tab:CreateToggle({
     name = "Auto E-Dash",
@@ -4981,7 +5051,7 @@ do
 	end
 
 	-- UI Elements
-	tab:CreateDivider()
+	tab:CreateDivider({ text = "Special Rounds" })
 
 	tab:CreateToggle({
 		name = "Disable Special Round Effects",
