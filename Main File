@@ -5010,6 +5010,9 @@ do
     })
 end
 
+-- more
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual%20tab/Main"))()
+
 --[[
 ============================================================================
 
