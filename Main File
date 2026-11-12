@@ -4801,6 +4801,144 @@ end
 
 --[[
 ===========================
+SPC ROUNDS REMOVER
+===========================
+]]--
+
+do
+	local roundEnabled = false
+	local selectedRounds = {}
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	-- Cache to store the original tables so we can restore them later
+	local originalData = {} 
+
+	local PATHS = {
+		["Speed"] = {"Info", "SpecialRounds", "Speed"},
+		["No Jumping"] = {"Info", "SpecialRounds", "No Jumping"},
+		["Moon Jump"] = {"Info", "SpecialRounds", "Moon Jump"},
+		["Fog"] = {"Info", "SpecialRounds", "Fog"},
+		["Darkness"] = {"Info", "SpecialRounds", "Darkness"},
+	}
+
+	-- Helper to resolve the path safely
+	local function getRoundScript(roundName)
+		local current = ReplicatedStorage
+		local path = PATHS[roundName]
+		if not path then return nil end
+		
+		for _, key in ipairs(path) do
+			current = current:FindFirstChild(key)
+			if not current then return nil end
+		end
+		return current
+	end
+
+	-- Main logic to apply or revert effects
+	local function applyEffects()
+		-- 1. If disabled, restore all originals and clear cache
+		if not roundEnabled then
+			for script, saved in pairs(originalData) do
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" then
+					if data.Shared and data.Shared.Character then
+						data.Shared.Character.Teams = saved.teams
+					end
+					data.Client = saved.client
+				end
+			end
+			originalData = {}
+			return
+		end
+
+		-- 2. Apply effects to currently selected rounds
+		for roundName, isSelected in pairs(selectedRounds) do
+			if isSelected then
+				local script = getRoundScript(roundName)
+				if script then
+					local ok, data = pcall(require, script)
+					if ok and type(data) == "table" then
+						-- Save original tables if we haven't already
+						if not originalData[script] then
+							originalData[script] = {
+								teams = data.Shared and data.Shared.Character and data.Shared.Character.Teams,
+								client = data.Client
+							}
+						end
+						
+						-- Strip the movement modifiers (Speed, Jump, etc.)
+						if data.Shared and data.Shared.Character then
+							data.Shared.Character.Teams = {}
+						end
+						-- Strip the lighting/client functions (Fog, Darkness, etc.)
+						data.Client = {}
+					end
+				end
+			end
+		end
+
+		-- 3. Revert any scripts that were previously modified but are no longer selected
+		for script, saved in pairs(originalData) do
+			local stillSelected = false
+			for roundName, isSelected in pairs(selectedRounds) do
+				if isSelected and getRoundScript(roundName) == script then
+					stillSelected = true
+					break
+				end
+			end
+			
+			if not stillSelected then
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" then
+					if data.Shared and data.Shared.Character then
+						data.Shared.Character.Teams = saved.teams
+					end
+					data.Client = saved.client
+				end
+				originalData[script] = nil
+			end
+		end
+	end
+
+	-- UI Elements
+	tab:CreateDivider()
+
+	tab:CreateToggle({
+		name = "Disable Special Round Effects",
+		value = false,
+		callback = function(v)
+			roundEnabled = v
+			applyEffects()
+		end,
+	})
+
+	tab:CreateDropdown({
+		name = "Special Rounds",
+		options = { "Speed", "No Jumping", "Moon Jump", "Fog", "Darkness" },
+		default = {},
+		multiSelect = true,
+		callback = function(selected)
+			selectedRounds = {}
+			for _, v in ipairs(selected) do
+				selectedRounds[v] = true
+			end
+			applyEffects()
+		end,
+	})
+
+	-- Enforcement Loop (ensures the game doesn't override the tables)
+	task.spawn(function()
+		while true do
+			if roundEnabled and next(selectedRounds) then
+				applyEffects()
+			end
+			task.wait(0.5)
+		end
+	end)
+end
+
+--[[
+===========================
 GAMEPLAY
 ===========================
 ]]--
