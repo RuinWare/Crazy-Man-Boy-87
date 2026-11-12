@@ -2903,6 +2903,9 @@ UNLOCK JUMP
 do
 	local jumpEnabled = false
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local RunService = game:GetService("RunService")
+	
+	local cachedData = nil
 
 	-- Helper to safely locate the CharacterService module
 	local function getCharacterService()
@@ -2915,7 +2918,6 @@ do
 		local charService = asset:FindFirstChild("CharacterService")
 		if not charService then return nil end
 		
-		-- If it's a folder, look for the ModuleScript inside
 		if charService:IsA("ModuleScript") then
 			return charService
 		else
@@ -2931,10 +2933,8 @@ do
 
 		for k, v in pairs(tbl) do
 			if type(v) == "table" then
-				-- Recurse into nested tables
 				forceUnlockJump(v, visited)
 			elseif type(k) == "string" then
-				-- Find and flip the specific states
 				if (k == "CanJump" or k == "JumpButtonVisible") and v == false then
 					tbl[k] = true
 				end
@@ -2952,20 +2952,24 @@ do
 		end,
 	})
 
-	-- Enforcement loop
-	task.spawn(function()
-		while true do
-			if jumpEnabled then
+	-- Update EVERY FRAME (using Heartbeat)
+	RunService.Heartbeat:Connect(function()
+		if jumpEnabled then
+			-- If we haven't grabbed the data yet, do it now
+			if not cachedData then
 				local charService = getCharacterService()
 				if charService then
 					local ok, data = pcall(require, charService)
 					if ok and type(data) == "table" then
-						-- Scan the entire function info table
-						forceUnlockJump(data)
+						cachedData = data
 					end
 				end
 			end
-			task.wait(0.2) -- Checks twice a second
+			
+			-- If we have the data, force the jump states every frame
+			if cachedData then
+				forceUnlockJump(cachedData)
+			end
 		end
 	end)
 end
