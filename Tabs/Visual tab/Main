@@ -1,3 +1,63 @@
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local fovEnabled = false
+    local fovValue = 90
+
+    local function getSetSetting()
+        local shared = ReplicatedStorage:FindFirstChild("Shared")
+        if not shared then return nil end
+        local ud = shared:FindFirstChild("UserData")
+        if not ud then return nil end
+        local remotes = ud:FindFirstChild("Remotes")
+        if not remotes then return nil end
+        return remotes:FindFirstChild("SetSetting")
+    end
+
+    local function fireFOV(value)
+        local remote = getSetSetting()
+        if not remote then return end
+        pcall(function()
+            remote:FireServer("FOV", value)
+        end)
+    end
+
+    VisTab:CreateDivider({ text = "Field of View" })
+
+    VisTab:CreateToggle({
+        name = "FOV Changer",
+        icon = 97562574851729,
+        currentValue = false,
+        flag = "FOVChanger_Toggle",
+        callback = function(v)
+            fovEnabled = v
+            if v then
+                fireFOV(fovValue)
+            else
+                fireFOV(90)
+            end
+        end,
+    })
+
+    VisTab:CreateInput({
+        name = "FOV Value",
+        icon = 80363621811850,
+        placeholder = "e.g. 120",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                fovValue = n
+                if fovEnabled then
+                    fireFOV(fovValue)
+                end
+            end
+        end,
+    })
+end
+
+do
+VisTab:CreateDivider()
+
 VisTab:CreateToggle({
     name = "Fix 90+ FOV bug",
     flag = "F9FOVB",
@@ -16,3 +76,4 @@ VisTab:CreateToggle({
         end
     end,
 })
+end
