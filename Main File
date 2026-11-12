@@ -820,9 +820,8 @@ END END END END END END END END END END END END END END END END END END END
 local window = Rayfield:CreateWindow({
     name = "RuinWare Client",
     configuration = {
-        Enabled = true,
-        autoSave = false,
-        autoLoad = false,
+        autoSave = true,
+        autoLoad = true,
         fileName = "Config",
         customFolder = "RuinWare",
     },
@@ -5233,159 +5232,11 @@ do
     ScriptTab:CreateDivider({ text = "Configuration Saving" })
 
     local selectedName = ""
-    local lastError = nil
 
     local function notify(title, content)
         pcall(function()
-            window:Notify({ title = title, content = content, duration = 4 })
+            window:Notify({ title = title, content = content, duration = 3 })
         end)
-    end
-
-    -- Try every known method signature and capture the last error
-    local function tryAll(candidates)
-        local lastErr = nil
-        for _, entry in ipairs(candidates) do
-            local fn = entry[1]
-            local label = entry[2]
-            if type(fn) == "function" then
-                local ok, err = pcall(fn)
-                if ok then return true, nil end
-                lastErr = label .. " → " .. tostring(err)
-            end
-        end
-        return false, lastErr
-    end
-
-    local function saveConfig(name)
-        local candidates = {}
-
-        if Rayfield.ConfigManager then
-            if type(Rayfield.ConfigManager.Save) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:Save(name) end, "ConfigManager:Save" })
-            end
-            if type(Rayfield.ConfigManager.SaveConfig) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:SaveConfig(name) end, "ConfigManager:SaveConfig" })
-            end
-            if type(Rayfield.ConfigManager.save) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:save(name) end, "ConfigManager:save" })
-            end
-        end
-
-        if type(Rayfield.SaveConfiguration) == "function" then
-            table.insert(candidates, { function() return Rayfield:SaveConfiguration(name) end, "SaveConfiguration" })
-        end
-        if type(Rayfield.SaveConfig) == "function" then
-            table.insert(candidates, { function() return Rayfield:SaveConfig(name) end, "SaveConfig" })
-        end
-        if type(Rayfield.save) == "function" then
-            table.insert(candidates, { function() return Rayfield:save(name) end, "save" })
-        end
-        if type(Rayfield.Save) == "function" then
-            table.insert(candidates, { function() return Rayfield:Save(name) end, "Save" })
-        end
-
-        return tryAll(candidates)
-    end
-
-    local function loadConfig(name)
-        local candidates = {}
-
-        if Rayfield.ConfigManager then
-            if type(Rayfield.ConfigManager.Load) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:Load(name) end, "ConfigManager:Load" })
-            end
-            if type(Rayfield.ConfigManager.LoadConfig) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:LoadConfig(name) end, "ConfigManager:LoadConfig" })
-            end
-            if type(Rayfield.ConfigManager.load) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:load(name) end, "ConfigManager:load" })
-            end
-        end
-
-        if type(Rayfield.LoadConfiguration) == "function" then
-            table.insert(candidates, { function() return Rayfield:LoadConfiguration(name) end, "LoadConfiguration" })
-        end
-        if type(Rayfield.LoadConfig) == "function" then
-            table.insert(candidates, { function() return Rayfield:LoadConfig(name) end, "LoadConfig" })
-        end
-        if type(Rayfield.load) == "function" then
-            table.insert(candidates, { function() return Rayfield:load(name) end, "load" })
-        end
-        if type(Rayfield.Load) == "function" then
-            table.insert(candidates, { function() return Rayfield:Load(name) end, "Load" })
-        end
-
-        return tryAll(candidates)
-    end
-
-    local function deleteConfig(name)
-        local candidates = {}
-
-        if Rayfield.ConfigManager then
-            if type(Rayfield.ConfigManager.Delete) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:Delete(name) end, "ConfigManager:Delete" })
-            end
-            if type(Rayfield.ConfigManager.DeleteConfig) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:DeleteConfig(name) end, "ConfigManager:DeleteConfig" })
-            end
-            if type(Rayfield.ConfigManager.delete) == "function" then
-                table.insert(candidates, { function() return Rayfield.ConfigManager:delete(name) end, "ConfigManager:delete" })
-            end
-        end
-
-        if type(Rayfield.DeleteConfiguration) == "function" then
-            table.insert(candidates, { function() return Rayfield:DeleteConfiguration(name) end, "DeleteConfiguration" })
-        end
-        if type(Rayfield.DeleteConfig) == "function" then
-            table.insert(candidates, { function() return Rayfield:DeleteConfig(name) end, "DeleteConfig" })
-        end
-        if type(Rayfield.delete) == "function" then
-            table.insert(candidates, { function() return Rayfield:delete(name) end, "delete" })
-        end
-
-        return tryAll(candidates)
-    end
-
-    local function getConfigList()
-        local configs = {}
-
-        local function tryPush(list)
-            if type(list) ~= "table" then return false end
-            for _, entry in ipairs(list) do
-                if type(entry) == "string" then
-                    table.insert(configs, entry)
-                elseif type(entry) == "table" and entry.Name then
-                    table.insert(configs, entry.Name)
-                end
-            end
-            return #configs > 0
-        end
-
-        if Rayfield.ConfigManager then
-            if type(Rayfield.ConfigManager.GetList) == "function" then
-                local ok, list = pcall(function() return Rayfield.ConfigManager:GetList() end)
-                if ok and tryPush(list) then return configs end
-            end
-            if type(Rayfield.ConfigManager.GetConfigs) == "function" then
-                local ok, list = pcall(function() return Rayfield.ConfigManager:GetConfigs() end)
-                if ok and tryPush(list) then return configs end
-            end
-            if type(Rayfield.ConfigManager.GetAll) == "function" then
-                local ok, list = pcall(function() return Rayfield.ConfigManager:GetAll() end)
-                if ok and tryPush(list) then return configs end
-            end
-        end
-
-        if type(Rayfield.GetConfigurationList) == "function" then
-            local ok, list = pcall(function() return Rayfield:GetConfigurationList() end)
-            if ok and tryPush(list) then return configs end
-        end
-        if type(Rayfield.GetConfigList) == "function" then
-            local ok, list = pcall(function() return Rayfield:GetConfigList() end)
-            if ok and tryPush(list) then return configs end
-        end
-
-        return configs
     end
 
     local configDropdown = ScriptTab:CreateDropdown({
@@ -5402,12 +5253,18 @@ do
     })
 
     local function refreshDropdown()
-        local list = getConfigList()
+        local list = {}
+        if type(window.ListConfigs) == "function" then
+            local ok, result = pcall(function() return window:ListConfigs() end)
+            if ok and type(result) == "table" then
+                list = result
+            end
+        end
         pcall(function() configDropdown:SetOptions(list) end)
     end
 
     ScriptTab:CreateInput({
-        name = "Name:aaa",
+        name = "Name:",
         placeholder = "config name",
         callback = function(text)
             if text and text ~= "" then selectedName = text end
@@ -5421,12 +5278,12 @@ do
                 notify("Config", "Enter a name first.")
                 return
             end
-            local ok, err = saveConfig(selectedName)
+            local ok, err = pcall(function() window:Save(selectedName) end)
             if ok then
                 notify("Config", "Saved: " .. selectedName)
                 refreshDropdown()
             else
-                notify("Config Save Error", tostring(err or "no method found"))
+                notify("Config Save Error", tostring(err))
             end
         end,
     })
@@ -5438,11 +5295,11 @@ do
                 notify("Config", "Select or type a config name.")
                 return
             end
-            local ok, err = loadConfig(selectedName)
+            local ok, err = pcall(function() window:Load(selectedName) end)
             if ok then
                 notify("Config", "Loaded: " .. selectedName)
             else
-                notify("Config Load Error", tostring(err or "no method found"))
+                notify("Config Load Error", tostring(err))
             end
         end,
     })
@@ -5454,12 +5311,12 @@ do
                 notify("Config", "Select a config to delete.")
                 return
             end
-            local ok, err = deleteConfig(selectedName)
+            local ok, err = pcall(function() window:DeleteConfig(selectedName) end)
             if ok then
                 notify("Config", "Deleted: " .. selectedName)
                 refreshDropdown()
             else
-                notify("Config Delete Error", tostring(err or "no method found"))
+                notify("Config Delete Error", tostring(err))
             end
         end,
     })
