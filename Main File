@@ -2895,6 +2895,82 @@ _G.RWCallbacks["JumpCap"] = function(v) jumpCapEnabled = v; if not v then fireJu
 end
 
 --[[
+===========================
+UNLOCK JUMP
+===========================
+]]--
+
+do
+	local jumpEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+	-- Helper to safely locate the CharacterService module
+	local function getCharacterService()
+		local services = ReplicatedStorage:FindFirstChild("Services")
+		if not services then return nil end
+		
+		local asset = services:FindFirstChild("Asset")
+		if not asset then return nil end
+		
+		local charService = asset:FindFirstChild("CharacterService")
+		if not charService then return nil end
+		
+		-- If it's a folder, look for the ModuleScript inside
+		if charService:IsA("ModuleScript") then
+			return charService
+		else
+			return charService:FindFirstChildWhichIsA("ModuleScript")
+		end
+	end
+
+	-- Recursive function to search the table and flip the values
+	local function forceUnlockJump(tbl, visited)
+		visited = visited or {}
+		if visited[tbl] then return end
+		visited[tbl] = true
+
+		for k, v in pairs(tbl) do
+			if type(v) == "table" then
+				-- Recurse into nested tables
+				forceUnlockJump(v, visited)
+			elseif type(k) == "string" then
+				-- Find and flip the specific states
+				if (k == "CanJump" or k == "JumpButtonVisible") and v == false then
+					tbl[k] = true
+				end
+			end
+		end
+	end
+
+	tab:CreateDivider()
+
+	tab:CreateToggle({
+		name = "Unlock Jump in All States",
+		value = false,
+		callback = function(v)
+			jumpEnabled = v
+		end,
+	})
+
+	-- Enforcement loop
+	task.spawn(function()
+		while true do
+			if jumpEnabled then
+				local charService = getCharacterService()
+				if charService then
+					local ok, data = pcall(require, charService)
+					if ok and type(data) == "table" then
+						-- Scan the entire function info table
+						forceUnlockJump(data)
+					end
+				end
+			end
+			task.wait(0.2) -- Checks twice a second
+		end
+	end)
+end
+
+--[[
 ============================================================================
 G changer
 ============================================================================
