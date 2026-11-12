@@ -5312,25 +5312,6 @@ do
         return list
     end
 
-    local configDropdown = ScriptTab:CreateDropdown({
-        name = "Configs",
-        options = {},
-        multiSelect = false,
-        callback = function(selected)
-            if type(selected) == "table" and selected[1] then
-                selectedName = selected[1]
-            elseif type(selected) == "string" then
-                selectedName = selected
-            end
-        end,
-    })
-
-    local function refreshDropdown()
-        local list = getConfigList()
-        pcall(function() configDropdown:SetOptions(list) end)
-        return #list
-    end
-
     ScriptTab:CreateInput({
         name = "Name:",
         placeholder = "config name",
@@ -5398,13 +5379,12 @@ do
 
     ScriptTab:CreateButton({
         name = "Refresh List",
+        description = "If you want a list or proper Configuration Settings, click on the gear icon in the top right and scroll down."
         callback = function()
             local count = refreshDropdown()
             notify("Config", "Found " .. tostring(count) .. " config(s).")
         end,
     })
-
-    task.delay(2, refreshDropdown)
 end
 
 do
