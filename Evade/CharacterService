@@ -1,0 +1,416 @@
+-- Script Path: game:GetService("ReplicatedStorage").Services.Asset.CharacterService
+
+if game:GetService("RunService"):IsServer() then
+    return require(game:GetService("ServerScriptService").Services.Asset.CharacterService)
+end
+local v_u_1 = {
+    ["Characters"] = {}
+}
+local v_u_2 = game:GetService("ReplicatedStorage")
+local v3 = game:GetService("Players")
+local v_u_4 = game:GetService("Debris")
+local v_u_5 = v3.LocalPlayer
+local v6 = v_u_2.Shared
+local v_u_7 = require(v6.Networking.Serializer)
+local v_u_8 = v_u_2.Objects
+local v9 = v_u_2:WaitForChild("Services")
+local v_u_10 = require(v9:WaitForChild("Data"):WaitForChild("ServerStateRegistryService"))
+local v_u_11 = require(v9:WaitForChild("UI"):WaitForChild("SharedUIService"))
+local v_u_12 = require(v_u_2:WaitForChild("Shared"):WaitForChild("Misc"):WaitForChild("ToolAmmo"))
+local v_u_13 = {
+    ["Blue"] = "GlitchBlueFX",
+    ["Yellow"] = "GlitchYellowFX"
+}
+local function v_u_22(p14, p15) -- name: portalGlitch
+    -- upvalues: (copy) v_u_13, (copy) v_u_2, (copy) v_u_4
+    if p14 then
+        p14 = v_u_13[p14]
+    end
+    if p14 then
+        p14 = v_u_2.Assets.Misc:FindFirstChild(p14)
+    end
+    if p14 and typeof(p15) == "Vector3" then
+        local v16 = p14:Clone()
+        v16.Anchored = true
+        v16.CanCollide = false
+        v16.CanQuery = false
+        v16.CanTouch = false
+        v16.Transparency = 1
+        v16.CFrame = CFrame.new(p15)
+        local v17 = 0
+        for _, v_u_18 in v16:GetDescendants() do
+            if not v_u_18:IsA("ParticleEmitter") then
+                continue
+            end
+            v_u_18.Enabled = false
+            local v19 = v_u_18:GetAttribute("EmitDelay") or 0
+            local v_u_20 = v_u_18:GetAttribute("EmitCount") or 1
+            local v21 = v19 + v_u_18.Lifetime.Max
+            v17 = math.max(v17, v21)
+            task.delay(v19, function()
+                -- upvalues: (copy) v_u_18, (copy) v_u_20
+                if v_u_18.Parent then
+                    v_u_18:Emit(v_u_20)
+                end
+            end)
+        end
+        v16.Parent = workspace:FindFirstChild("Effects") or workspace
+        v_u_4:AddItem(v16, v17 + 1)
+    end
+end
+local v_u_42 = {
+    ["Kill"] = function(p23, p24) -- name: Kill
+        p23:Kill(p24)
+    end,
+    ["Movement"] = function(p25, p26) -- name: Movement
+        if p25.Movement and p26.SpeedChange then
+            p25.Movement.MoveStats:SpeedChange(p26.SpeedChange.Type, p26.SpeedChange.Value)
+            if p26.SpeedChange.Length then
+                task.wait(p26.SpeedChange.Length)
+                p25.Movement.MoveStats:SpeedChange(p26.SpeedChange.Type, nil)
+            end
+        end
+    end,
+    ["ModifyMovement"] = function(p27, p28) -- name: ModifyMovement
+        if p27.Movement then
+            if not p27.Movement.MoveStats.Modifiers then
+                p27.Movement.MoveStats.Modifiers = {}
+            end
+            p27.Movement.MoveStats.Modifiers[p28[1]] = p28[2]
+            p27.Movement.MoveStats:Reset()
+        end
+    end,
+    ["Teleport"] = function(p29, p30) -- name: Teleport
+        if typeof(p30) == "table" and p30[2] == true then
+            p29.Model.PrimaryPart.AssemblyLinearVelocity = Vector3.new()
+            p30 = p30[1]
+        end
+        p29.Model.PrimaryPart.CFrame = p30
+    end,
+    ["PortalTeleport"] = function(p31, p32) -- name: PortalTeleport
+        -- upvalues: (copy) v_u_5, (copy) v_u_22
+        if p31.Model ~= v_u_5.Character and typeof(p32) == "table" then
+            local v33 = p32.Color == "Blue" and "Yellow" or "Blue"
+            v_u_22(p32.Color, p32.From)
+            v_u_22(v33, p32.To)
+        end
+    end,
+    ["ToolAmmo"] = function(p34, p35) -- name: ToolAmmo
+        -- upvalues: (copy) v_u_12
+        if typeof(p35) == "table" then
+            local v36 = p35.Tool
+            if typeof(v36) == "string" then
+                local v37 = p35.Amount
+                if typeof(v37) == "number" then
+                    local v38 = v_u_12.ClipOf(p34.ToolProfile, p35.Tool)
+                    if v38 then
+                        v_u_12.Add(v38, p35.Amount)
+                        if p34.ToolProfile.UpdateResources then
+                            p34.ToolProfile:UpdateResources()
+                        end
+                    end
+                    return
+                end
+            end
+        end
+    end,
+    ["Drown"] = function(p39) -- name: Drown
+        -- upvalues: (copy) v_u_4
+        local v40 = { "rbxassetid://220194561", "rbxassetid://13832846572", "rbxassetid://13832846515" }
+        local v41 = Instance.new("Sound")
+        v41.SoundId = v40[math.random(1, #v40)]
+        v41.RollOffMaxDistance = 40
+        v41.RollOffMinDistance = 10
+        v41.Volume = 1
+        v41.Parent = p39.Model.PrimaryPart.SoundPos
+        v41:Play()
+        v_u_4:AddItem(v41, 1.5)
+    end
+}
+local v_u_43 = {}
+function v_u_1.GetCharacterFromTag(_, p44) -- name: GetCharacterFromTag
+    -- upvalues: (copy) v_u_1
+    for v45, v46 in pairs(v_u_1:GetCharacters()) do
+        if not v46.Model or v46.Model:GetAttribute("Tag") ~= p44 then
+            continue
+        end
+        return v46, v45
+    end
+    return nil
+end
+function v_u_1.GetCharacterFromPlayer(_, p47) -- name: GetCharacterFromPlayer
+    -- upvalues: (copy) v_u_1
+    if p47 then
+        for v48, v49 in pairs(v_u_1:GetCharacters()) do
+            if not v49.Model or (v49.Model.Name ~= p47.Name or v49.Model:GetAttribute("AI")) then
+                continue
+            end
+            return v49, v48
+        end
+        return nil
+    end
+end
+function v_u_1.GetCharacterFromRig(_, p50) -- name: GetCharacterFromRig
+    -- upvalues: (copy) v_u_1
+    for v51, v52 in pairs(v_u_1:GetCharacters()) do
+        if not v52.Rig or v52.Rig:GetRigModel() ~= p50 then
+            continue
+        end
+        return v52, v51
+    end
+    return nil
+end
+function v_u_1.GetCharacters(_) -- name: GetCharacters
+    -- upvalues: (copy) v_u_1
+    return v_u_1.Characters
+end
+function v_u_1.GetCharacterModels(_) -- name: GetCharacterModels
+    -- upvalues: (copy) v_u_1
+    local v53 = {}
+    for _, v54 in v_u_1.Characters do
+        local v55 = v54.Model
+        table.insert(v53, v55)
+    end
+    return v53
+end
+function v_u_1.GetLocalCharacter(_) -- name: GetLocalCharacter
+    -- upvalues: (copy) v_u_1
+    for v56, v57 in v_u_1:GetCharacters() do
+        if not v57.Local then
+            continue
+        end
+        return v57, v56
+    end
+    return nil
+end
+local function v_u_60(p58) -- name: findCharacterModel
+    for _, v59 in workspace.Players:GetChildren() do
+        if v59:GetAttribute("Tag") ~= p58 or not (v59.PrimaryPart and (v59.PrimaryPart.Parent and (v59:FindFirstChild("Humanoid") and v59.PrimaryPart:FindFirstChild("SoundPos")))) then
+            continue
+        end
+        return v59
+    end
+    return nil
+end
+function v_u_1.AddCharacter(_, p61) -- name: AddCharacter
+    -- upvalues: (copy) v_u_1, (copy) v_u_43, (copy) v_u_60, (copy) v_u_8, (copy) v_u_5
+    if v_u_1:GetCharacterFromTag(p61.Tag) then
+        v_u_1:RemoveCharacter(p61.Tag)
+    end
+    local v62 = {
+        ["Updates"] = {}
+    }
+    v_u_43[p61.Tag] = v62
+    local v63 = v_u_60(p61.Tag)
+    local v64 = os.clock()
+    while not v63 and (v_u_43[p61.Tag] == v62 and os.clock() - v64 < 30) do
+        task.wait(0.1)
+        v63 = v_u_60(p61.Tag)
+    end
+    if v_u_43[p61.Tag] == v62 then
+        v_u_43[p61.Tag] = nil
+        if v63 then
+            local v65 = require(v_u_8.Game.Character).new(v63, v63 == v_u_5.Character, p61.AI and true or false)
+            v65:Init(p61)
+            local v66 = v_u_1.Characters
+            table.insert(v66, v65)
+            for _, v67 in v62.Updates do
+                v65.DataRegistry:ServerToClient(v67)
+            end
+        else
+            warn("Waited on data tag: ", p61.Tag, ", but the character did not spawn in the time period of: ", 30)
+        end
+    else
+        return
+    end
+end
+function v_u_1.RemoveCharacter(_, p68) -- name: RemoveCharacter
+    -- upvalues: (copy) v_u_1
+    local v69
+    if typeof(p68) == "number" then
+        p68, v69 = v_u_1:GetCharacterFromTag(p68)
+    else
+        v69 = table.find(v_u_1.Characters, p68)
+    end
+    if p68 then
+        table.remove(v_u_1.Characters, v69)
+        p68:Destroy()
+    end
+end
+function v_u_1.KeyUsed(_, p70) -- name: KeyUsed
+    -- upvalues: (copy) v_u_1
+    local v71 = v_u_1:GetLocalCharacter()
+    if v71 then
+        v71:KeyUsed(p70)
+    end
+end
+function v_u_1.Update(_, p72) -- name: Update
+    -- upvalues: (copy) v_u_10, (copy) v_u_1
+    if not v_u_10:Get("MapLoading") then
+        for _, v73 in v_u_1:GetCharacters() do
+            if v73.Model and (v73.Model.Parent and (v73.Model.PrimaryPart and (v73.Humanoid and v73.Humanoid.Parent))) then
+                v73:Update(p72)
+            else
+                v_u_1:RemoveCharacter(v73)
+            end
+        end
+    end
+end
+function updateCharacterFromData(p74) -- name: updateCharacterFromData
+    -- upvalues: (copy) v_u_7, (copy) v_u_5, (copy) v_u_1, (copy) v_u_43, (copy) v_u_11, (copy) v_u_2
+    local v_u_75 = v_u_7:Decode(p74)
+    if v_u_75.Tag then
+        local v76 = v_u_75.OwnerEcho
+        local v77 = v_u_75.OwnerEchoUnreliable
+        v_u_75.OwnerEcho = nil
+        v_u_75.OwnerEchoUnreliable = nil
+        if (v76 or v77) and (v_u_5.Character and v_u_5.Character:GetAttribute("Tag") == v_u_75.Tag) then
+            for _, v78 in { v76 or {}, v77 or {} } do
+                for _, v79 in v78 do
+                    local v80 = v_u_7:GetNameFromID(v79)
+                    if not v80 then
+                        continue
+                    end
+                    v_u_75[v80] = nil
+                end
+            end
+        end
+        if v_u_75.Create == true then
+            task.spawn(function()
+                -- upvalues: (ref) v_u_1, (copy) v_u_75, (ref) v_u_43, (ref) v_u_5, (ref) v_u_11, (ref) v_u_2
+                local function v81()
+                    -- upvalues: (ref) v_u_1, (ref) v_u_75
+                    v_u_1:AddCharacter(v_u_75)
+                end
+                local _, v82 = pcall(v81)
+                if v82 then
+                    v_u_43[v_u_75.Tag] = nil
+                    warn(v82)
+                    if v_u_5.Character and v_u_5.Character:GetAttribute("Tag") == v_u_75.Tag then
+                        task.spawn(function()
+                            -- upvalues: (ref) v_u_11
+                            v_u_11:SetType("Notification", "Message", "Your character failed to load in. You have been taken to the menu", "Error")
+                        end)
+                        task.spawn(function()
+                            -- upvalues: (ref) v_u_2
+                            task.wait(0.5)
+                            v_u_2.Remotes.Session.SetPlayerMode:FireServer(false)
+                        end)
+                    end
+                end
+            end)
+            return
+        elseif v_u_75.Destroy == true then
+            v_u_43[v_u_75.Tag] = nil
+            v_u_1:RemoveCharacter(v_u_75.Tag)
+            return
+        else
+            local v83 = v_u_1:GetCharacterFromTag(v_u_75.Tag)
+            if v83 then
+                v83.DataRegistry:ServerToClient(v_u_75)
+            else
+                local v84 = v_u_43[v_u_75.Tag]
+                if v84 then
+                    local v85 = v84.Updates
+                    table.insert(v85, v_u_75)
+                end
+            end
+        end
+    else
+        warn("No tag was found in dataset: ", p74)
+        return
+    end
+end
+v_u_2.Remotes.Registry.UpdateCharacterDataRegistry.OnClientEvent:Connect(function(p86)
+    if typeof(p86) == "table" and p86[1] == true then
+        for v87, v88 in p86 do
+            if v87 <= 1 then
+                continue
+            end
+            updateCharacterFromData(v88)
+        end
+    else
+        updateCharacterFromData(p86)
+    end
+end)
+v_u_2.Remotes.Registry.UpdateCharacterDataRegistryUnreliable.OnClientEvent:Connect(function(p89)
+    if typeof(p89) == "table" and p89[1] == true then
+        for v90, v91 in p89 do
+            if v90 <= 1 then
+                continue
+            end
+            updateCharacterFromData(v91)
+        end
+    else
+        updateCharacterFromData(p89)
+    end
+end)
+v_u_2.Remotes.Character.CharacterTask.OnClientEvent:Connect(function(p92, p93, p94)
+    -- upvalues: (copy) v_u_1, (copy) v_u_42
+    local v95 = v_u_1:GetCharacterFromTag(p92)
+    if v95 then
+        v_u_42[p93](v95, p94)
+    end
+end)
+v_u_2.Remotes:WaitForChild("Character"):WaitForChild("ToolAction").OnClientEvent:Connect(function(p96, p97, p98)
+    -- upvalues: (copy) v_u_1
+    local v99 = v_u_1:GetCharacterFromTag(p96)
+    if v99 and (v99.ToolProfile and v99.ToolProfile.CharacterVisuals) then
+        v99.ToolProfile.CharacterVisuals:Task(p97, p98)
+    end
+end)
+v_u_2.Remotes:WaitForChild("Character"):WaitForChild("Action").OnClientEvent:Connect(function(p100, ...)
+    -- upvalues: (copy) v_u_1
+    local v101 = v_u_1:GetCharacterFromTag(p100)
+    if v101 then
+        v101.ActionVisuals:Action(...)
+    end
+end)
+v_u_2.Remotes:WaitForChild("Character"):WaitForChild("Task").OnClientEvent:Connect(function(p102, p103, ...)
+    -- upvalues: (copy) v_u_1
+    local v104 = v_u_1:GetCharacterFromTag(p102)
+    if v104 then
+        v104.Tasks:Activate(v104.Tasks:GetTaskFromName(p103), ...)
+    end
+end)
+v_u_2.Remotes:WaitForChild("Character"):WaitForChild("VerifyRange").OnClientInvoke = function(p105, p106)
+    -- upvalues: (copy) v_u_5
+    local v107 = nil
+    for _, v108 in pairs(workspace.Players:GetChildren()) do
+        if v108:GetAttribute("Tag") ~= p105 then
+            continue
+        end
+        v107 = v108
+    end
+    return v107 == nil and true or ((v107.PrimaryPart == nil or (v_u_5.Character == nil or (v_u_5.Character.Parent == nil or v_u_5.Character.PrimaryPart == nil))) and true or (v_u_5.Character.PrimaryPart.Position - v107.PrimaryPart.Position).magnitude <= p106)
+end
+game:GetService("RunService").RenderStepped:Connect(function(p109)
+    -- upvalues: (copy) v_u_1
+    v_u_1:Update(p109)
+end)
+local v_u_110 = game:GetService("StarterGui")
+game:GetService("RunService")
+local function v115(p111, ...) -- name: coreCall
+    -- upvalues: (copy) v_u_110
+    local v112 = {}
+    for _ = 1, 8 do
+        v112 = {}
+        local v113 = v_u_110[p111]
+        local v114 = v_u_110
+        __set_list(v112, 1, {pcall(v113, v114, ...)})
+        if v112[1] then
+            break
+        end
+        task.wait(0.5)
+    end
+    return unpack(v112)
+end
+local v116 = Instance.new("BindableEvent")
+v115("SetCore", "ResetButtonCallback", v116)
+v116.Event:Connect(function()
+    -- upvalues: (copy) v_u_1
+    if v_u_1:GetLocalCharacter() then
+        game.ReplicatedStorage.Remotes.Character.CharacterTask:FireServer("Reset")
+    end
+end)
+return v_u_1
