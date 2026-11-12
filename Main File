@@ -819,6 +819,11 @@ END END END END END END END END END END END END END END END END END END END
 -- WINDOW
 local window = Rayfield:CreateWindow({
     name = "RuinWare Client",
+    configuration = {
+        Enabled = true,
+        fileName = "Config",
+        customFolder = "RuinWare",
+    },
     icon = 98691154054966,
     subtitle = "Evade",
     sidebarLayout = true,
@@ -5220,6 +5225,158 @@ do
             end
         end,
     })
+end
+
+do
+    ScriptTab:CreateDivider({ text = "Configuration Saving" })
+
+    local selectedName = ""
+
+    local function getConfigList()
+        local configs = {}
+        if Rayfield and Rayfield.ConfigManager then
+            local ok, list = pcall(function() return Rayfield.ConfigManager:GetList() end)
+            if not ok or type(list) ~= "table" then
+                ok, list = pcall(function() return Rayfield.ConfigManager:GetConfigs() end)
+            end
+            if ok and type(list) == "table" then
+                for _, name in ipairs(list) do
+                    if type(name) == "string" then
+                        table.insert(configs, name)
+                    end
+                end
+            end
+        end
+        if #configs == 0 and Rayfield and Rayfield.GetConfigurationList then
+            local ok, list = pcall(function() return Rayfield:GetConfigurationList() end)
+            if ok and type(list) == "table" then
+                for _, name in ipairs(list) do
+                    if type(name) == "string" then
+                        table.insert(configs, name)
+                    end
+                end
+            end
+        end
+        return configs
+    end
+
+    local function saveConfig(name)
+        local ok = false
+        if Rayfield and Rayfield.ConfigManager then
+            ok = pcall(function() Rayfield.ConfigManager:Save(name) end)
+        end
+        if not ok and Rayfield and Rayfield.SaveConfiguration then
+            ok = pcall(function() Rayfield:SaveConfiguration(name) end)
+        end
+        return ok
+    end
+
+    local function loadConfig(name)
+        local ok = false
+        if Rayfield and Rayfield.ConfigManager then
+            ok = pcall(function() Rayfield.ConfigManager:Load(name) end)
+        end
+        if not ok and Rayfield and Rayfield.LoadConfiguration then
+            ok = pcall(function() Rayfield:LoadConfiguration(name) end)
+        end
+        return ok
+    end
+
+    local function deleteConfig(name)
+        local ok = false
+        if Rayfield and Rayfield.ConfigManager then
+            ok = pcall(function() Rayfield.ConfigManager:Delete(name) end)
+        end
+        if not ok and Rayfield and Rayfield.DeleteConfiguration then
+            ok = pcall(function() Rayfield:DeleteConfiguration(name) end)
+        end
+        return ok
+    end
+
+    local function notify(title, content)
+        pcall(function()
+            window:Notify({ title = title, content = content, duration = 3 })
+        end)
+    end
+
+    local configDropdown = ScriptTab:CreateDropdown({
+        name = "Configs",
+        options = {},
+        multiSelect = false,
+        callback = function(selected)
+            if type(selected) == "table" and selected[1] then
+                selectedName = selected[1]
+            elseif type(selected) == "string" then
+                selectedName = selected
+            end
+        end,
+    })
+
+    local function refreshDropdown()
+        local list = getConfigList()
+        pcall(function()
+            configDropdown:SetOptions(list)
+        end)
+    end
+
+    ScriptTab:CreateInput({
+        name = "Name:",
+        placeholder = "config name",
+        callback = function(text)
+            if text and text ~= "" then
+                selectedName = text
+            end
+        end,
+    })
+
+    ScriptTab:CreateButton({
+        name = "Save",
+        callback = function()
+            if selectedName == "" then
+                notify("Config", "Enter a name first.")
+                return
+            end
+            if saveConfig(selectedName) then
+                notify("Config", "Saved: " .. selectedName)
+                refreshDropdown()
+            else
+                notify("Config", "Save failed — ConfigurationSaving may be disabled.")
+            end
+        end,
+    })
+
+    ScriptTab:CreateButton({
+        name = "Load",
+        callback = function()
+            if selectedName == "" then
+                notify("Config", "Select or type a config name.")
+                return
+            end
+            if loadConfig(selectedName) then
+                notify("Config", "Loaded: " .. selectedName)
+            else
+                notify("Config", "Load failed.")
+            end
+        end,
+    })
+
+    ScriptTab:CreateButton({
+        name = "Delete",
+        callback = function()
+            if selectedName == "" then
+                notify("Config", "Select a config to delete.")
+                return
+            end
+            if deleteConfig(selectedName) then
+                notify("Config", "Deleted: " .. selectedName)
+                refreshDropdown()
+            else
+                notify("Config", "Delete failed.")
+            end
+        end,
+    })
+
+    task.delay(2, refreshDropdown)
 end
 
 do
