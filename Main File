@@ -821,6 +821,8 @@ local window = Rayfield:CreateWindow({
     name = "RuinWare Client",
     configuration = {
         Enabled = true,
+        autoSave = false,
+        autoLoad = false,
         fileName = "Config",
         customFolder = "RuinWare",
     },
