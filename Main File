@@ -1886,8 +1886,8 @@ local function isTouchingWall(char, root)
     rayParams.FilterDescendantsInstances = {char}
     local origin = root.Position
     -- Cast from 3 heights (lower, center, upper) so small alignment errors don't matter
-    local heightOffsets = { -1.5, 0, 1.5 }
-    local rayLength = 3.5 -- was 1.5, now detects walls from ~2x farther away
+    local heightOffsets = { -1.2, 0, 1.2 }
+    local rayLength = 3.1 -- was 1.5, now detects walls from ~2x farther away
     for _, yOff in ipairs(heightOffsets) do
         local castOrigin = origin + Vector3.new(0, yOff, 0)
         for i = 0, 15 do -- 16 directions instead of 8
