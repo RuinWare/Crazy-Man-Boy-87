@@ -5356,6 +5356,7 @@ do
 
     ScriptTab:CreateButton({
         name = "Delete",
+        description = "If you want a list or proper Configuration Settings, click on the gear icon in the top right and scroll down.",
         callback = function()
             if selectedName == "" then
                 notify("Config", "Select a config to delete.")
@@ -5374,15 +5375,6 @@ do
             else
                 notify("Config Delete Error", tostring(err))
             end
-        end,
-    })
-
-    ScriptTab:CreateButton({
-        name = "Refresh List",
-        description = "If you want a list or proper Configuration Settings, click on the gear icon in the top right and scroll down."
-        callback = function()
-            local count = refreshDropdown()
-            notify("Config", "Found " .. tostring(count) .. " config(s).")
         end,
     })
 end
