@@ -1,1 +1,18 @@
-
+VisTab:CreateToggle({
+    name = "Fix 90+ FOV bug",
+    flag = "F9FOVB",
+    CurrentValue = false,
+    callback = function(v)
+        local RunService = game:GetService("RunService")
+        if v then
+            RunService:BindToRenderStep("ForceFOV", Enum.RenderPriority.Camera.Value - 1, function()
+                local cam = workspace.CurrentCamera
+                if cam then
+                    cam.FieldOfView = 90
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("ForceFOV")
+        end
+    end,
+})
