@@ -5231,85 +5231,10 @@ end
 do
     ScriptTab:CreateDivider({ text = "Configuration Saving" })
 
-    local selectedName = ""
-    local trackedNames = {} -- session-local fallback
-
     local function notify(title, content)
         pcall(function()
             window:Notify({ title = title, content = content, duration = 3 })
         end)
-    end
-
-    local function addUnique(list, name)
-        if type(name) ~= "string" or name == "" then return end
-        for _, existing in ipairs(list) do
-            if existing == name then return end
-        end
-        table.insert(list, name)
-    end
-
-    local function getConfigList()
-        local list = {}
-
-        -- Try window API
-        local apiMethods = { "ListConfigs", "GetConfigs", "ListConfigurations", "GetConfigurationList" }
-        for _, methodName in ipairs(apiMethods) do
-            if type(window[methodName]) == "function" then
-                local ok, result = pcall(function() return window[methodName](window) end)
-                if ok and type(result) == "table" then
-                    for _, entry in ipairs(result) do
-                        if type(entry) == "string" then
-                            addUnique(list, entry)
-                        elseif type(entry) == "table" and entry.Name then
-                            addUnique(list, entry.Name)
-                        elseif type(entry) == "table" and entry.name then
-                            addUnique(list, entry.name)
-                        end
-                    end
-                    if #list > 0 then return list end
-                end
-            end
-        end
-
-        -- Try direct file listing
-        if type(listfiles) == "function" then
-            local folderCandidates = {
-                "RuinWare",
-                "RuinWare/Configs",
-                "RuinWare/Config",
-                "RuinWare/Configs/Config",
-            }
-            for _, folder in ipairs(folderCandidates) do
-                local exists = false
-                if type(isfolder) == "function" then
-                    local ok, res = pcall(isfolder, folder)
-                    exists = ok and res
-                else
-                    local ok = pcall(listfiles, folder)
-                    exists = ok
-                end
-                if exists then
-                    local ok, files = pcall(listfiles, folder)
-                    if ok and type(files) == "table" then
-                        for _, filePath in ipairs(files) do
-                            if type(filePath) == "string" then
-                                local name = filePath:match("([^/\\]+)%.json$")
-                                if name then
-                                    addUnique(list, name)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        -- Session-local tracking (adds anything we saved this session)
-        for _, name in ipairs(trackedNames) do
-            addUnique(list, name)
-        end
-
-        return list
     end
 
     ScriptTab:CreateInput({
