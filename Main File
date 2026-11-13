@@ -1779,6 +1779,123 @@ tab:CreateSlider({
 })
 
 --[[
+===========================
+Crouch spam
+===========================
+]]--
+
+do
+	local crouchSpamEnabled = false
+	local spamSpeed = 0.1
+	local targetState = false
+	local originalState = nil
+	local crouchTable = nil
+	local crouchKey = nil
+	
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local RunService = game:GetService("RunService")
+
+	-- Helper to safely locate the CharacterService module
+	local function getCharacterService()
+		local services = ReplicatedStorage:FindFirstChild("Services")
+		if not services then return nil end
+		
+		local asset = services:FindFirstChild("Asset")
+		if not asset then return nil end
+		
+		local charService = asset:FindFirstChild("CharacterService")
+		if not charService then return nil end
+		
+		if charService:IsA("ModuleScript") then
+			return charService
+		else
+			return charService:FindFirstChildWhichIsA("ModuleScript")
+		end
+	end
+
+	-- Recursive finder that stops after 35 keys (to simulate "first 35 lines")
+	local function findCrouching(tbl, counter)
+		counter = counter or {count = 0}
+		if type(tbl) ~= "table" then return nil end
+		
+		for k, v in pairs(tbl) do
+			counter.count = counter.count + 1
+			if counter.count > 35 then return nil end -- Stop searching after 35 items
+			
+			if k == "Crouching" and type(v) == "boolean" then
+				return tbl, k
+			elseif type(v) == "table" then
+				local foundTbl, foundKey = findCrouching(v, counter)
+				if foundTbl then return foundTbl, foundKey end
+			end
+		end
+		return nil
+	end
+
+	tab:CreateDivider()
+
+	tab:CreateToggle({
+		name = "Crouch Spam",
+		value = false,
+		callback = function(v)
+			crouchSpamEnabled = v
+			if v then
+				local cs = getCharacterService()
+				if cs then
+					local ok, data = pcall(require, cs)
+					if ok and type(data) == "table" then
+						crouchTable, crouchKey = findCrouching(data)
+						
+						if crouchTable then
+							originalState = crouchTable[crouchKey]
+							targetState = true
+							
+							-- Start the rapid toggle loop
+							task.spawn(function()
+								while crouchSpamEnabled do
+									if crouchTable and crouchKey then
+										crouchTable[crouchKey] = targetState
+									end
+									task.wait(spamSpeed)
+									targetState = not targetState
+								end
+							end)
+						else
+							window:Notify({ title = "Crouch Spam", content = "Could not find Crouching in first 35 lines.", duration = 5 })
+							crouchSpamEnabled = false
+						end
+					end
+				end
+			else
+				-- Restore original state when turned off
+				if crouchTable and crouchKey and originalState ~= nil then
+					crouchTable[crouchKey] = originalState
+				end
+			end
+		end,
+	})
+
+	tab:CreateSlider({
+		name = "Speed:",
+		range = {0.02, 5.00},
+		increment = 0.01,
+		suffix = "ms",
+		currentValue = 0.1,
+		callback = function(v)
+			spamSpeed = v
+		end,
+	})
+
+	-- RunService.Heartbeat enforces the current state every single frame
+	-- so the game physically cannot override it mid-spam.
+	RunService.Heartbeat:Connect(function()
+		if crouchSpamEnabled and crouchTable and crouchKey then
+			crouchTable[crouchKey] = targetState
+		end
+	end)
+end
+
+--[[
 ============================================================================
 Y LOCK
 ============================================================================
