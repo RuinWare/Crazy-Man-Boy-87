@@ -4085,7 +4085,7 @@ QES
 
 do
 	local quickEmoteEnabled = false
-	local currentKey = Enum.KeyCode.Q
+	local currentKey = "Q"
 	local selectedSlotStr = "1"
 	local slotToEmoteMap = {}
 	local lastPress = 0
@@ -4119,16 +4119,28 @@ do
 		end
 	end
 
+	-- UPGRADED FINDER: Ignores empty template tables and looks for the real data
 	local function findEmotesTable(tbl, visited)
 		visited = visited or {}
 		if type(tbl) ~= "table" or visited[tbl] then return nil end
 		visited[tbl] = true
 		
+		-- Check current level
 		for k, v in pairs(tbl) do
-			if k == "Emotes" and type(v) == "table" then
-				return v
+			if k == "Emotes" and type(v) == "table" and #v > 0 then
+				-- Verify it actually has emote data, not just empty brackets
+				local hasValidData = false
+				for _, entry in pairs(v) do
+					if type(entry) == "table" and #entry >= 2 then
+						hasValidData = true
+						break
+					end
+				end
+				if hasValidData then return v end
 			end
 		end
+		
+		-- Go deeper
 		for k, v in pairs(tbl) do
 			if type(v) == "table" then
 				local found = findEmotesTable(v, visited)
@@ -4160,18 +4172,20 @@ do
 			end
 		end
 		
-		-- Swap the map safely so it's never empty mid-update
-		slotToEmoteMap = newMap
+		-- Swap safely
+		if next(newMap) then
+			slotToEmoteMap = newMap
+		end
 	end
 
 	local function triggerEmote()
 		if not quickEmoteEnabled then return end
 		
-		-- Anti-spam cooldown
 		if tick() - lastPress < 0.1 then return end
 		lastPress = tick()
 		
-		local cleanSlot = tostring(selectedSlotStr)
+		-- Clean the input string (removes weird spaces or characters)
+		local cleanSlot = tostring(selectedSlotStr):gsub("%s+", "")
 		local emoteId = slotToEmoteMap[cleanSlot]
 		
 		if emoteId then
@@ -4181,17 +4195,17 @@ do
 					Event:FireServer("Emote", emoteId)
 				end)
 				if success then
-					print("[QuickEmote] Fired emote ID", emoteId, "for slot", cleanSlot)
+					print("[QuickEmote] SUCCESS: Fired Emote ID", emoteId, "for Slot", cleanSlot)
 				else
-					warn("[QuickEmote] Error firing remote:", err)
+					warn("[QuickEmote] FAILED to fire remote:", err)
 				end
 			end
 		else
-			-- PRINT OUT EXACTLY WHICH SLOTS ARE AVAILABLE
-			local validSlots = {}
-			for k in pairs(slotToEmoteMap) do table.insert(validSlots, k) end
-			table.sort(validSlots)
-			warn("[QuickEmote] Slot", cleanSlot, "not found! Available slots are:", table.concat(validSlots, ", "))
+			-- PRINT EXACTLY WHAT IS IN THE MAP
+			local validKeys = {}
+			for k in pairs(slotToEmoteMap) do table.insert(validKeys, k) end
+			table.sort(validKeys)
+			warn("[QuickEmote] Slot '" .. cleanSlot .. "' not found! Loaded slots are: " .. table.concat(validKeys, ", "))
 		end
 	end
 
@@ -4224,14 +4238,15 @@ do
 		placeholder = "Type 1 - 12",
 		removeTextAfterFocusLost = false,
 		callback = function(text)
-			-- Failsafe parsing: Only accept valid numbers 1-12, otherwise default to "1"
-			local num = tonumber(text)
-			if num and num >= 1 and num <= 12 then
-				selectedSlotStr = tostring(math.floor(num))
-			else
+			-- If the text is empty, default to 1
+			if text == nil or text == "" then
 				selectedSlotStr = "1"
+			else
+				selectedSlotStr = tostring(text)
 			end
-			print("[QuickEmote] Slot selected:", selectedSlotStr)
+			-- Force the map to update the moment you type
+			updateEmoteMap()
+			print("[QuickEmote] Input set to:", selectedSlotStr)
 		end,
 	})
 
@@ -4251,8 +4266,7 @@ do
 		if gameProcessed then return end
 		if not quickEmoteEnabled then return end
 		
-		local pressedKey = input.KeyCode.Name
-		if pressedKey:lower() == tostring(currentKey):lower() then
+		if input.KeyCode.Name:lower() == tostring(currentKey):lower() then
 			pcall(triggerEmote)
 		end
 	end)
