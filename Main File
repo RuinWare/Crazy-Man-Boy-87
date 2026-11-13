@@ -5503,15 +5503,17 @@ do
     local fpsUnlockerEnabled = false
     local maxFPS = 240
 
-    local function applyFPS(value)
+    local function applyFPS()
         if not setfpscap then return end
-        local cap = tonumber(value) or 60
-        if cap > 999 then
-            pcall(setfpscap, 0)
-        else
-            pcall(setfpscap, cap)
-        end
+        local cap = tonumber(maxFPS) or 60
+        local target = cap > 999 and 0 or cap
+        pcall(setfpscap, target)
     end
+
+    RunService.Heartbeat:Connect(function()
+        if not fpsUnlockerEnabled then return end
+        applyFPS()
+    end)
 
     tab:CreateDivider()
 
@@ -5522,7 +5524,7 @@ do
         callback = function(v)
             fpsUnlockerEnabled = v
             if v then
-                applyFPS(maxFPS)
+                applyFPS()
             else
                 if setfpscap then pcall(setfpscap, 60) end
             end
@@ -5536,9 +5538,7 @@ do
             local n = tonumber(text)
             if n then
                 maxFPS = n
-                if fpsUnlockerEnabled then
-                    applyFPS(maxFPS)
-                end
+                if fpsUnlockerEnabled then applyFPS() end
             end
         end,
     })
@@ -5547,7 +5547,7 @@ do
     _G.RWCallbacks["FPSUnlocker"] = function(v)
         fpsUnlockerEnabled = v
         if v then
-            applyFPS(maxFPS)
+            applyFPS()
         else
             if setfpscap then pcall(setfpscap, 60) end
         end
