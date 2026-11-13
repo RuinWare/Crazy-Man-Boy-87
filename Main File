@@ -4085,15 +4085,14 @@ QES
 
 do
 	local quickEmoteEnabled = false
-	local currentKey = "Q" -- Default keybind
-	local selectedSlotStr = "1" -- Default input
+	local currentKey = "Q"
+	local selectedSlotStr = "1"
 	local slotToEmoteMap = {}
 	local lastPress = 0
 	
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local UserInputService = game:GetService("UserInputService")
 	
-	-- PLACEHOLDER LOADSTRINGS (Replace the text inside the quotes)
 	local LOADSTRING_ON = "-- put your ON loadstring here"
 	local LOADSTRING_OFF = "-- put your OFF loadstring here"
 
@@ -4110,10 +4109,8 @@ do
 	local function getCharacterService()
 		local services = ReplicatedStorage:FindFirstChild("Services")
 		if not services then return nil end
-		
 		local asset = services:FindFirstChild("Asset")
 		if not asset then return nil end
-		
 		local charService = asset:FindFirstChild("CharacterService")
 		if not charService then return nil end
 		
@@ -4124,16 +4121,21 @@ do
 		end
 	end
 
-	-- Recursive finder for the "Emotes" table
+	-- Aggressive finder for the "Emotes" table
 	local function findEmotesTable(tbl, visited)
 		visited = visited or {}
 		if type(tbl) ~= "table" or visited[tbl] then return nil end
 		visited[tbl] = true
 		
+		-- Check current level first
 		for k, v in pairs(tbl) do
 			if k == "Emotes" and type(v) == "table" then
 				return v
-			elseif type(v) == "table" then
+			end
+		end
+		-- Go deeper if not found
+		for k, v in pairs(tbl) do
+			if type(v) == "table" then
 				local found = findEmotesTable(v, visited)
 				if found then return found end
 			end
@@ -4141,7 +4143,7 @@ do
 		return nil
 	end
 
-	-- Function to rebuild the slot map from scratch (prevents stale data)
+	-- Function to rebuild the slot map
 	local function updateEmoteMap()
 		slotToEmoteMap = {} -- Wipe old data
 		
@@ -4154,7 +4156,7 @@ do
 		local emotesTable = findEmotesTable(data)
 		if not emotesTable then return end
 		
-		for _, entry in ipairs(emotesTable) do
+		for _, entry in pairs(emotesTable) do
 			if type(entry) == "table" and #entry >= 2 then
 				local slot = tonumber(entry[1])
 				local emoteId = entry[2]
@@ -4181,36 +4183,40 @@ do
 			local Event = getEvent()
 			if Event then
 				Event:FireServer("Emote", emoteId)
-				print("[QuickEmote] Fired emote ID:", emoteId, "for slot:", cleanSlot)
+				print("[QuickEmote] SUCCESS: Fired emote ID", emoteId, "for slot", cleanSlot)
+			else
+				warn("[QuickEmote] FAILED: Could not find CharacterTask remote!")
 			end
 		else
-			print("[QuickEmote] Failed: Slot", cleanSlot, "not found in map.")
+			warn("[QuickEmote] FAILED: Slot", cleanSlot, "not found in map. Map has", #slotToEmoteMap, "slots loaded.")
 		end
 	end
 
 	tab:CreateDivider()
 
-	-- Main Toggle
 	tab:CreateToggle({
 		name = "Quick Emote Selection",
 		value = false,
 		callback = function(v)
 			quickEmoteEnabled = v
-			if v then updateEmoteMap() end -- Force update immediately on toggle
+			if v then updateEmoteMap() end -- Force update immediately
 		end,
 	})
 
-	-- Keybind Setup
 	tab:CreateKeybind({
 		name = "Emote Keybind",
 		currentKeybind = currentKey,
 		holdToInteract = false,
 		callback = function(key)
-			currentKey = key
+			-- Handle both string and Enum types from Rayfield
+			if type(key) == "EnumItem" then
+				currentKey = key.Name
+			else
+				currentKey = tostring(key)
+			end
 		end,
 	})
 
-	-- Input Setup
 	tab:CreateInput({
 		name = "Emote Slot (1-12)",
 		placeholder = "Type 1 - 12",
@@ -4220,7 +4226,6 @@ do
 		end,
 	})
 
-	-- Loadstring Toggle
 	tab:CreateToggle({
 		name = "Run Custom Loadstrings",
 		value = false,
@@ -4233,22 +4238,22 @@ do
 		end,
 	})
 
-	-- Input Listener for Keybind
+	-- Input Listener with pcall so it never breaks
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
 		if not quickEmoteEnabled then return end
 		
-		-- Case-insensitive key check
-		if input.KeyCode.Name:lower() == tostring(currentKey):lower() then
-			triggerEmote()
+		local pressedKey = input.KeyCode.Name
+		if pressedKey:lower() == tostring(currentKey):lower() then
+			pcall(triggerEmote)
 		end
 	end)
 	
-	-- Background Map Updater (Rebuilds map every 2 seconds silently)
+	-- Unbreakable Background Loop
 	task.spawn(function()
 		while true do
-			updateEmoteMap()
-			task.wait(2)
+			pcall(updateEmoteMap)
+			task.wait(1) -- Refreshes every second
 		end
 	end)
 end
