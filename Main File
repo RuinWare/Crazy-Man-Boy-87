@@ -4090,7 +4090,6 @@ do
 	
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local UserInputService = game:GetService("UserInputService")
-	local ContextActionService = game:GetService("ContextActionService")
 	
 	local LOADSTRING_ON = "-- put your ON loadstring here"
 	local LOADSTRING_OFF = "-- put your OFF loadstring here"
@@ -4121,14 +4120,16 @@ do
 	local function triggerEmote()
 		if not quickEmoteEnabled then return end
 		
-		local cleanSlot = tostring(selectedSlotStr):match("%d+") or "1"
-		local currentMap = {}
+		local cleanSlot = tostring(selectedSlotStr)
+		print("[QuickEmote] You pressed the keybind! Looking for Slot:", cleanSlot)
 		
+		local currentMap = {}
 		local cs = getCharacterService()
+		
 		if cs then
 			local ok, data = pcall(require, cs)
 			if ok and type(data) == "table" then
-				-- MERGE ALL EMOTES TABLES SO WE NEVER MISS A SLOT
+				-- Scan EVERY table recursively to find all Emotes
 				local function scanAllEmotes(tbl, visited)
 					visited = visited or {}
 					if type(tbl) ~= "table" or visited[tbl] then return end
@@ -4140,7 +4141,7 @@ do
 								if type(entry) == "table" and #entry >= 2 then
 									local slot = tonumber(entry[1])
 									local emoteId = entry[2]
-									if slot and slot >= 1 and slot <= 12 and emoteId then
+									if slot and emoteId then
 										currentMap[tostring(slot)] = emoteId
 									end
 								end
@@ -4151,43 +4152,30 @@ do
 					end
 				end
 				scanAllEmotes(data)
+			else
+				warn("[QuickEmote] Failed to require CharacterService")
 			end
+		else
+			warn("[QuickEmote] Could not find CharacterService module")
 		end
 		
 		local emoteId = currentMap[cleanSlot]
 		
 		if emoteId then
+			print("[QuickEmote] Found Emote ID:", emoteId, "for slot:", cleanSlot)
 			local Event = getEvent()
 			if Event then
 				Event:FireServer("Emote", emoteId)
-				print("[QuickEmote] SUCCESS: Fired Emote ID", emoteId, "for Slot", cleanSlot)
+				print("[QuickEmote] SUCCESS: Fired Server Event!")
+			else
+				warn("[QuickEmote] FAILED: Could not find CharacterTask remote!")
 			end
 		else
 			local keys = {}
 			for k in pairs(currentMap) do table.insert(keys, k) end
 			table.sort(keys)
-			warn("[QuickEmote] FAILED! You typed Slot '" .. cleanSlot .. "', but the script only sees these equipped slots: " .. table.concat(keys, ", "))
+			warn("[QuickEmote] FAILED! Slot '" .. cleanSlot .. "' not found. The script sees these slots: " .. table.concat(keys, ", "))
 		end
-	end
-
-	-- BINDS THE KEY SO IT WORKS EVEN IF THE TEXT BOX IS FOCUSED
-	local function handleKeybind(actionName, inputState, inputObject)
-		if inputState ~= Enum.UserInputState.Begin then return end
-		if not quickEmoteEnabled then return end
-		
-		-- Only fire if they press their selected key
-		if inputObject.KeyCode.Name:lower() == tostring(currentKey):lower() then
-			pcall(triggerEmote)
-			-- Return Sink so it doesn't type into the Rayfield text box
-			return Enum.ContextActionResult.Sink 
-		end
-		return Enum.ContextActionResult.Pass
-	end
-
-	-- Function to update the keybind
-	local function updateKeybind()
-		ContextActionService:UnbindAction("QuickEmoteBind")
-		ContextActionService:BindAction("QuickEmoteBind", handleKeybind, false)
 	end
 
 	tab:CreateDivider()
@@ -4197,11 +4185,6 @@ do
 		value = false,
 		callback = function(v)
 			quickEmoteEnabled = v
-			if v then
-				updateKeybind()
-			else
-				ContextActionService:UnbindAction("QuickEmoteBind")
-			end
 		end,
 	})
 
@@ -4215,7 +4198,6 @@ do
 			else
 				currentKey = tostring(key)
 			end
-			updateKeybind()
 		end,
 	})
 
@@ -4226,7 +4208,7 @@ do
 		callback = function(text)
 			local num = tostring(text or "1"):match("%d+")
 			selectedSlotStr = num or "1"
-			print("[QuickEmote] Input Slot set to:", selectedSlotStr)
+			print("[QuickEmote] Input Box updated. New Slot:", selectedSlotStr)
 		end,
 	})
 
@@ -4242,13 +4224,12 @@ do
 		end,
 	})
 
-	-- Keep the keybind active
-	task.spawn(function()
-		while true do
-			if quickEmoteEnabled then
-				updateKeybind()
-			end
-			task.wait(1)
+	-- REMOVED the gameProcessed check. It will ALWAYS fire when you press Q.
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if not quickEmoteEnabled then return end
+		
+		if input.KeyCode.Name:lower() == tostring(currentKey):lower() then
+			pcall(triggerEmote)
 		end
 	end)
 end
