@@ -4144,14 +4144,13 @@ do
 		return nil
 	end
 
-	-- NO CACHING. We build the map right when you press the key.
 	local function triggerEmote()
 		if not quickEmoteEnabled then return end
 		
-		local cleanSlot = tostring(selectedSlotStr):gsub("%s+", "")
+		-- Read the slot directly from the input variable
+		local cleanSlot = tostring(selectedSlotStr)
 		local currentMap = {}
 		
-		-- Read the game's module directly
 		local cs = getCharacterService()
 		if cs then
 			local ok, data = pcall(require, cs)
@@ -4176,23 +4175,14 @@ do
 		if emoteId then
 			local Event = getEvent()
 			if Event then
-				-- Fire it
 				Event:FireServer("Emote", emoteId)
 				print("[QuickEmote] SUCCESS: Fired Emote ID", emoteId, "for Slot", cleanSlot)
-			else
-				warn("[QuickEmote] FAILED: Could not find CharacterTask remote!")
 			end
 		else
-			-- PRINT EXACTLY WHAT IT SEES
-			local validKeys = {}
-			for k in pairs(currentMap) do table.insert(validKeys, k) end
-			table.sort(validKeys)
-			
-			if #validKeys > 0 then
-				warn("[QuickEmote] FAILED! Slot '" .. cleanSlot .. "' is NOT in the table. The game only has slots: " .. table.concat(validKeys, ", "))
-			else
-				warn("[QuickEmote] FAILED! The Emotes table is completely EMPTY. Are you dead or in a state where you can't emote?")
-			end
+			-- Print out exactly what is inside the map if it fails
+			local keys = {}
+			for k in pairs(currentMap) do table.insert(keys, k) end
+			warn("[QuickEmote] FAILED: Slot '" .. cleanSlot .. "' is not in the map. Current map has: " .. table.concat(keys, ", "))
 		end
 	end
 
@@ -4224,12 +4214,9 @@ do
 		placeholder = "1",
 		removeTextAfterFocusLost = false,
 		callback = function(text)
-			if text == nil or text == "" then
-				selectedSlotStr = "1"
-			else
-				selectedSlotStr = tostring(text):gsub("%s+", "")
-			end
-			print("[QuickEmote] Input Slot set to:", selectedSlotStr)
+			-- Save exactly what is typed
+			selectedSlotStr = tostring(text)
+			print("[QuickEmote] Input changed to:", selectedSlotStr)
 		end,
 	})
 
@@ -4245,8 +4232,8 @@ do
 		end,
 	})
 
+	-- THE FIX: Removed the "if gameProcessed then return end" line
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
 		if not quickEmoteEnabled then return end
 		
 		if input.KeyCode.Name:lower() == tostring(currentKey):lower() then
