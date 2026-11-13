@@ -4085,7 +4085,7 @@ QES
 
 do
 	local quickEmoteEnabled = false
-	local currentKey = "Q"
+	local currentKey = Enum.KeyCode.Q
 	local selectedSlotStr = "1"
 	local slotToEmoteMap = {}
 	local lastPress = 0
@@ -4096,7 +4096,6 @@ do
 	local LOADSTRING_ON = "-- put your ON loadstring here"
 	local LOADSTRING_OFF = "-- put your OFF loadstring here"
 
-	-- Helper to safely get the event dynamically
 	local function getEvent()
 		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 		if not remotes then return nil end
@@ -4105,7 +4104,6 @@ do
 		return char:FindFirstChild("CharacterTask")
 	end
 
-	-- Helper to safely locate the CharacterService module
 	local function getCharacterService()
 		local services = ReplicatedStorage:FindFirstChild("Services")
 		if not services then return nil end
@@ -4121,19 +4119,16 @@ do
 		end
 	end
 
-	-- Aggressive finder for the "Emotes" table
 	local function findEmotesTable(tbl, visited)
 		visited = visited or {}
 		if type(tbl) ~= "table" or visited[tbl] then return nil end
 		visited[tbl] = true
 		
-		-- Check current level first
 		for k, v in pairs(tbl) do
 			if k == "Emotes" and type(v) == "table" then
 				return v
 			end
 		end
-		-- Go deeper if not found
 		for k, v in pairs(tbl) do
 			if type(v) == "table" then
 				local found = findEmotesTable(v, visited)
@@ -4143,10 +4138,8 @@ do
 		return nil
 	end
 
-	-- Function to rebuild the slot map
 	local function updateEmoteMap()
-		slotToEmoteMap = {} -- Wipe old data
-		
+		local newMap = {}
 		local cs = getCharacterService()
 		if not cs then return end
 		
@@ -4162,33 +4155,43 @@ do
 				local emoteId = entry[2]
 				
 				if slot and slot >= 1 and slot <= 12 then
-					slotToEmoteMap[tostring(slot)] = emoteId
+					newMap[tostring(slot)] = emoteId
 				end
 			end
 		end
+		
+		-- Swap the map safely so it's never empty mid-update
+		slotToEmoteMap = newMap
 	end
 
-	-- Fire the selected emote
 	local function triggerEmote()
 		if not quickEmoteEnabled then return end
 		
-		-- Anti-spam cooldown (0.5 seconds)
-		if tick() - lastPress < 0.5 then return end
+		-- Anti-spam cooldown
+		if tick() - lastPress < 0.1 then return end
 		lastPress = tick()
 		
-		local cleanSlot = tostring(selectedSlotStr):match("^%s*(.-)%s*$")
+		local cleanSlot = tostring(selectedSlotStr)
 		local emoteId = slotToEmoteMap[cleanSlot]
 		
 		if emoteId then
 			local Event = getEvent()
 			if Event then
-				Event:FireServer("Emote", emoteId)
-				print("[QuickEmote] SUCCESS: Fired emote ID", emoteId, "for slot", cleanSlot)
-			else
-				warn("[QuickEmote] FAILED: Could not find CharacterTask remote!")
+				local success, err = pcall(function()
+					Event:FireServer("Emote", emoteId)
+				end)
+				if success then
+					print("[QuickEmote] Fired emote ID", emoteId, "for slot", cleanSlot)
+				else
+					warn("[QuickEmote] Error firing remote:", err)
+				end
 			end
 		else
-			warn("[QuickEmote] FAILED: Slot", cleanSlot, "not found in map. Map has", #slotToEmoteMap, "slots loaded.")
+			-- PRINT OUT EXACTLY WHICH SLOTS ARE AVAILABLE
+			local validSlots = {}
+			for k in pairs(slotToEmoteMap) do table.insert(validSlots, k) end
+			table.sort(validSlots)
+			warn("[QuickEmote] Slot", cleanSlot, "not found! Available slots are:", table.concat(validSlots, ", "))
 		end
 	end
 
@@ -4199,7 +4202,7 @@ do
 		value = false,
 		callback = function(v)
 			quickEmoteEnabled = v
-			if v then updateEmoteMap() end -- Force update immediately
+			if v then updateEmoteMap() end
 		end,
 	})
 
@@ -4208,7 +4211,6 @@ do
 		currentKeybind = currentKey,
 		holdToInteract = false,
 		callback = function(key)
-			-- Handle both string and Enum types from Rayfield
 			if type(key) == "EnumItem" then
 				currentKey = key.Name
 			else
@@ -4222,7 +4224,14 @@ do
 		placeholder = "Type 1 - 12",
 		removeTextAfterFocusLost = false,
 		callback = function(text)
-			selectedSlotStr = text
+			-- Failsafe parsing: Only accept valid numbers 1-12, otherwise default to "1"
+			local num = tonumber(text)
+			if num and num >= 1 and num <= 12 then
+				selectedSlotStr = tostring(math.floor(num))
+			else
+				selectedSlotStr = "1"
+			end
+			print("[QuickEmote] Slot selected:", selectedSlotStr)
 		end,
 	})
 
@@ -4238,7 +4247,6 @@ do
 		end,
 	})
 
-	-- Input Listener with pcall so it never breaks
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
 		if not quickEmoteEnabled then return end
@@ -4249,11 +4257,10 @@ do
 		end
 	end)
 	
-	-- Unbreakable Background Loop
 	task.spawn(function()
 		while true do
 			pcall(updateEmoteMap)
-			task.wait(1) -- Refreshes every second
+			task.wait(1)
 		end
 	end)
 end
