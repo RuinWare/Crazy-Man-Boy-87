@@ -4138,13 +4138,13 @@ do
 		local options = {}
 		
 		local cs = getCharacterService()
-		if not cs then return { "None" } end
+		if not cs then return { "Loading..." } end
 		
 		local ok, data = pcall(require, cs)
-		if not ok or type(data) ~= "table" then return { "None" } end
+		if not ok or type(data) ~= "table" then return { "Loading..." } end
 		
 		local emotesTable = findEmotesTable(data)
-		if not emotesTable then return { "None" } end
+		if not emotesTable then return { "Loading..." } end
 		
 		for _, entry in ipairs(emotesTable) do
 			-- Ensure the entry is a table with at least a slot and emote ID
@@ -4207,15 +4207,11 @@ do
 		end,
 	})
 
-	-- Dropdown Setup
-	local emoteDropdownOptions = parseEmotes()
-	local initialSlot = emoteDropdownOptions[1] ~= "None" and emoteDropdownOptions[1] or nil
-	selectedSlot = initialSlot
-
-	tab:CreateDropdown({
+	-- Dropdown Setup (Stored in variable so we can update it later)
+	local EmoteDropdown = tab:CreateDropdown({
 		name = "Emote Slot",
-		options = emoteDropdownOptions,
-		default = { initialSlot or "None" },
+		options = { "Loading..." },
+		default = { "Loading..." },
 		multiSelect = false,
 		callback = function(selected)
 			local picked = type(selected) == "table" and selected[1] or selected
@@ -4241,20 +4237,31 @@ do
 		if gameProcessed then return end
 		if not quickEmoteEnabled then return end
 		
-		-- Compare the pressed key to the saved currentKey string
 		if input.KeyCode.Name == currentKey then
 			triggerEmote()
 		end
 	end)
 	
-	-- Auto-refresh the dropdown after 3 seconds in case the module streams in late
-	task.delay(3, function()
-		local newOptions = parseEmotes()
-		if #newOptions > 0 and newOptions[1] ~= "None" then
-			-- Update the map and set default if nothing is selected yet
-			if not selectedSlot or selectedSlot == "None" then
-				selectedSlot = newOptions[1]
+	-- Top-Level Auto-Refresh Loop
+	-- This runs right when the script loads and waits for the game data to appear
+	task.spawn(function()
+		local attempts = 0
+		while attempts < 120 do -- Wait up to 60 seconds
+			local options = parseEmotes()
+			if #options > 0 and options[1] ~= "Loading..." and options[1] ~= "None" then
+				-- Data has loaded! Update the dropdown live.
+				pcall(function()
+					EmoteDropdown:SetOptions(options)
+				end)
+				
+				-- Set the selected slot if it hasn't been set yet
+				if not selectedSlot or selectedSlot == "Loading..." or selectedSlot == "None" then
+					selectedSlot = options[1]
+				end
+				break
 			end
+			task.wait(0.5)
+			attempts = attempts + 1
 		end
 	end)
 end
