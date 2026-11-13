@@ -4088,14 +4088,23 @@ do
 	local currentKey = "Q" -- Default keybind
 	local selectedSlotStr = "1" -- Default input
 	local slotToEmoteMap = {}
+	local lastPress = 0
 	
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local UserInputService = game:GetService("UserInputService")
 	
 	-- PLACEHOLDER LOADSTRINGS (Replace the text inside the quotes)
 	local LOADSTRING_ON = "-- put your ON loadstring here"
 	local LOADSTRING_OFF = "-- put your OFF loadstring here"
 
-	local Event = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
+	-- Helper to safely get the event dynamically
+	local function getEvent()
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		if not remotes then return nil end
+		local char = remotes:FindFirstChild("Character")
+		if not char then return nil end
+		return char:FindFirstChild("CharacterTask")
+	end
 
 	-- Helper to safely locate the CharacterService module
 	local function getCharacterService()
@@ -4132,8 +4141,10 @@ do
 		return nil
 	end
 
-	-- Function to silently map the slots behind the scenes
+	-- Function to rebuild the slot map from scratch (prevents stale data)
 	local function updateEmoteMap()
+		slotToEmoteMap = {} -- Wipe old data
+		
 		local cs = getCharacterService()
 		if not cs then return end
 		
@@ -4145,10 +4156,10 @@ do
 		
 		for _, entry in ipairs(emotesTable) do
 			if type(entry) == "table" and #entry >= 2 then
-				local slot = entry[1]
+				local slot = tonumber(entry[1])
 				local emoteId = entry[2]
 				
-				if type(slot) == "number" and slot >= 1 and slot <= 12 then
+				if slot and slot >= 1 and slot <= 12 then
 					slotToEmoteMap[tostring(slot)] = emoteId
 				end
 			end
@@ -4159,12 +4170,21 @@ do
 	local function triggerEmote()
 		if not quickEmoteEnabled then return end
 		
-		-- Clean up the user input just in case they added spaces
-		local cleanSlot = tostring(selectedSlotStr):match("^%s*(.-)%s*$")
+		-- Anti-spam cooldown (0.5 seconds)
+		if tick() - lastPress < 0.5 then return end
+		lastPress = tick()
 		
+		local cleanSlot = tostring(selectedSlotStr):match("^%s*(.-)%s*$")
 		local emoteId = slotToEmoteMap[cleanSlot]
+		
 		if emoteId then
-			Event:FireServer("Emote", emoteId)
+			local Event = getEvent()
+			if Event then
+				Event:FireServer("Emote", emoteId)
+				print("[QuickEmote] Fired emote ID:", emoteId, "for slot:", cleanSlot)
+			end
+		else
+			print("[QuickEmote] Failed: Slot", cleanSlot, "not found in map.")
 		end
 	end
 
@@ -4176,6 +4196,7 @@ do
 		value = false,
 		callback = function(v)
 			quickEmoteEnabled = v
+			if v then updateEmoteMap() end -- Force update immediately on toggle
 		end,
 	})
 
@@ -4189,7 +4210,7 @@ do
 		end,
 	})
 
-	-- Input Setup (Replaced Dropdown)
+	-- Input Setup
 	tab:CreateInput({
 		name = "Emote Slot (1-12)",
 		placeholder = "Type 1 - 12",
@@ -4213,21 +4234,21 @@ do
 	})
 
 	-- Input Listener for Keybind
-	game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
 		if not quickEmoteEnabled then return end
 		
-		if input.KeyCode.Name == currentKey then
+		-- Case-insensitive key check
+		if input.KeyCode.Name:lower() == tostring(currentKey):lower() then
 			triggerEmote()
 		end
 	end)
 	
-	-- Background Map Updater
-	-- Runs silently so the slot mappings are always ready when you press the keybind
+	-- Background Map Updater (Rebuilds map every 2 seconds silently)
 	task.spawn(function()
 		while true do
 			updateEmoteMap()
-			task.wait(2) -- Updates every 2 seconds to keep it fresh
+			task.wait(2)
 		end
 	end)
 end
