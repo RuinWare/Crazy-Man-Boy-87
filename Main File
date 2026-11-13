@@ -5499,6 +5499,61 @@ do
     })
 end
 
+do
+    local fpsUnlockerEnabled = false
+    local maxFPS = 240
+
+    local function applyFPS(value)
+        if not setfpscap then return end
+        local cap = tonumber(value) or 60
+        if cap > 999 then
+            pcall(setfpscap, 0)
+        else
+            pcall(setfpscap, cap)
+        end
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "FPS Unlocker",
+        currentValue = false,
+        flag = "FPSUnlocker_Toggle",
+        callback = function(v)
+            fpsUnlockerEnabled = v
+            if v then
+                applyFPS(maxFPS)
+            else
+                if setfpscap then pcall(setfpscap, 60) end
+            end
+        end,
+    })
+
+    tab:CreateInput({
+        name = "Max FPS:",
+        placeholder = "e.g. 240",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                maxFPS = n
+                if fpsUnlockerEnabled then
+                    applyFPS(maxFPS)
+                end
+            end
+        end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["FPSUnlocker"] = function(v)
+        fpsUnlockerEnabled = v
+        if v then
+            applyFPS(maxFPS)
+        else
+            if setfpscap then pcall(setfpscap, 60) end
+        end
+    end
+end
+
 --[[
 ============================================================================
 
