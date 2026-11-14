@@ -124,7 +124,7 @@ do
     local tracerTransparency = 0
 
     local gui = Instance.new("ScreenGui")
-    gui.Name = "RW_ESP"
+    gui.Name = "Qa6-¡》♤-w¿L9-ZELA♧-aHTW8SBQ9SHWKSHEKWSYWMaSKWWMSMDGW8YDGD7¡¡"
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
