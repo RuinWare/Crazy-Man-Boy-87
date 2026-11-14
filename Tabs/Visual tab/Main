@@ -1,5 +1,3 @@
--- VisTab cmon raw url fuckin load
-
 do
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -175,13 +173,35 @@ do
         boxContainer.BackgroundTransparency = 1
         boxContainer.BorderSizePixel = 0
         boxContainer.Visible = false
+        boxContainer.ZIndex = 2
         boxContainer.Parent = gui
         data.boxContainer = boxContainer
 
+        -- Fill FIRST so it renders behind the outline (sides/corners have higher ZIndex)
+        local fillFrame = Instance.new("Frame")
+        fillFrame.BorderSizePixel = 0
+        fillFrame.BackgroundTransparency = 1
+        fillFrame.Size = UDim2.new(1, 0, 1, 0)
+        fillFrame.ZIndex = 1
+        fillFrame.Parent = boxContainer
+        data.fillFrame = fillFrame
+
+        local fillImage = Instance.new("ImageLabel")
+        fillImage.BorderSizePixel = 0
+        fillImage.BackgroundTransparency = 1
+        fillImage.ScaleType = Enum.ScaleType.Stretch
+        fillImage.ImageTransparency = 1
+        fillImage.Size = UDim2.new(1, 0, 1, 0)
+        fillImage.ZIndex = 1
+        fillImage.Parent = boxContainer
+        data.fillImage = fillImage
+
+        -- Outline (ZIndex 2, above fill)
         data.sides = {}
         for i = 1, 4 do
             local f = Instance.new("Frame")
             f.BorderSizePixel = 0
+            f.ZIndex = 2
             f.Parent = boxContainer
             data.sides[i] = f
         end
@@ -194,6 +214,7 @@ do
         for i = 1, 8 do
             local f = Instance.new("Frame")
             f.BorderSizePixel = 0
+            f.ZIndex = 2
             f.Parent = boxContainer
             data.corners[i] = f
         end
@@ -205,22 +226,6 @@ do
         data.corners[6].Position = UDim2.new(0, 0, 0.75, 0); data.corners[6].Size = UDim2.new(0, 2, 0.25, 0)
         data.corners[7].Position = UDim2.new(0.75, 0, 1, -2); data.corners[7].Size = UDim2.new(0.25, 0, 0, 2)
         data.corners[8].Position = UDim2.new(1, -2, 0.75, 0); data.corners[8].Size = UDim2.new(0, 2, 0.25, 0)
-
-        local fillFrame = Instance.new("Frame")
-        fillFrame.BorderSizePixel = 0
-        fillFrame.BackgroundTransparency = 1
-        fillFrame.Size = UDim2.new(1, 0, 1, 0)
-        fillFrame.Parent = boxContainer
-        data.fillFrame = fillFrame
-
-        local fillImage = Instance.new("ImageLabel")
-        fillImage.BorderSizePixel = 0
-        fillImage.BackgroundTransparency = 1
-        fillImage.ScaleType = Enum.ScaleType.Stretch
-        fillImage.ImageTransparency = 1
-        fillImage.Size = UDim2.new(1, 0, 1, 0)
-        fillImage.Parent = boxContainer
-        data.fillImage = fillImage
 
         local chamsBox = Instance.new("Frame")
         chamsBox.BorderSizePixel = 0
@@ -270,11 +275,11 @@ do
         data.anchor = nil
         data.topOffset = 0
         data.botOffset = 0
+        data.source = nil
+        data.hasJoints = false
         return data
     end
 
-    -- Collects rigs from workspace.Players first, then workspace.Rigs.
-    -- If a name appears in both, workspace.Players wins (Rigs version skipped).
     local function collectRigs()
         local result = {}
         local seen = {}
@@ -286,7 +291,7 @@ do
                 if (child:IsA("Model") or child:IsA("BasePart")) and not seen[child] then
                     seen[child] = true
                     nameInPlayers[child.Name] = true
-                    table.insert(result, child)
+                    table.insert(result, { rig = child, source = "players" })
                 end
             end
         end
@@ -297,7 +302,7 @@ do
                 if (child:IsA("Model") or child:IsA("BasePart")) and not seen[child] then
                     if not nameInPlayers[child.Name] then
                         seen[child] = true
-                        table.insert(result, child)
+                        table.insert(result, { rig = child, source = "rigs" })
                     end
                 end
             end
@@ -306,7 +311,36 @@ do
         return result
     end
 
-    local function computeBounds(rig, isPlayer)
+    local function rigHasJoints(rig)
+        if rig:FindFirstChildOfClass("Humanoid") then return true end
+        for _, d in ipairs(rig:GetDescendants()) do
+            if d:IsA("Motor6D") then return true end
+        end
+        return false
+    end
+
+    -- Model bounds helper (works for BasePart or Model)
+    local function modelBounds(target)
+        if target:IsA("BasePart") then
+            return target, target.Size.Y / 2, -target.Size.Y / 2
+        end
+        if target:IsA("Model") then
+            local anchor = target.PrimaryPart
+            if not anchor then
+                for _, d in ipairs(target:GetDescendants()) do
+                    if d:IsA("BasePart") then anchor = d break end
+                end
+            end
+            if not anchor then return nil end
+            local okBB, cf, sz = pcall(function() return target:GetBoundingBox() end)
+            if not okBB or not cf then return nil end
+            return anchor, (cf.Position.Y + sz.Y / 2) - anchor.Position.Y, (cf.Position.Y - sz.Y / 2) - anchor.Position.Y
+        end
+        return nil
+    end
+
+    -- Compute bounds depending on source/type
+    local function computeBounds(rig, isPlayer, source)
         if isPlayer then
             local hrp = rig:FindFirstChild("HumanoidRootPart")
             if not hrp then return nil end
@@ -315,24 +349,15 @@ do
             return hrp, (cf.Position.Y + sz.Y / 2) - hrp.Position.Y, (cf.Position.Y - sz.Y / 2) - hrp.Position.Y
         end
 
-        local hb = rig:FindFirstChild("Hitbox")
-        if not hb then return nil end
-        if hb:IsA("BasePart") then
-            return hb, hb.Size.Y / 2, -hb.Size.Y / 2
+        if source == "players" then
+            -- workspace.Players nextbots: use the model itself
+            return modelBounds(rig)
+        else
+            -- workspace.Rigs nextbots: use Hitbox child
+            local hb = rig:FindFirstChild("Hitbox")
+            if not hb then return nil end
+            return modelBounds(hb)
         end
-        if hb:IsA("Model") then
-            local anchor = hb.PrimaryPart
-            if not anchor then
-                for _, d in ipairs(hb:GetDescendants()) do
-                    if d:IsA("BasePart") then anchor = d break end
-                end
-            end
-            if not anchor then return nil end
-            local okBB, cf, sz = pcall(function() return hb:GetBoundingBox() end)
-            if not okBB or not cf then return nil end
-            return anchor, (cf.Position.Y + sz.Y / 2) - anchor.Position.Y, (cf.Position.Y - sz.Y / 2) - anchor.Position.Y
-        end
-        return nil
     end
 
     local function projectPoint(worldPos)
@@ -356,7 +381,10 @@ do
 
         local seen = {}
 
-        for _, rig in ipairs(collectRigs()) do
+        for _, entry in ipairs(collectRigs()) do
+            local rig = entry.rig
+            local source = entry.source
+
             if rig.Name == player.Name then continue end
 
             local isPlayer = playerNames[rig.Name] == true
@@ -372,13 +400,26 @@ do
             if isPlayer then
                 local hrp = rig:FindFirstChild("HumanoidRootPart")
                 if hrp then refPos = hrp.Position end
-            else
+            elseif source == "rigs" then
                 local hb = rig:FindFirstChild("Hitbox")
                 if hb and hb:IsA("BasePart") then refPos = hb.Position
                 elseif hb then
                     for _, d in ipairs(hb:GetDescendants()) do
                         if d:IsA("BasePart") then refPos = d.Position break end
                     end
+                end
+            else
+                -- Players folder nextbot: use model's own position
+                if rig:IsA("BasePart") then
+                    refPos = rig.Position
+                else
+                    local anchor = rig.PrimaryPart
+                    if not anchor then
+                        for _, d in ipairs(rig:GetDescendants()) do
+                            if d:IsA("BasePart") then anchor = d break end
+                        end
+                    end
+                    if anchor then refPos = anchor.Position end
                 end
             end
             if not refPos then continue end
@@ -395,12 +436,17 @@ do
             local data = rigData[rig]
             if not data then
                 data = buildRigElements()
+                data.source = source
+                data.hasJoints = rigHasJoints(rig)
                 rigData[rig] = data
-                data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer)
+                data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer, source)
             end
 
-            if not data.anchor or not data.anchor.Parent then
-                data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer)
+            -- If source changed (moved between folders) or anchor died, recompute
+            if data.source ~= source or not data.anchor or not data.anchor.Parent then
+                data.source = source
+                data.hasJoints = rigHasJoints(rig)
+                data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer, source)
             end
 
             if not data.anchor then
@@ -422,13 +468,14 @@ do
             local tDistColor = isPlayer and distanceColorPlayers or distanceColorNextbots
             local tTracerColor = isPlayer and tracerColorPlayers or tracerColorNextbots
 
+            local currentBoxWidth = 0
             if optBox and onScreen then
                 data.boxContainer.Visible = true
                 local boxHeight = math.abs(botScreen.Y - topScreen.Y)
-                local boxWidth = boxHeight * 0.55 * boxSize
-                local px = math.floor(topScreen.X - boxWidth / 2 + 0.5)
+                currentBoxWidth = boxHeight * 0.55 * boxSize
+                local px = math.floor(topScreen.X - currentBoxWidth / 2 + 0.5)
                 local py = math.floor(topScreen.Y + 0.5)
-                local pw = math.floor(boxWidth + 0.5)
+                local pw = math.floor(currentBoxWidth + 0.5)
                 local ph = math.floor(boxHeight + 0.5)
                 data.boxContainer.Position = UDim2.fromOffset(px, py)
                 data.boxContainer.Size = UDim2.fromOffset(pw, ph)
@@ -467,8 +514,10 @@ do
                 data.boxContainer.Visible = false
             end
 
+            -- CHAMS
             if optChams then
-                if isPlayer then
+                if data.hasJoints then
+                    -- Jointed rig (player or jointed nextbot) → Highlight on rig itself
                     if not data.highlight then
                         local h = Instance.new("Highlight")
                         h.FillColor = chamsColor
@@ -483,7 +532,8 @@ do
                     end
                     if data.chamsBox.Visible then data.chamsBox.Visible = false end
                 else
-                    local hb = rig:FindFirstChild("Hitbox")
+                    -- Non-jointed nextbot → Hitbox (if Rigs) or box chams (if Players)
+                    local hb = source == "rigs" and rig:FindFirstChild("Hitbox") or nil
                     if hb and (hb:IsA("BasePart") or hb:IsA("Model")) then
                         if not data.highlight then
                             local h = Instance.new("Highlight")
@@ -536,7 +586,8 @@ do
                 data.distLabel.TextColor3 = tDistColor
                 data.distLabel.TextTransparency = distanceTransparency
                 data.distLabel.TextStrokeTransparency = distanceTransparency
-                data.distLabel.Position = UDim2.fromOffset(math.floor(topScreen.X + 5 + 0.5), math.floor(topScreen.Y - 20 + 0.5))
+                -- Positioned clearly to the right of the name (name spans X-100 to X+100)
+                data.distLabel.Position = UDim2.fromOffset(math.floor(topScreen.X + 110 + 0.5), math.floor(topScreen.Y - 20 + 0.5))
                 data.distLabel.Size = UDim2.fromOffset(100, 16)
             elseif data.distLabel.Visible then
                 data.distLabel.Visible = false
