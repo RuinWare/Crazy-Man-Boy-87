@@ -6571,3 +6571,9 @@ do
     addTabNav(ScriptTab, "Map",            "Credits")
     addTabNav(CreTab,    "Script Settings", nil)
 end
+
+window:Notify({
+    title = "RuinWare",
+    content = "All tabs ready! If you dont get this message, The game may have updated meaning there might be a ban risk, use with caution",
+    duration = 16,
+})
