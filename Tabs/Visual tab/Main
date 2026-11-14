@@ -863,6 +863,69 @@ end
 
 --[[
 ===========================
+3RD PERSON
+===========================
+]]--
+
+do
+    local thirdPersonEnabled = false
+    local zoomDistance = 10
+    local bindName = "ThirdPersonZoom"
+    local bound = false
+
+    local function applyZoom()
+        if not thirdPersonEnabled then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+        -- Positive Z in camera-local space = backward = zoom out
+        cam.CFrame = cam.CFrame * CFrame.new(0, 0, zoomDistance)
+    end
+
+    local function start()
+        if bound then return end
+        bound = true
+        RunService:BindToRenderStep(bindName, Enum.RenderPriority.Camera.Value + 1, applyZoom)
+    end
+
+    local function stop()
+        if bound then
+            pcall(function() RunService:UnbindFromRenderStep(bindName) end)
+            bound = false
+        end
+        -- Game camera rebuilds CFrame next frame automatically, snaps back
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "3rd Person",
+        currentValue = false,
+        flag = "ThirdPerson_Toggle",
+        callback = function(v)
+            thirdPersonEnabled = v
+            if v then start() else stop() end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Zoom Distance",
+        range = {1, 50},
+        increment = 0.5,
+        suffix = "s",
+        currentValue = 10,
+        flag = "ThirdPerson_Distance",
+        callback = function(v) zoomDistance = v end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["ThirdPerson"] = function(v)
+        thirdPersonEnabled = v
+        if v then start() else stop() end
+    end
+end
+
+--[[
+===========================
 SPOOFING
 ===========================
 ]]--
