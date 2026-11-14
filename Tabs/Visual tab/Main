@@ -1668,7 +1668,7 @@ end
 
 --[[
 ===========================
-HIDE HUD
+HIDE HUD v2.0
 ===========================
 ]]--
 
@@ -1698,37 +1698,62 @@ do
 		end,
 	})
 
-	-- Enforce visibility every frame to prevent the game from overriding it
-	RunService.Heartbeat:Connect(function()
+	-- RenderStepped is perfect for UI because it runs right before the frame is drawn
+	RunService.RenderStepped:Connect(function()
 		local playerGui = LP:FindFirstChild("PlayerGui")
 		if not playerGui then return end
 
-		-- Locate the HUD
+		-- Safely find the Game UI
 		local gameGui = playerGui:FindFirstChild("Game")
 		local hud = gameGui and gameGui:FindFirstChild("HUD")
-		
-		-- Locate the Mobile Jump Button
+
+		-- Safely find the Touch UI
 		local touchGui = playerGui:FindFirstChild("TouchGui")
-		local touchFrame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
-		local jumpButton = touchFrame and touchFrame:FindFirstChild("JumpButton")
+		local jumpButton = nil
+		
+		if touchGui then
+			local frame = touchGui:FindFirstChild("TouchControlFrame")
+			if frame then
+				jumpButton = frame:FindFirstChild("JumpButton")
+			end
+		end
 
 		if hideHudEnabled then
-			-- Hide Main HUD
-			if hud then 
-				hud.Enabled = false 
+			-- HIDE MAIN HUD
+			if hud then
+				if hud:IsA("ScreenGui") then
+					hud.Enabled = false
+				else
+					hud.Visible = false -- For Frames/Folders
+					-- Fallback: hide the GameGui if it's a ScreenGui
+					if gameGui and gameGui:IsA("ScreenGui") then
+						gameGui.Enabled = false
+					end
+				end
+			elseif gameGui and gameGui:IsA("ScreenGui") then
+				-- If "HUD" doesn't exist, just hide the whole Game UI
+				gameGui.Enabled = false
 			end
 			
-			-- Handle Jump Button only if main HUD is hidden
+			-- HANDLE JUMP BUTTON
 			if jumpButton then
 				jumpButton.Visible = not hideJumpEnabled
 			end
 		else
-			-- Restore everything when main HUD toggle is off
-			if hud then 
-				hud.Enabled = true 
+			-- RESTORE EVERYTHING
+			if hud then
+				if hud:IsA("ScreenGui") then
+					hud.Enabled = true
+				else
+					hud.Visible = true
+				end
 			end
 			
-			-- Force Jump Button visible regardless of its own toggle
+			if gameGui and gameGui:IsA("ScreenGui") then
+				gameGui.Enabled = true
+			end
+			
+			-- Force jump button visible if main toggle is off
 			if jumpButton then
 				jumpButton.Visible = true
 			end
