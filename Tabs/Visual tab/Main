@@ -89,9 +89,6 @@ do
     local RunService = game:GetService("RunService")
     local player = Players.LocalPlayer
 
-    -- ============================================================
-    -- STATE
-    -- ============================================================
     local espEnabled = false
     local showPlayers = false
     local showNextbots = false
@@ -100,6 +97,7 @@ do
     local optName = false
     local optDistance = false
     local optTracers = false
+    local debugMode = false
 
     local boxSize = 1
     local boxType = "Full"
@@ -126,25 +124,15 @@ do
     local tracerPart = "Bottom"
     local tracerTransparency = 0
 
-    -- ============================================================
-    -- GUI CONTAINER
-    -- ============================================================
     local gui = Instance.new("ScreenGui")
     gui.Name = "RW_ESP"
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.DisplayOrder = 999
-    if gethui then
-        pcall(function() gui.Parent = gethui() end)
-    end
-    if not gui.Parent then
-        gui.Parent = player:WaitForChild("PlayerGui")
-    end
+    if gethui then pcall(function() gui.Parent = gethui() end) end
+    if not gui.Parent then gui.Parent = player:WaitForChild("PlayerGui") end
 
-    -- ============================================================
-    -- PLAYER NAME CACHE
-    -- ============================================================
     local playerNames = {}
     local function refreshPlayerNames()
         playerNames = {}
@@ -154,19 +142,87 @@ do
     end
     refreshPlayerNames()
     Players.PlayerAdded:Connect(refreshPlayerNames)
-    Players.PlayerRemoving:Connect(function(p)
-        playerNames[p.Name] = nil
-    end)
+    Players.PlayerRemoving:Connect(function(p) playerNames[p.Name] = nil end)
 
     -- ============================================================
-    -- PER-RIG CACHE
+    -- BOUNDING BOX HELPER (works for Model OR BasePart)
+    -- ============================================================
+    local function getRigBounds(rig)
+        if rig:IsA("BasePart") then
+            return rig.CFrame, rig.Size
+        end
+
+        if rig:IsA("Model") then
+            local okBB, cf, sz = pcall(function()
+                return rig:GetBoundingBox()
+            end)
+            if okBB and cf and sz and sz.Magnitude > 0.01 then
+                return cf, sz
+            end
+
+            -- Fallback: PrimaryPart or first BasePart
+            local ref = rig.PrimaryPart
+            if not ref then
+                for _, d in ipairs(rig:GetDescendants()) do
+                    if d:IsA("BasePart") then
+                        ref = d
+                        break
+                    end
+                end
+            end
+            if ref then
+                return ref.CFrame, ref.Size
+            end
+        end
+
+        return nil, nil
+    end
+
+    -- ============================================================
+    -- RIG COLLECTION (Rigs + subfolders + other common nextbot spots)
+    -- ============================================================
+    local function collectRigs()
+        local list = {}
+        local seen = {}
+
+        local function addFrom(container, depth)
+            if not container or (depth or 0) > 3 then return end
+            for _, child in ipairs(container:GetChildren()) do
+                if child:IsA("Model") or child:IsA("BasePart") then
+                    if not seen[child] then
+                        seen[child] = true
+                        list[#list + 1] = child
+                    end
+                elseif child:IsA("Folder") then
+                    addFrom(child, (depth or 0) + 1)
+                end
+            end
+        end
+
+        local rigsFolder = workspace:FindFirstChild("Rigs")
+        if rigsFolder then
+            addFrom(rigsFolder, 0)
+        end
+
+        -- Common nextbot containers if Rigs doesn't have them
+        for _, folderName in ipairs({ "Nextbots", "NPCs", "Enemies", "Entities", "Characters", "Mobs" }) do
+            local folder = workspace:FindFirstChild(folderName)
+            if folder then addFrom(folder, 0) end
+        end
+
+        return list
+    end
+
+    -- ============================================================
+    -- PER-RIG DATA
     -- ============================================================
     local rigData = {}
 
     local function hasJoints(rig)
+        if rig:IsA("BasePart") then return false end
         if rig:FindFirstChildOfClass("Humanoid") then return true end
         for _, d in ipairs(rig:GetDescendants()) do
-            if d:IsA("Motor6D") or d:IsA("Weld") then return true end
+            if d:IsA("Motor6D") then return true end
         end
         return false
     end
@@ -188,7 +244,6 @@ do
             f.Parent = boxContainer
             data.sides[i] = f
         end
-        -- Full box layouts
         data.sides[1].Position = UDim2.new(0, 0, 0, 0); data.sides[1].Size = UDim2.new(1, 0, 0, 2)
         data.sides[2].Position = UDim2.new(0, 0, 1, -2); data.sides[2].Size = UDim2.new(1, 0, 0, 2)
         data.sides[3].Position = UDim2.new(0, 0, 0, 0); data.sides[3].Size = UDim2.new(0, 2, 1, 0)
@@ -213,7 +268,6 @@ do
         local fillFrame = Instance.new("Frame")
         fillFrame.BorderSizePixel = 0
         fillFrame.BackgroundTransparency = 1
-        fillFrame.Position = UDim2.new(0, 0, 0, 0)
         fillFrame.Size = UDim2.new(1, 0, 1, 0)
         fillFrame.Parent = boxContainer
         data.fillFrame = fillFrame
@@ -223,7 +277,6 @@ do
         fillImage.BackgroundTransparency = 1
         fillImage.ScaleType = Enum.ScaleType.Stretch
         fillImage.ImageTransparency = 1
-        fillImage.Position = UDim2.new(0, 0, 0, 0)
         fillImage.Size = UDim2.new(1, 0, 1, 0)
         fillImage.Parent = boxContainer
         data.fillImage = fillImage
@@ -276,81 +329,52 @@ do
         return data
     end
 
-    local function clearRigData(data, rig)
+    local function clearRigData(data)
         if data.boxContainer then data.boxContainer:Destroy() end
         if data.chamsBox then data.chamsBox:Destroy() end
         if data.nameLabel then data.nameLabel:Destroy() end
         if data.distLabel then data.distLabel:Destroy() end
         if data.tracer then data.tracer:Destroy() end
+        if data.highlight then pcall(function() data.highlight:Destroy() end) end
+    end
+
+    local function hideData(data)
+        if data.boxContainer then data.boxContainer.Visible = false end
+        if data.chamsBox then data.chamsBox.Visible = false end
+        if data.nameLabel then data.nameLabel.Visible = false end
+        if data.distLabel then data.distLabel.Visible = false end
+        if data.tracer then data.tracer.Visible = false end
         if data.highlight then
             pcall(function() data.highlight:Destroy() end)
             data.highlight = nil
         end
     end
 
-    local function updateChams(data, rig, color, transparency, useJoints)
-        if useJoints then
-            if not data.highlight then
-                local h = Instance.new("Highlight")
-                h.Name = "RW_Chams"
-                h.FillColor = color
-                h.FillTransparency = transparency
-                h.OutlineTransparency = 1
-                h.Parent = rig
-                data.highlight = h
-            else
-                if data.highlight.Parent ~= rig then data.highlight.Parent = rig end
-                data.highlight.FillColor = color
-                data.highlight.FillTransparency = transparency
-            end
-            data.chamsBox.Visible = false
-        else
-            if data.highlight then
-                data.highlight:Destroy()
-                data.highlight = nil
-            end
-        end
-    end
-
     local function projectPoint(worldPos)
         local cam = workspace.CurrentCamera
         if not cam then return nil, false end
-        local screenPos, onScreen = cam:WorldToViewportPoint(worldPos)
-        return screenPos, onScreen and screenPos.Z > 0
+        local sp, onScreen = cam:WorldToViewportPoint(worldPos)
+        return sp, onScreen and sp.Z > 0
     end
 
     -- ============================================================
-    -- MAIN RENDER LOOP
+    -- RENDER LOOP
     -- ============================================================
     RunService.RenderStepped:Connect(function()
         local cam = workspace.CurrentCamera
         if not cam then return end
         local viewportSize = cam.ViewportSize
 
-        -- If ESP is off, hide everything and clear highlights
         if not espEnabled then
-            for rig, data in pairs(rigData) do
-                if data.boxContainer then data.boxContainer.Visible = false end
-                if data.chamsBox then data.chamsBox.Visible = false end
-                if data.nameLabel then data.nameLabel.Visible = false end
-                if data.distLabel then data.distLabel.Visible = false end
-                if data.tracer then data.tracer.Visible = false end
-                if data.highlight then
-                    pcall(function() data.highlight:Destroy() end)
-                    data.highlight = nil
-                end
-            end
+            for _, data in pairs(rigData) do hideData(data) end
             return
         end
 
-        local rigsFolder = workspace:FindFirstChild("Rigs")
-        if not rigsFolder then return end
+        local rigs = collectRigs()
+        local seen = {}
 
-        local seenRigs = {}
-
-        for _, rig in ipairs(rigsFolder:GetChildren()) do
-            if not rig:IsA("Model") then continue end
-            if rig.Name == player.Name then continue end -- skip local player
+        for _, rig in ipairs(rigs) do
+            if rig.Name == player.Name then continue end
             if not rig.Parent then continue end
 
             local isPlayer = playerNames[rig.Name] == true
@@ -358,40 +382,30 @@ do
             local shouldRender = (isPlayer and showPlayers) or (isNextbot and showNextbots)
 
             if not shouldRender then
-                -- hide if we had elements
                 local data = rigData[rig]
-                if data then
-                    if data.boxContainer then data.boxContainer.Visible = false end
-                    if data.chamsBox then data.chamsBox.Visible = false end
-                    if data.nameLabel then data.nameLabel.Visible = false end
-                    if data.distLabel then data.distLabel.Visible = false end
-                    if data.tracer then data.tracer.Visible = false end
-                    if data.highlight then
-                        pcall(function() data.highlight:Destroy() end)
-                        data.highlight = nil
-                    end
+                if data then hideData(data) end
+                continue
+            end
+
+            seen[rig] = true
+
+            local cf, sz = getRigBounds(rig)
+            if not cf or not sz then
+                if debugMode then
+                    warn("[ESP] No bounds for:", rig.Name, "| Class:", rig.ClassName)
                 end
                 continue
             end
 
-            seenRigs[rig] = true
             local data = rigData[rig]
             if not data then
                 data = buildRigElements()
                 rigData[rig] = data
             end
 
-            -- Determine colors by type
             local tNameColor = isPlayer and nameColorPlayers or nameColorNextbots
             local tDistColor = isPlayer and distanceColorPlayers or distanceColorNextbots
             local tTracerColor = isPlayer and tracerColorPlayers or tracerColorNextbots
-
-            -- Get world bounding box (top + bottom)
-            local okBB, cf, sz = pcall(function()
-                local c, s = rig:GetBoundingBox()
-                return c, s
-            end)
-            if not okBB or not cf then continue end
 
             local topWorld = cf.Position + Vector3.new(0, sz.Y / 2, 0)
             local bottomWorld = cf.Position - Vector3.new(0, sz.Y / 2, 0)
@@ -400,20 +414,14 @@ do
             local topScreen, topOn = projectPoint(topWorld)
             local bottomScreen, bottomOn = projectPoint(bottomWorld)
             local centerScreen, centerOn = projectPoint(centerWorld)
-
             local onScreen = topOn and bottomOn and centerOn
 
-            -- ====================
             -- BOX
-            -- ====================
             if optBox and onScreen then
                 data.boxContainer.Visible = true
                 local boxHeight = math.abs(bottomScreen.Y - topScreen.Y)
                 local boxWidth = boxHeight * 0.55 * boxSize
-                local boxX = topScreen.X - boxWidth / 2
-                local boxY = topScreen.Y
-
-                data.boxContainer.Position = UDim2.fromOffset(boxX, boxY)
+                data.boxContainer.Position = UDim2.fromOffset(topScreen.X - boxWidth / 2, topScreen.Y)
                 data.boxContainer.Size = UDim2.fromOffset(boxWidth, boxHeight)
 
                 local isFull = (boxType == "Full")
@@ -428,7 +436,6 @@ do
                     data.corners[i].BackgroundTransparency = boxTransparency
                 end
 
-                -- Fill
                 if fillBox then
                     local hasAsset = fillAssetId ~= "" and tonumber(fillAssetId)
                     if hasAsset then
@@ -451,22 +458,39 @@ do
                 data.boxContainer.Visible = false
             end
 
-            -- ====================
             -- CHAMS
-            -- ====================
             local jointed = hasJoints(rig)
             if optChams then
-                updateChams(data, rig, chamsColor, chamsTransparency, jointed)
-                if not jointed and onScreen then
-                    data.chamsBox.Visible = true
-                    local boxHeight = math.abs(bottomScreen.Y - topScreen.Y)
-                    local boxWidth = boxHeight * 0.55 * boxSize
-                    data.chamsBox.Position = UDim2.fromOffset(topScreen.X - boxWidth / 2, topScreen.Y)
-                    data.chamsBox.Size = UDim2.fromOffset(boxWidth, boxHeight)
-                    data.chamsBox.BackgroundColor3 = chamsColor
-                    data.chamsBox.BackgroundTransparency = chamsTransparency
-                else
+                if jointed and (rig:IsA("Model")) then
+                    if not data.highlight then
+                        local h = Instance.new("Highlight")
+                        h.FillColor = chamsColor
+                        h.FillTransparency = chamsTransparency
+                        h.OutlineTransparency = 1
+                        h.Parent = rig
+                        data.highlight = h
+                    else
+                        if data.highlight.Parent ~= rig then data.highlight.Parent = rig end
+                        data.highlight.FillColor = chamsColor
+                        data.highlight.FillTransparency = chamsTransparency
+                    end
                     data.chamsBox.Visible = false
+                else
+                    if data.highlight then
+                        pcall(function() data.highlight:Destroy() end)
+                        data.highlight = nil
+                    end
+                    if onScreen then
+                        data.chamsBox.Visible = true
+                        local boxHeight = math.abs(bottomScreen.Y - topScreen.Y)
+                        local boxWidth = boxHeight * 0.55 * boxSize
+                        data.chamsBox.Position = UDim2.fromOffset(topScreen.X - boxWidth / 2, topScreen.Y)
+                        data.chamsBox.Size = UDim2.fromOffset(boxWidth, boxHeight)
+                        data.chamsBox.BackgroundColor3 = chamsColor
+                        data.chamsBox.BackgroundTransparency = chamsTransparency
+                    else
+                        data.chamsBox.Visible = false
+                    end
                 end
             else
                 if data.highlight then
@@ -476,9 +500,7 @@ do
                 data.chamsBox.Visible = false
             end
 
-            -- ====================
             -- NAME
-            -- ====================
             if optName and topOn then
                 data.nameLabel.Visible = true
                 data.nameLabel.Text = rig.Name
@@ -491,9 +513,7 @@ do
                 data.nameLabel.Visible = false
             end
 
-            -- ====================
             -- DISTANCE
-            -- ====================
             if optDistance and topOn then
                 data.distLabel.Visible = true
                 local distStuds = (centerWorld - cam.CFrame.Position).Magnitude
@@ -507,9 +527,7 @@ do
                 data.distLabel.Visible = false
             end
 
-            -- ====================
             -- TRACERS
-            -- ====================
             if optTracers and centerOn then
                 local fromPos
                 if tracerPart == "Bottom" then
@@ -520,7 +538,6 @@ do
                     fromPos = Vector2.new(viewportSize.X / 2, 0)
                 end
                 local toPos = Vector2.new(centerScreen.X, centerScreen.Y)
-
                 local delta = toPos - fromPos
                 local length = delta.Magnitude
                 local angle = math.deg(math.atan2(delta.Y, delta.X))
@@ -537,10 +554,9 @@ do
             end
         end
 
-        -- Cleanup rigs that are gone
         for rig, data in pairs(rigData) do
-            if not seenRigs[rig] then
-                clearRigData(data, rig)
+            if not seen[rig] then
+                clearRigData(data)
                 rigData[rig] = nil
             end
         end
@@ -555,9 +571,14 @@ do
         name = "ESP",
         currentValue = false,
         flag = "ESP_Toggle",
-        callback = function(v)
-            espEnabled = v
-        end,
+        callback = function(v) espEnabled = v end,
+    })
+
+    VisTab:CreateToggle({
+        name = "ESP Debug",
+        currentValue = false,
+        flag = "ESP_Debug",
+        callback = function(v) debugMode = v end,
     })
 
     VisTab:CreateDropdown({
@@ -570,13 +591,10 @@ do
             showPlayers = false
             showNextbots = false
             if type(selected) == "table" then
-                for _, name in ipairs(selected) do
-                    if name == "Players" then showPlayers = true end
-                    if name == "Nextbots" then showNextbots = true end
+                for _, n in ipairs(selected) do
+                    if n == "Players" then showPlayers = true end
+                    if n == "Nextbots" then showNextbots = true end
                 end
-            elseif type(selected) == "string" then
-                if selected == "Players" then showPlayers = true end
-                if selected == "Nextbots" then showNextbots = true end
             end
         end,
     })
@@ -588,194 +606,37 @@ do
         multiSelect = true,
         flag = "ESP_Options",
         callback = function(selected)
-            optBox = false
-            optChams = false
-            optName = false
-            optDistance = false
-            optTracers = false
+            optBox = false; optChams = false; optName = false; optDistance = false; optTracers = false
             if type(selected) == "table" then
-                for _, name in ipairs(selected) do
-                    if name == "Box ESP" then optBox = true end
-                    if name == "Chams" then optChams = true end
-                    if name == "Name" then optName = true end
-                    if name == "Distance" then optDistance = true end
-                    if name == "Tracers" then optTracers = true end
+                for _, n in ipairs(selected) do
+                    if n == "Box ESP" then optBox = true end
+                    if n == "Chams" then optChams = true end
+                    if n == "Name" then optName = true end
+                    if n == "Distance" then optDistance = true end
+                    if n == "Tracers" then optTracers = true end
                 end
             end
         end,
     })
 
-    VisTab:CreateSlider({
-        name = "Box Size",
-        range = {0.5, 2.0},
-        increment = 0.05,
-        suffix = "x",
-        currentValue = 1,
-        flag = "ESP_BoxSize",
-        callback = function(v) boxSize = v end,
-    })
-
-    VisTab:CreateDropdown({
-        name = "Box Type",
-        options = { "Full", "Corners" },
-        currentOption = { "Full" },
-        multiSelect = false,
-        flag = "ESP_BoxType",
-        callback = function(selected)
-            local pick = type(selected) == "table" and selected[1] or selected
-            if pick then boxType = pick end
-        end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Box Outline Color",
-        color = Color3.fromRGB(255, 255, 255),
-        flag = "ESP_BoxColor",
-        callback = function(c) boxOutlineColor = c end,
-    })
-
-    VisTab:CreateToggle({
-        name = "Fill Box",
-        currentValue = false,
-        flag = "ESP_FillBox",
-        callback = function(v) fillBox = v end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Fill Color",
-        color = Color3.fromRGB(255, 255, 255),
-        flag = "ESP_FillColor",
-        callback = function(c) fillColor = c end,
-    })
-
-    VisTab:CreateInput({
-        name = "Box Fill Asset ID (Optional)",
-        placeholder = "e.g. 1234",
-        flag = "ESP_FillAsset",
-        callback = function(text)
-            fillAssetId = text or ""
-        end,
-    })
-
-    VisTab:CreateSlider({
-        name = "Box Transparency",
-        range = {0, 1},
-        increment = 0.01,
-        suffix = "",
-        currentValue = 0,
-        flag = "ESP_BoxTransparency",
-        callback = function(v) boxTransparency = v end,
-    })
-
-    VisTab:CreateSlider({
-        name = "Box Fill Transparency",
-        range = {0, 1},
-        increment = 0.01,
-        suffix = "",
-        currentValue = 0.5,
-        flag = "ESP_BoxFillTransparency",
-        callback = function(v) boxFillTransparency = v end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Chams Color",
-        color = Color3.fromRGB(255, 0, 0),
-        flag = "ESP_ChamsColor",
-        callback = function(c) chamsColor = c end,
-    })
-
-    VisTab:CreateSlider({
-        name = "Chams Transparency",
-        range = {0, 1},
-        increment = 0.01,
-        suffix = "",
-        currentValue = 0.5,
-        flag = "ESP_ChamsTransparency",
-        callback = function(v) chamsTransparency = v end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Name Color Players",
-        color = Color3.fromRGB(255, 255, 255),
-        flag = "ESP_NameColorPlayers",
-        callback = function(c) nameColorPlayers = c end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Name Color Nextbots",
-        color = Color3.fromRGB(255, 100, 100),
-        flag = "ESP_NameColorNextbots",
-        callback = function(c) nameColorNextbots = c end,
-    })
-
-    VisTab:CreateSlider({
-        name = "Name Transparency",
-        range = {0, 1},
-        increment = 0.01,
-        suffix = "",
-        currentValue = 0,
-        flag = "ESP_NameTransparency",
-        callback = function(v) nameTransparency = v end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Distance Color Players",
-        color = Color3.fromRGB(200, 200, 200),
-        flag = "ESP_DistColorPlayers",
-        callback = function(c) distanceColorPlayers = c end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Distance Color Nextbots",
-        color = Color3.fromRGB(255, 150, 150),
-        flag = "ESP_DistColorNextbots",
-        callback = function(c) distanceColorNextbots = c end,
-    })
-
-    VisTab:CreateSlider({
-        name = "Distance Transparency",
-        range = {0, 1},
-        increment = 0.01,
-        suffix = "",
-        currentValue = 0,
-        flag = "ESP_DistTransparency",
-        callback = function(v) distanceTransparency = v end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Tracers Color Players",
-        color = Color3.fromRGB(255, 255, 255),
-        flag = "ESP_TracerColorPlayers",
-        callback = function(c) tracerColorPlayers = c end,
-    })
-
-    VisTab:CreateColorPicker({
-        name = "Tracers Color Nextbots",
-        color = Color3.fromRGB(255, 100, 100),
-        flag = "ESP_TracerColorNextbots",
-        callback = function(c) tracerColorNextbots = c end,
-    })
-
-    VisTab:CreateDropdown({
-        name = "Tracers Part:",
-        options = { "Bottom", "Center", "Top" },
-        currentOption = { "Bottom" },
-        multiSelect = false,
-        flag = "ESP_TracerPart",
-        callback = function(selected)
-            local pick = type(selected) == "table" and selected[1] or selected
-            if pick then tracerPart = pick end
-        end,
-    })
-
-    VisTab:CreateSlider({
-        name = "Tracers Transparency",
-        range = {0, 1},
-        increment = 0.01,
-        suffix = "",
-        currentValue = 0,
-        flag = "ESP_TracerTransparency",
-        callback = function(v) tracerTransparency = v end,
-    })
+    VisTab:CreateSlider({ name = "Box Size", range = {0.5, 2.0}, increment = 0.05, suffix = "x", currentValue = 1, flag = "ESP_BoxSize", callback = function(v) boxSize = v end })
+    VisTab:CreateDropdown({ name = "Box Type", options = { "Full", "Corners" }, currentOption = { "Full" }, multiSelect = false, flag = "ESP_BoxType", callback = function(sel) local p = type(sel) == "table" and sel[1] or sel; if p then boxType = p end end })
+    VisTab:CreateColorPicker({ name = "Box Outline Color", color = Color3.fromRGB(255, 255, 255), flag = "ESP_BoxColor", callback = function(c) boxOutlineColor = c end })
+    VisTab:CreateToggle({ name = "Fill Box", currentValue = false, flag = "ESP_FillBox", callback = function(v) fillBox = v end })
+    VisTab:CreateColorPicker({ name = "Fill Color", color = Color3.fromRGB(255, 255, 255), flag = "ESP_FillColor", callback = function(c) fillColor = c end })
+    VisTab:CreateInput({ name = "Box Fill Asset ID (Optional)", placeholder = "e.g. 1234", flag = "ESP_FillAsset", callback = function(text) fillAssetId = text or "" end })
+    VisTab:CreateSlider({ name = "Box Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_BoxTransparency", callback = function(v) boxTransparency = v end })
+    VisTab:CreateSlider({ name = "Box Fill Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0.5, flag = "ESP_BoxFillTransparency", callback = function(v) boxFillTransparency = v end })
+    VisTab:CreateColorPicker({ name = "Chams Color", color = Color3.fromRGB(255, 0, 0), flag = "ESP_ChamsColor", callback = function(c) chamsColor = c end })
+    VisTab:CreateSlider({ name = "Chams Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0.5, flag = "ESP_ChamsTransparency", callback = function(v) chamsTransparency = v end })
+    VisTab:CreateColorPicker({ name = "Name Color Players", color = Color3.fromRGB(255, 255, 255), flag = "ESP_NameColorPlayers", callback = function(c) nameColorPlayers = c end })
+    VisTab:CreateColorPicker({ name = "Name Color Nextbots", color = Color3.fromRGB(255, 100, 100), flag = "ESP_NameColorNextbots", callback = function(c) nameColorNextbots = c end })
+    VisTab:CreateSlider({ name = "Name Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_NameTransparency", callback = function(v) nameTransparency = v end })
+    VisTab:CreateColorPicker({ name = "Distance Color Players", color = Color3.fromRGB(200, 200, 200), flag = "ESP_DistColorPlayers", callback = function(c) distanceColorPlayers = c end })
+    VisTab:CreateColorPicker({ name = "Distance Color Nextbots", color = Color3.fromRGB(255, 150, 150), flag = "ESP_DistColorNextbots", callback = function(c) distanceColorNextbots = c end })
+    VisTab:CreateSlider({ name = "Distance Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_DistTransparency", callback = function(v) distanceTransparency = v end })
+    VisTab:CreateColorPicker({ name = "Tracers Color Players", color = Color3.fromRGB(255, 255, 255), flag = "ESP_TracerColorPlayers", callback = function(c) tracerColorPlayers = c end })
+    VisTab:CreateColorPicker({ name = "Tracers Color Nextbots", color = Color3.fromRGB(255, 100, 100), flag = "ESP_TracerColorNextbots", callback = function(c) tracerColorNextbots = c end })
+    VisTab:CreateDropdown({ name = "Tracers Part:", options = { "Bottom", "Center", "Top" }, currentOption = { "Bottom" }, multiSelect = false, flag = "ESP_TracerPart", callback = function(sel) local p = type(sel) == "table" and sel[1] or sel; if p then tracerPart = p end end })
+    VisTab:CreateSlider({ name = "Tracers Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_TracerTransparency", callback = function(v) tracerTransparency = v end })
 end
-
