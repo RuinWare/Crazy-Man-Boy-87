@@ -5845,7 +5845,7 @@ H and k
 buildExtras(VisTab, window)
 
 -- more
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual tab/Main"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual%20tab/Main"))()
 
 --[[
 ============================================================================
