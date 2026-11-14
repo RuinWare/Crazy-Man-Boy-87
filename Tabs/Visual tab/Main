@@ -1401,3 +1401,133 @@ do
 		end
 	end)
 end
+
+--[[
+===========================
+FULLBRIGHT
+===========================
+]]--
+
+do
+	local fullbrightEnabled = false
+	local currentLevel = "Medium"
+	local RunService = game:GetService("RunService")
+	local Lighting = game:GetService("Lighting")
+
+	-- Save original lighting properties so we can revert cleanly
+	local originalProps = {
+		Brightness = Lighting.Brightness,
+		ClockTime = Lighting.ClockTime,
+		GlobalShadows = Lighting.GlobalShadows,
+		Ambient = Lighting.Ambient,
+		OutdoorAmbient = Lighting.OutdoorAmbient,
+		FogEnd = Lighting.FogEnd,
+		FogStart = Lighting.FogStart,
+		FogColor = Lighting.FogColor
+	}
+	
+	-- Track atmospheric objects that we might need to hide
+	local hiddenObjects = {}
+
+	local function applyFullbright()
+		if not fullbrightEnabled then return end
+
+		-- Nuke fog
+		Lighting.FogEnd = 100000
+		Lighting.FogStart = 0
+		Lighting.FogColor = Color3.fromRGB(255, 255, 255)
+
+		-- Hide any Atmosphere or Clouds
+		for _, v in ipairs(Lighting:GetDescendants()) do
+			if v:IsA("Atmosphere") or v:IsA("Sky") then
+				if not hiddenObjects[v] then
+					hiddenObjects[v] = v.Parent
+					v.Parent = nil -- Hide it
+				end
+			end
+		end
+		local terrain = workspace:FindFirstChild("Terrain")
+		if terrain then
+			local clouds = terrain:FindFirstChild("Clouds")
+			if clouds and not hiddenObjects[clouds] then
+				hiddenObjects[clouds] = clouds.Parent
+				clouds.Parent = nil
+			end
+		end
+
+		-- Apply settings based on level
+		if currentLevel == "Low" then
+			Lighting.Brightness = 2
+			Lighting.ClockTime = 14
+			Lighting.GlobalShadows = true
+			Lighting.Ambient = Color3.fromRGB(120, 120, 120)
+			Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120)
+		elseif currentLevel == "Medium" then
+			Lighting.Brightness = 3
+			Lighting.ClockTime = 12
+			Lighting.GlobalShadows = false
+			Lighting.Ambient = Color3.fromRGB(200, 200, 200)
+			Lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
+		elseif currentLevel == "Extreme" then
+			Lighting.Brightness = 10
+			Lighting.ClockTime = 12
+			Lighting.GlobalShadows = false
+			Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+			Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+		end
+	end
+
+	local function revertFullbright()
+		-- Restore original lighting
+		for prop, val in pairs(originalProps) do
+			pcall(function()
+				Lighting[prop] = val
+			end)
+		end
+
+		-- Restore hidden objects
+		for obj, parent in pairs(hiddenObjects) do
+			if parent then
+				pcall(function()
+					obj.Parent = parent
+				end)
+			end
+		end
+		hiddenObjects = {}
+	end
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Fullbright",
+		value = false,
+		callback = function(v)
+			fullbrightEnabled = v
+			if v then
+				applyFullbright()
+			else
+				revertFullbright()
+			end
+		end,
+	})
+
+	VisTab:CreateDropdown({
+		name = "Level:",
+		options = { "Low", "Medium", "Extreme" },
+		default = { "Medium" },
+		multiSelect = false,
+		callback = function(selected)
+			currentLevel = type(selected) == "table" and selected[1] or selected
+			if fullbrightEnabled then
+				applyFullbright() -- Instantly update if changed while on
+			end
+		end,
+	})
+
+	-- Loop to enforce the lighting every frame (stops the game from overriding it)
+	RunService.Heartbeat:Connect(function()
+		if fullbrightEnabled then
+			applyFullbright()
+		end
+	end)
+end
