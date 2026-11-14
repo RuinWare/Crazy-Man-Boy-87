@@ -2212,10 +2212,10 @@ do
     local edgeTrimpEnabled = false
     local edgeTrimpPower = 100
 
-    local TRIMP_HORIZONTAL_DISTANCE = 0.7
-    local TRIMP_VERTICAL_MIN = -0.2
-    local TRIMP_VERTICAL_MAX = 1.0
-    local RAY_LENGTH = 4
+    local TRIMP_HORIZONTAL_DISTANCE = 1.1
+    local TRIMP_VERTICAL_MIN = -0.5
+    local TRIMP_VERTICAL_MAX = 1.5
+    local RAY_LENGTH = 5
     local COOLDOWN = 0.4
 
     local rayParams = RaycastParams.new()
@@ -2274,7 +2274,7 @@ do
         rayParams.FilterDescendantsInstances = {char}
 
         local feetPos = getFeetInfo(char, root)
-        local heights = { 0, 0.3, 0.6, 0.9, 1.2 }
+        local heights = { 0, 0.3, 0.6, 0.9, 1.2, 1.5 }
 
         for _, h in ipairs(heights) do
             local origin = Vector3.new(feetPos.X, feetPos.Y + h, feetPos.Z)
