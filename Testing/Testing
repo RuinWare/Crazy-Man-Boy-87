@@ -10,11 +10,21 @@ local tab = window:CreateTab({ name = "Test", icon = 0 })
 
 do
 	local noclipEnabled = false
-	local walkSpeed = 16
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
-	local UserInputService = game:GetService("UserInputService")
 	local LP = Players.LocalPlayer
+
+	-- Create an invisible "dummy" part to act as the camera subject
+	-- This prevents the camera from bugging out when we disable CanQuery
+	local camFixPart = Instance.new("Part")
+	camFixPart.Name = "NoclipCameraFix"
+	camFixPart.Size = Vector3.new(1, 1, 1)
+	camFixPart.Transparency = 1
+	camFixPart.CanCollide = false
+	camFixPart.CanTouch = false
+	camFixPart.CanQuery = true -- Camera can raycast to this perfectly
+	camFixPart.Parent = workspace.CurrentCamera
+	camFixPart.Position = Vector3.new(0, -1000, 0) -- Hide it underground initially
 
 	tab:CreateDivider()
 
@@ -25,58 +35,54 @@ do
 			noclipEnabled = v
 			
 			local rig = workspace.Rigs:FindFirstChild(LP.Name)
-			if rig then
-				local hum = rig:FindFirstChild("Humanoid")
-				
-				if v then
-					-- Save normal speed and freeze the game's movement controller
-					if hum then
-						walkSpeed = hum.WalkSpeed
-						hum.WalkSpeed = 0 
-					end
-				else
-					-- Restore normal speed
-					if hum then
-						hum.WalkSpeed = walkSpeed
-					end
-				end
-
-				-- Toggle physical collisions
+			if not v and rig then
+				-- RESTORE EVERYTHING WHEN TURNED OFF
 				for _, part in ipairs(rig:GetDescendants()) do
 					if part:IsA("BasePart") then
-						part.CanCollide = not v
-						part.CanTouch = not v
-						-- We leave CanQuery alone so the camera doesn't bug
+						part.CanCollide = true
+						part.CanTouch = true
+						part.CanQuery = true
 					end
 				end
+				
+				-- Restore the original camera subject
+				local head = rig:FindFirstChild("Head")
+				local hum = rig:FindFirstChild("Humanoid")
+				workspace.CurrentCamera.CameraSubject = hum or head
+				
+				-- Hide the dummy part
+				camFixPart.Position = Vector3.new(0, -1000, 0)
 			end
 		end,
 	})
 
-	-- Manually move the character with CFrame, ignoring the game's movement checks
-	RunService.RenderStepped:Connect(function(dt)
+	-- Apply every physics step so the game can't fight it
+	RunService.Stepped:Connect(function()
 		if not noclipEnabled then return end
 		
 		local rig = workspace.Rigs:FindFirstChild(LP.Name)
 		if rig then
-			local hum = rig:FindFirstChild("Humanoid")
-			local root = rig:FindFirstChild("TorsoRot") or rig:FindFirstChild("Torso") or rig:FindFirstChild("HumanoidRootPart")
+			local head = rig:FindFirstChild("Head")
 			
-			-- Keep WalkSpeed at 0 so the game can't cancel your movement
-			if hum then hum.WalkSpeed = 0 end 
+			-- If the camera is currently looking at the rig, swap it to the dummy part
+			if head and workspace.CurrentCamera.CameraSubject ~= camFixPart then
+				workspace.CurrentCamera.CameraSubject = camFixPart
+			end
 			
-			if root then
-				-- Get WASD, Mobile Joystick, or Controller Stick
-				local move = UserInputService:GetMoveVector()
-				
-				if move.Magnitude > 0 then
-					local cam = workspace.CurrentCamera
-					-- Calculate direction based on camera
-					local dir = (cam.CFrame.LookVector * -move.Z) + (cam.CFrame.RightVector * move.X)
-					dir = Vector3.new(dir.X, 0, dir.Z).Unit -- Keep it flat/horizontal
+			-- Keep the dummy part exactly where the head is
+			if head then
+				camFixPart.CFrame = head.CFrame
+			end
+
+			-- Disable EVERYTHING on the entire rig
+			for _, part in ipairs(rig:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = false
+					part.CanTouch = false
+					part.CanQuery = false -- This is what bypasses their raycasts
 					
-					-- Physically push the rig through the wall
-					root.CFrame = root.CFrame + (dir * walkSpeed * dt)
+					-- Clear velocity so the game can't push you out of the wall
+					part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 				end
 			end
 		end
