@@ -1624,6 +1624,86 @@ tab:CreateToggle({
 _G.RWCallbacks["LegitBounce"] = function(v) legitBounceEnabled = v end
 
 --[[
+===========================
+EF
+===========================
+]]--
+
+do
+    local emoteFlingEnabled = false
+    local EMOTE_FLING_MULTIPLIER = 5.00
+
+    local emoteFlingStateConn
+    local emoteFlingLastYVelocity = 0
+    local emoteFlingAirStartTime = 0
+    local emoteFlingWasInAir = false
+
+    local function attachEmoteFling(char)
+        local hum = char:WaitForChild("Humanoid")
+        local root = char:WaitForChild("HumanoidRootPart")
+
+        if emoteFlingStateConn then emoteFlingStateConn:Disconnect() end
+        emoteFlingStateConn = hum.StateChanged:Connect(function(_, newState)
+            if not emoteFlingEnabled then return end
+            if newState ~= Enum.HumanoidStateType.Landed then return end
+            if hum.Health <= 0 then return end
+            if not emoteFlingWasInAir then return end
+            if (tick() - emoteFlingAirStartTime) < 2 then return end
+            local bounceVel = math.abs(emoteFlingLastYVelocity) * EMOTE_FLING_MULTIPLIER
+            if bounceVel < 10 then return end
+            root.AssemblyLinearVelocity = Vector3.new(
+                root.AssemblyLinearVelocity.X,
+                bounceVel,
+                root.AssemblyLinearVelocity.Z
+            )
+        end)
+    end
+
+    if player.Character then
+        task.spawn(attachEmoteFling, player.Character)
+    end
+    player.CharacterAdded:Connect(function(char)
+        task.spawn(attachEmoteFling, char)
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not emoteFlingEnabled then return end
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+
+        emoteFlingLastYVelocity = root.AssemblyLinearVelocity.Y
+
+        if hum.FloorMaterial == Enum.Material.Air then
+            if not emoteFlingWasInAir then
+                emoteFlingWasInAir = true
+                emoteFlingAirStartTime = tick()
+            end
+        else
+            emoteFlingWasInAir = false
+        end
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Emote Fling",
+        currentValue = false,
+        flag = "EmoteFling_Toggle",
+        callback = function(v)
+            emoteFlingEnabled = v
+        end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["EmoteFling"] = function(v)
+        emoteFlingEnabled = v
+    end
+end
+
+--[[
 ============================================================================
 INF SLIDE
 ============================================================================
