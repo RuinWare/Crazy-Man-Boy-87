@@ -504,9 +504,22 @@ do
 
 -- CHAMS
 if optChams then
+    -- Highlight doesn't render on workspace.Players proxy models.
+    -- Prefer the workspace.Rigs version of the same-named rig.
+    local chamsTarget = rig
+    if source == "players" then
+        local rigsFolder = workspace:FindFirstChild("Rigs")
+        if rigsFolder then
+            local rigsVersion = rigsFolder:FindFirstChild(rig.Name)
+            if rigsVersion then
+                chamsTarget = rigsVersion
+            end
+        end
+    end
+
     local useModelHighlight = isPlayer
     if not useModelHighlight then
-        useModelHighlight = rigHasJoints(rig)
+        useModelHighlight = rigHasJoints(chamsTarget)
     end
 
     if useModelHighlight then
@@ -515,36 +528,30 @@ if optChams then
                 pcall(function() data.highlight:Destroy() end)
             end
             local h = Instance.new("Highlight")
-            h.Name = "RW_Chams_" .. tostring(math.random(100000, 999999))
             h.FillColor = chamsColor
             h.FillTransparency = chamsTransparency
             h.OutlineTransparency = 1
             h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            h.Enabled = true
-            h.Adornee = rig
-            h.Parent = rig
+            h.Parent = chamsTarget
             data.highlight = h
         else
-            if data.highlight.Parent ~= rig then data.highlight.Parent = rig end
+            if data.highlight.Parent ~= chamsTarget then data.highlight.Parent = chamsTarget end
             data.highlight.FillColor = chamsColor
             data.highlight.FillTransparency = chamsTransparency
         end
         if data.chamsBox.Visible then data.chamsBox.Visible = false end
     else
-        local hb = source == "rigs" and rig:FindFirstChild("Hitbox") or nil
+        local hb = chamsTarget:FindFirstChild("Hitbox")
         if hb and (hb:IsA("BasePart") or hb:IsA("Model")) then
             if not data.highlight or not data.highlight.Parent then
                 if data.highlight then
                     pcall(function() data.highlight:Destroy() end)
                 end
                 local h = Instance.new("Highlight")
-                h.Name = "RW_Chams_" .. tostring(math.random(100000, 999999))
                 h.FillColor = chamsColor
                 h.FillTransparency = chamsTransparency
                 h.OutlineTransparency = 1
                 h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                h.Enabled = true
-                h.Adornee = hb
                 h.Parent = hb
                 data.highlight = h
             else
@@ -566,6 +573,11 @@ if optChams then
             if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
             if data.chamsBox.Visible then data.chamsBox.Visible = false end
         end
+    end
+else
+    if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
+    if data.chamsBox.Visible then data.chamsBox.Visible = false end
+end
     end
 else
     if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
