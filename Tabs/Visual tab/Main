@@ -701,3 +701,64 @@ do
     VisTab:CreateDropdown({ name = "Tracers Part:", options = { "Bottom", "Center", "Top" }, currentOption = { "Bottom" }, multiSelect = false, flag = "ESP_TracerPart", callback = function(sel) local p = type(sel) == "table" and sel[1] or sel; if p then tracerPart = p end end })
     VisTab:CreateSlider({ name = "Tracers Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_TracerTransparency", callback = function(v) tracerTransparency = v end })
 end
+
+--[[
+===========================
+REMOVE BREACHER LAG
+===========================
+]]--
+
+VisTab:CreateToggle({
+    name = "Remove Breacher Lag",
+    flag = "RBLREMOVEBREACHERLAG",
+    currentValue = false,
+    callback = function(v)
+        if v then
+   _G.RuinWarePortalLag = true
+
+if _G.RuinWarePortalLagThread then
+    task.cancel(_G.RuinWarePortalLagThread)
+end
+
+_G.RuinWarePortalLagThread = task.spawn(function()
+    while _G.RuinWarePortalLag do
+        task.wait(1)
+        
+        local effects = workspace:FindFirstChild("Effects")
+        if effects then
+            local portals = effects:FindFirstChild("Portals")
+            if portals then
+                for _, portal in ipairs(portals:GetChildren()) do
+                    if portal.Name == "PortalYellow" or portal.Name == "PortalBlue" then
+                        for _, attName in ipairs({"Attachment1", "Attachment3"}) do
+                            local att = portal:FindFirstChild(attName)
+                            if att then
+                                for _, child in ipairs(att:GetChildren()) do
+                                    if child.Name == "Left" or child.Name == "Right" or child.Name == "Vortex" then
+                                        pcall(function() child:Destroy() end)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+window:Notify({
+    title = "RuinWare",
+    content = "Breacher Effects Removed",
+    duration = 5,
+})
+       else
+_G.RuinWarePortalLag = false
+
+if _G.RuinWarePortalLagThread then
+    task.cancel(_G.RuinWarePortalLagThread)
+    _G.RuinWarePortalLagThread = nil
+   end
+end
+    end,
+})
