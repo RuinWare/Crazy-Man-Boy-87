@@ -707,7 +707,7 @@ end
 REMOVE BREACHER LAG
 ===========================
 ]]--
-
+do
 VisTab:CreateDivider({ text = "Optimization" })
 
 VisTab:CreateToggle({
@@ -764,13 +764,13 @@ if _G.RuinWarePortalLagThread then
 end
     end,
 })
-
+end
 --[[
 ===========================
 RES STRECHER
 ===========================
 ]]--
-
+do
 -- declare
 local RunService = game:GetService("RunService")
 
@@ -859,3 +859,4 @@ VisTab:CreateInput({
 		RESAMOUNT1 = tonumber(text) or 1
 	end,
 })
+end
