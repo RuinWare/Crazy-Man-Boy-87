@@ -1067,3 +1067,103 @@ do
         end,
     })
 end
+
+-- avatar
+
+do
+	local avatarEnabled = false
+	local targetUsername = ""
+	local Players = game:GetService("Players")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	-- Helper to clear existing avatar items from the rig
+	local function clearAvatar(rig)
+		for _, child in ipairs(rig:GetChildren()) do
+			if child:IsA("Accessory") or child:IsA("Shirt") or child:IsA("Pants") or child:IsA("BodyColors") then
+				child:Destroy()
+			end
+		end
+		-- Also clear accessories that might have parented to body parts
+		for _, part in ipairs(rig:GetDescendants()) do
+			if part:IsA("Accessory") then
+				part:Destroy()
+			end
+		end
+	end
+
+	-- Helper to apply an avatar by UserId
+	local function applyAvatar(userId)
+		local rig = workspace.Rigs:FindFirstChild(LP.Name)
+		if not rig then return end
+		
+		local hum = rig:FindFirstChildOfClass("Humanoid")
+		if not hum then return end
+
+		-- Fetch the appearance model from Roblox
+		local success, appearance = pcall(function()
+			return Players:GetCharacterAppearanceAsync(userId)
+		end)
+
+		if success and appearance then
+			clearAvatar(rig)
+			
+			-- Clone the fetched appearance onto the rig
+			for _, item in ipairs(appearance:GetChildren()) do
+				if item:IsA("Accessory") then
+					-- Humanoid:AddAccessory correctly rigs the item to the attachment points
+					pcall(function() hum:AddAccessory(item:Clone()) end)
+				elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") then
+					-- We ignore CharacterMesh (R15 packages) to prevent bugs on the custom rig
+					item:Clone().Parent = rig
+				end
+			end
+		else
+			window:Notify({ title = "Avatar Changer", content = "Failed to load avatar data.", duration = 3 })
+		end
+	end
+
+	VisTab:CreateToggle({
+		name = "Avatar Spoofer",
+		value = false,
+		callback = function(v)
+			avatarEnabled = v
+			
+			if v then
+				if targetUsername ~= "" then
+					task.spawn(function()
+						local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(targetUsername) end)
+						if ok and userId then
+							applyAvatar(userId)
+						else
+							window:Notify({ title = "Avatar Changer", content = "Invalid username: "..targetUsername, duration = 3 })
+						end
+					end)
+				end
+			else
+				-- Revert to LocalPlayer's avatar when turned off
+				applyAvatar(LP.UserId)
+			end
+		end,
+	})
+
+	VisTab:CreateInput({
+		name = "Username",
+		placeholder = "Enter a username",
+		removeTextAfterFocusLost = false,
+		callback = function(text)
+			targetUsername = text
+			
+			-- If the toggle is already on and they type a new name, update instantly
+			if avatarEnabled and targetUsername ~= "" then
+				task.spawn(function()
+					local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(targetUsername) end)
+					if ok and userId then
+						applyAvatar(userId)
+					end
+				end)
+			end
+		end,
+	})
+end
