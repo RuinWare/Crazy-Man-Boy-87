@@ -845,7 +845,7 @@ VisTab:CreateDivider({ text = "Camera" })
 VisTab:CreateToggle({
 	name = "Resolution Stretcher",
 	flag = "resstrecheromgggg",
-	value = true,
+	value = false,
 	callback = function(value)
 		stretchEnabled = value
 	end,
