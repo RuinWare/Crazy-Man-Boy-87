@@ -12,7 +12,15 @@ do
 	local noclipEnabled = false
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
+	local PhysicsService = game:GetService("PhysicsService")
 	local LP = Players.LocalPlayer
+
+	-- Create a custom collision group for Noclip
+	pcall(function()
+		PhysicsService:RegisterCollisionGroup("NoclipGroup")
+		PhysicsService:CollisionGroupSetCollidable("NoclipGroup", "Default", false)
+		PhysicsService:CollisionGroupSetCollidable("NoclipGroup", "NoclipGroup", false)
+	end)
 
 	tab:CreateDivider()
 
@@ -22,7 +30,7 @@ do
 		callback = function(v)
 			noclipEnabled = v
 			
-			-- Instantly restore collisions when turned off
+			-- Instantly restore everything when turned off
 			if not v then
 				local rigs = workspace:FindFirstChild("Rigs")
 				if rigs then
@@ -33,6 +41,7 @@ do
 									descendant.CanCollide = true
 									descendant.CanTouch = true
 									descendant.CanQuery = true
+									pcall(function() descendant.CollisionGroup = "Default" end)
 								end
 							end
 						end
@@ -42,7 +51,7 @@ do
 		end,
 	})
 
-	-- Update every physics step to ensure collisions stay completely off
+	-- Update every physics step to fight the game's map protection
 	RunService.Stepped:Connect(function()
 		if not noclipEnabled then return end
 		
@@ -50,16 +59,25 @@ do
 		if rigs then
 			for _, rig in ipairs(rigs:GetChildren()) do
 				if rig.Name == LP.Name then
-					-- Loop through every part (Torso, Head, Arms, Legs, RotParts, etc.)
+					-- Loop through every single part in the rig
 					for _, descendant in ipairs(rig:GetDescendants()) do
 						if descendant:IsA("BasePart") then
+							-- 1. Disable standard physics
 							descendant.CanCollide = false
 							descendant.CanTouch = false
-							descendant.CanQuery = false -- Prevents the game's raycasts from detecting you
+							descendant.CanQuery = false 
+							
+							-- 2. Apply the invisible collision group
+							pcall(function() descendant.CollisionGroup = "NoclipGroup" end)
+							
+							-- 3. Clear velocity so the game can't push you backwards
+							if descendant.AssemblyLinearVelocity.Magnitude > 0 then
+								descendant.AssemblyLinearVelocity = Vector3.new(0, descendant.AssemblyLinearVelocity.Y, 0)
+							end
 						end
 					end
 					
-					-- Also disable collisions on the Joints folder if it contains any parts
+					-- Make sure joints are also phantom
 					local joints = rig:FindFirstChild("Joints")
 					if joints then
 						for _, joint in ipairs(joints:GetDescendants()) do
@@ -67,6 +85,7 @@ do
 								joint.CanCollide = false
 								joint.CanTouch = false
 								joint.CanQuery = false
+								pcall(function() joint.CollisionGroup = "NoclipGroup" end)
 							end
 						end
 					end
@@ -76,3 +95,10 @@ do
 	end)
 end
 
+-- new
+
+window:Notify({
+    title = "All Loaded",
+    content = "All tests were successful at loading.",
+    duration = 10,
+})
