@@ -10,8 +10,10 @@ local tab = window:CreateTab({ name = "Test", icon = 0 })
 
 do
 	local noclipEnabled = false
+	local walkSpeed = 16
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
+	local UserInputService = game:GetService("UserInputService")
 	local LP = Players.LocalPlayer
 
 	tab:CreateDivider()
@@ -22,41 +24,59 @@ do
 		callback = function(v)
 			noclipEnabled = v
 			
-			-- When turning off, restore EVERYTHING to normal
-			if not v then
-				local rig = workspace.Rigs:FindFirstChild(LP.Name)
-				if rig then
-					for _, part in ipairs(rig:GetDescendants()) do
-						if part:IsA("BasePart") then
-							part.CanCollide = true
-							part.CanTouch = true
-							part.CanQuery = true
-						end
+			local rig = workspace.Rigs:FindFirstChild(LP.Name)
+			if rig then
+				local hum = rig:FindFirstChild("Humanoid")
+				
+				if v then
+					-- Save normal speed and freeze the game's movement controller
+					if hum then
+						walkSpeed = hum.WalkSpeed
+						hum.WalkSpeed = 0 
+					end
+				else
+					-- Restore normal speed
+					if hum then
+						hum.WalkSpeed = walkSpeed
+					end
+				end
+
+				-- Toggle physical collisions
+				for _, part in ipairs(rig:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.CanCollide = not v
+						part.CanTouch = not v
+						-- We leave CanQuery alone so the camera doesn't bug
 					end
 				end
 			end
 		end,
 	})
 
-	-- Apply every physics step so the game can't fight it
-	RunService.Stepped:Connect(function()
+	-- Manually move the character with CFrame, ignoring the game's movement checks
+	RunService.RenderStepped:Connect(function(dt)
 		if not noclipEnabled then return end
 		
 		local rig = workspace.Rigs:FindFirstChild(LP.Name)
 		if rig then
-			for _, part in ipairs(rig:GetDescendants()) do
-				if part:IsA("BasePart") then
+			local hum = rig:FindFirstChild("Humanoid")
+			local root = rig:FindFirstChild("TorsoRot") or rig:FindFirstChild("Torso") or rig:FindFirstChild("HumanoidRootPart")
+			
+			-- Keep WalkSpeed at 0 so the game can't cancel your movement
+			if hum then hum.WalkSpeed = 0 end 
+			
+			if root then
+				-- Get WASD, Mobile Joystick, or Controller Stick
+				local move = UserInputService:GetMoveVector()
+				
+				if move.Magnitude > 0 then
+					local cam = workspace.CurrentCamera
+					-- Calculate direction based on camera
+					local dir = (cam.CFrame.LookVector * -move.Z) + (cam.CFrame.RightVector * move.X)
+					dir = Vector3.new(dir.X, 0, dir.Z).Unit -- Keep it flat/horizontal
 					
-					-- Disable physical collisions
-					part.CanCollide = false
-					part.CanTouch = false
-					
-					-- Disable raycasts on the BODY so the game's wall detection ignores you.
-					-- We leave the Head's CanQuery alone so your camera doesn't bug out.
-					if part.Name ~= "Head" then
-						part.CanQuery = false
-					end
-					
+					-- Physically push the rig through the wall
+					root.CFrame = root.CFrame + (dir * walkSpeed * dt)
 				end
 			end
 		end
