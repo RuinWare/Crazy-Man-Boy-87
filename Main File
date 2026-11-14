@@ -2212,15 +2212,53 @@ do
     local edgeTrimpEnabled = false
     local edgeTrimpPower = 100
 
-    local TRIMP_HORIZONTAL_DISTANCE = 0.6
-    local TRIMP_VERTICAL_BAND = 1
-    local RAY_LENGTH = 3
-    local COOLDOWN = 0.3
+    local TRIMP_HORIZONTAL_DISTANCE = 0.7
+    local TRIMP_VERTICAL_MIN = -0.2
+    local TRIMP_VERTICAL_MAX = 1.0
+    local RAY_LENGTH = 4
+    local COOLDOWN = 0.4
 
     local rayParams = RaycastParams.new()
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
     local lastTrigger = 0
+
+    local function getFeetInfo(char, root)
+        local bestY = nil
+        local names = { "RightFoot", "LeftFoot", "RightLowerLeg", "LeftLowerLeg", "Right Leg", "Left Leg" }
+        for _, name in ipairs(names) do
+            local part = char:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                local bottomY = part.Position.Y - part.Size.Y / 2
+                if not bestY or bottomY < bestY then
+                    bestY = bottomY
+                end
+            end
+        end
+        if not bestY then
+            bestY = root.Position.Y - 3
+        end
+        return Vector3.new(root.Position.X, bestY, root.Position.Z)
+    end
+
+    local function tryTrimpAt(origin, feetY)
+        for i = 0, 15 do
+            local angle = (math.pi * 2 / 16) * i
+            local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+
+            local result = workspace:Raycast(origin, dir * RAY_LENGTH, rayParams)
+            if result and result.Instance and result.Distance <= TRIMP_HORIZONTAL_DISTANCE then
+                local part = result.Instance
+                local wallTopY = part.Position.Y + (part.Size.Y / 2)
+                local delta = wallTopY - feetY
+
+                if delta >= TRIMP_VERTICAL_MIN and delta <= TRIMP_VERTICAL_MAX then
+                    return true
+                end
+            end
+        end
+        return false
+    end
 
     local function checkEdgeTrimp()
         if not edgeTrimpEnabled then return end
@@ -2235,29 +2273,19 @@ do
 
         rayParams.FilterDescendantsInstances = {char}
 
-        -- Approximate feet Y for R6 (HRP center is ~3 studs above feet)
-        local feetY = root.Position.Y - 3
+        local feetPos = getFeetInfo(char, root)
+        local heights = { 0, 0.3, 0.6, 0.9, 1.2 }
 
-        for i = 0, 7 do
-            local angle = (math.pi / 4) * i
-            local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
-
-            local result = workspace:Raycast(root.Position, dir * RAY_LENGTH, rayParams)
-            if result and result.Instance and result.Distance <= TRIMP_HORIZONTAL_DISTANCE then
-                local part = result.Instance
-                local wallTopY = part.Position.Y + (part.Size.Y / 2)
-
-                -- Player feet must be in the top 1-stud band of the wall
-                local delta = wallTopY - feetY
-                if delta >= 0 and delta <= TRIMP_VERTICAL_BAND then
-                    lastTrigger = tick()
-                    root.AssemblyLinearVelocity = Vector3.new(
-                        root.AssemblyLinearVelocity.X,
-                        edgeTrimpPower,
-                        root.AssemblyLinearVelocity.Z
-                    )
-                    return
-                end
+        for _, h in ipairs(heights) do
+            local origin = Vector3.new(feetPos.X, feetPos.Y + h, feetPos.Z)
+            if tryTrimpAt(origin, feetPos.Y) then
+                lastTrigger = tick()
+                root.AssemblyLinearVelocity = Vector3.new(
+                    root.AssemblyLinearVelocity.X,
+                    edgeTrimpPower,
+                    root.AssemblyLinearVelocity.Z
+                )
+                return
             end
         end
     end
