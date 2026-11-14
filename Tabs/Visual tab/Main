@@ -1,7 +1,3 @@
--- copyright 2026
--- VisTab
--- upd
-
 do
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -312,8 +308,6 @@ do
         return result
     end
 
-    -- Called live (no caching) — cheap because Humanoid is O(1) and Motor6D scan only
-    -- runs if Humanoid is missing
     local function rigHasJoints(rig)
         if rig:FindFirstChildOfClass("Humanoid") then return true end
         for _, d in ipairs(rig:GetDescendants()) do
@@ -503,87 +497,82 @@ do
                 data.boxContainer.Visible = false
             end
 
--- CHAMS
-if optChams then
-    -- Highlight doesn't render on workspace.Players proxy models.
-    -- Prefer the workspace.Rigs version of the same-named rig.
-    local chamsTarget = rig
-    if source == "players" then
-        local rigsFolder = workspace:FindFirstChild("Rigs")
-        if rigsFolder then
-            local rigsVersion = rigsFolder:FindFirstChild(rig.Name)
-            if rigsVersion then
-                chamsTarget = rigsVersion
-            end
-        end
-    end
-
-    local useModelHighlight = isPlayer
-    if not useModelHighlight then
-        useModelHighlight = rigHasJoints(chamsTarget)
-    end
-
-    if useModelHighlight then
-        if not data.highlight or not data.highlight.Parent then
-            if data.highlight then
-                pcall(function() data.highlight:Destroy() end)
-            end
-            local h = Instance.new("Highlight")
-            h.FillColor = chamsColor
-            h.FillTransparency = chamsTransparency
-            h.OutlineTransparency = 1
-            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            h.Parent = chamsTarget
-            data.highlight = h
-        else
-            if data.highlight.Parent ~= chamsTarget then data.highlight.Parent = chamsTarget end
-            data.highlight.FillColor = chamsColor
-            data.highlight.FillTransparency = chamsTransparency
-        end
-        if data.chamsBox.Visible then data.chamsBox.Visible = false end
-    else
-        local hb = chamsTarget:FindFirstChild("Hitbox")
-        if hb and (hb:IsA("BasePart") or hb:IsA("Model")) then
-            if not data.highlight or not data.highlight.Parent then
-                if data.highlight then
-                    pcall(function() data.highlight:Destroy() end)
+            -- CHAMS
+            if optChams then
+                -- Highlight doesn't render on workspace.Players proxy models.
+                -- Prefer the workspace.Rigs version of the same-named rig.
+                local chamsTarget = rig
+                if source == "players" then
+                    local rigsFolder = workspace:FindFirstChild("Rigs")
+                    if rigsFolder then
+                        local rigsVersion = rigsFolder:FindFirstChild(rig.Name)
+                        if rigsVersion then
+                            chamsTarget = rigsVersion
+                        end
+                    end
                 end
-                local h = Instance.new("Highlight")
-                h.FillColor = chamsColor
-                h.FillTransparency = chamsTransparency
-                h.OutlineTransparency = 1
-                h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                h.Parent = hb
-                data.highlight = h
+
+                local useModelHighlight = isPlayer
+                if not useModelHighlight then
+                    useModelHighlight = rigHasJoints(chamsTarget)
+                end
+
+                if useModelHighlight then
+                    if not data.highlight or not data.highlight.Parent then
+                        if data.highlight then
+                            pcall(function() data.highlight:Destroy() end)
+                        end
+                        local h = Instance.new("Highlight")
+                        h.FillColor = chamsColor
+                        h.FillTransparency = chamsTransparency
+                        h.OutlineTransparency = 1
+                        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        h.Parent = chamsTarget
+                        data.highlight = h
+                    else
+                        if data.highlight.Parent ~= chamsTarget then data.highlight.Parent = chamsTarget end
+                        data.highlight.FillColor = chamsColor
+                        data.highlight.FillTransparency = chamsTransparency
+                    end
+                    if data.chamsBox.Visible then data.chamsBox.Visible = false end
+                else
+                    local hb = chamsTarget:FindFirstChild("Hitbox")
+                    if hb and (hb:IsA("BasePart") or hb:IsA("Model")) then
+                        if not data.highlight or not data.highlight.Parent then
+                            if data.highlight then
+                                pcall(function() data.highlight:Destroy() end)
+                            end
+                            local h = Instance.new("Highlight")
+                            h.FillColor = chamsColor
+                            h.FillTransparency = chamsTransparency
+                            h.OutlineTransparency = 1
+                            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                            h.Parent = hb
+                            data.highlight = h
+                        else
+                            if data.highlight.Parent ~= hb then data.highlight.Parent = hb end
+                            data.highlight.FillColor = chamsColor
+                            data.highlight.FillTransparency = chamsTransparency
+                        end
+                        if data.chamsBox.Visible then data.chamsBox.Visible = false end
+                    elseif onScreen then
+                        if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
+                        data.chamsBox.Visible = true
+                        local boxHeight = math.abs(botScreen.Y - topScreen.Y)
+                        local boxWidth = boxHeight * 0.55 * boxSize
+                        data.chamsBox.Position = UDim2.fromOffset(math.floor(topScreen.X - boxWidth / 2 + 0.5), math.floor(topScreen.Y + 0.5))
+                        data.chamsBox.Size = UDim2.fromOffset(math.floor(boxWidth + 0.5), math.floor(boxHeight + 0.5))
+                        data.chamsBox.BackgroundColor3 = chamsColor
+                        data.chamsBox.BackgroundTransparency = chamsTransparency
+                    else
+                        if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
+                        if data.chamsBox.Visible then data.chamsBox.Visible = false end
+                    end
+                end
             else
-                if data.highlight.Parent ~= hb then data.highlight.Parent = hb end
-                data.highlight.FillColor = chamsColor
-                data.highlight.FillTransparency = chamsTransparency
+                if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
+                if data.chamsBox.Visible then data.chamsBox.Visible = false end
             end
-            if data.chamsBox.Visible then data.chamsBox.Visible = false end
-        elseif onScreen then
-            if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
-            data.chamsBox.Visible = true
-            local boxHeight = math.abs(botScreen.Y - topScreen.Y)
-            local boxWidth = boxHeight * 0.55 * boxSize
-            data.chamsBox.Position = UDim2.fromOffset(math.floor(topScreen.X - boxWidth / 2 + 0.5), math.floor(topScreen.Y + 0.5))
-            data.chamsBox.Size = UDim2.fromOffset(math.floor(boxWidth + 0.5), math.floor(boxHeight + 0.5))
-            data.chamsBox.BackgroundColor3 = chamsColor
-            data.chamsBox.BackgroundTransparency = chamsTransparency
-        else
-            if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
-            if data.chamsBox.Visible then data.chamsBox.Visible = false end
-        end
-    end
-else
-    if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
-    if data.chamsBox.Visible then data.chamsBox.Visible = false end
-end
-    end
-else
-    if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
-    if data.chamsBox.Visible then data.chamsBox.Visible = false end
-end
 
             if optName and topOn then
                 data.nameLabel.Visible = true
