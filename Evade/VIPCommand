@@ -1,0 +1,89 @@
+local Info = {
+    Function = {
+        Source = "ZsEALzfuUZWHBQFGuTeLDZEld",
+        Type = "Luau function",
+        Name = "",
+        Address = "function: 0x3ec961002b3c1246",
+        Protos = {},
+        Upvalues = {
+            {
+                UnreliableRemoteEvent = true,
+                RemoteEvent = true,
+                RemoteFunction = true,
+                BindableEvent = true,
+                BindableFunction = true
+            },
+            {
+                envname = "Cobalt",
+                version = "0.4.1",
+                script = .LocalScript --[[Nil Parent]],
+                require = function(...)
+                    --[[Name: require | Line: -1
+                    Upvalues: N/A (C Closure)
+                    Function Hash: N/A (C Closure)
+                    LuaEncode: Unable to serialize function]]
+                    return
+                end,
+                shared = {}
+            },
+            {
+                invoke = {
+                    BindableFunction = true
+                },
+                InvokeServer = {
+                    RemoteFunction = true
+                },
+                invokeServer = {
+                    RemoteFunction = true
+                },
+                FireServer = {
+                    UnreliableRemoteEvent = true,
+                    RemoteEvent = true
+                },
+                fire = {
+                    BindableEvent = true
+                },
+                Fire = {
+                    BindableEvent = true
+                },
+                Invoke = {
+                    BindableFunction = true
+                },
+                fireServer = {
+                    UnreliableRemoteEvent = true,
+                    RemoteEvent = true
+                }
+            },
+            function(arg1, arg2, arg3, ...)
+                --[[Name: HandleLogging | Line: 2385
+                Upvalues: 6
+                Function Hash: 9994d8fe88ebda6f1a166e01c011c5cb4b352336fd1f72414ed98da8d5c30e20e6f6ff0b2b3184a51dce1dce0ad31a54
+                LuaEncode: Unable to serialize function]]
+                return
+            end
+        },
+        Arguments = {
+            "!stretchvertical me 0.8"
+        },
+        Constants = {
+            "getnamecallmethod",
+            nil,
+            "typeof",
+            nil,
+            "Instance",
+            "ClassName",
+            "shared",
+            "Communicator",
+            "rawequal",
+            nil,
+            "ActorCommunicator",
+            "ShouldIgnore",
+            "getcallingscript",
+            nil,
+            "cloneref",
+            nil,
+            "NamecallHook"
+        }
+    },
+    Line = 2507
+}
