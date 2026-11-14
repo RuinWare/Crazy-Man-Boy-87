@@ -1,0 +1,78 @@
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
+
+local window = Rayfield:CreateWindow({
+    name = "RW TESTING",
+    subtitle = "Evade",
+    sidebarLayout = true,
+})
+
+local tab = window:CreateTab({ name = "Test", icon = 0 })
+
+do
+	local noclipEnabled = false
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	tab:CreateDivider()
+
+	tab:CreateToggle({
+		name = "Noclip",
+		value = false,
+		callback = function(v)
+			noclipEnabled = v
+			
+			-- Instantly restore collisions when turned off
+			if not v then
+				local rigs = workspace:FindFirstChild("Rigs")
+				if rigs then
+					for _, rig in ipairs(rigs:GetChildren()) do
+						if rig.Name == LP.Name then
+							for _, descendant in ipairs(rig:GetDescendants()) do
+								if descendant:IsA("BasePart") then
+									descendant.CanCollide = true
+									descendant.CanTouch = true
+									descendant.CanQuery = true
+								end
+							end
+						end
+					end
+				end
+			end
+		end,
+	})
+
+	-- Update every physics step to ensure collisions stay completely off
+	RunService.Stepped:Connect(function()
+		if not noclipEnabled then return end
+		
+		local rigs = workspace:FindFirstChild("Rigs")
+		if rigs then
+			for _, rig in ipairs(rigs:GetChildren()) do
+				if rig.Name == LP.Name then
+					-- Loop through every part (Torso, Head, Arms, Legs, RotParts, etc.)
+					for _, descendant in ipairs(rig:GetDescendants()) do
+						if descendant:IsA("BasePart") then
+							descendant.CanCollide = false
+							descendant.CanTouch = false
+							descendant.CanQuery = false -- Prevents the game's raycasts from detecting you
+						end
+					end
+					
+					-- Also disable collisions on the Joints folder if it contains any parts
+					local joints = rig:FindFirstChild("Joints")
+					if joints then
+						for _, joint in ipairs(joints:GetDescendants()) do
+							if joint:IsA("BasePart") then
+								joint.CanCollide = false
+								joint.CanTouch = false
+								joint.CanQuery = false
+							end
+						end
+					end
+				end
+			end
+		end
+	end)
+end
+
