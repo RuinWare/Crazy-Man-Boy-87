@@ -2204,6 +2204,91 @@ end
 
 --[[
 ===========================
+EASY EDGE
+===========================
+]]--
+
+do
+    local edgeTrimpEnabled = false
+    local edgeTrimpPower = 100
+
+    local TRIMP_HORIZONTAL_DISTANCE = 0.6
+    local TRIMP_VERTICAL_BAND = 1
+    local RAY_LENGTH = 3
+    local COOLDOWN = 0.3
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+    local lastTrigger = 0
+
+    local function checkEdgeTrimp()
+        if not edgeTrimpEnabled then return end
+        if tick() - lastTrigger < COOLDOWN then return end
+
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+        if hum.Health <= 0 then return end
+
+        rayParams.FilterDescendantsInstances = {char}
+
+        -- Approximate feet Y for R6 (HRP center is ~3 studs above feet)
+        local feetY = root.Position.Y - 3
+
+        for i = 0, 7 do
+            local angle = (math.pi / 4) * i
+            local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+
+            local result = workspace:Raycast(root.Position, dir * RAY_LENGTH, rayParams)
+            if result and result.Instance and result.Distance <= TRIMP_HORIZONTAL_DISTANCE then
+                local part = result.Instance
+                local wallTopY = part.Position.Y + (part.Size.Y / 2)
+
+                -- Player feet must be in the top 1-stud band of the wall
+                local delta = wallTopY - feetY
+                if delta >= 0 and delta <= TRIMP_VERTICAL_BAND then
+                    lastTrigger = tick()
+                    root.AssemblyLinearVelocity = Vector3.new(
+                        root.AssemblyLinearVelocity.X,
+                        edgeTrimpPower,
+                        root.AssemblyLinearVelocity.Z
+                    )
+                    return
+                end
+            end
+        end
+    end
+
+    RunService.Heartbeat:Connect(checkEdgeTrimp)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Easy Edge Trimp",
+        currentValue = false,
+        flag = "EdgeTrimp_Toggle",
+        callback = function(v) edgeTrimpEnabled = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Power:",
+        range = {10, 500},
+        increment = 1,
+        suffix = "",
+        currentValue = 100,
+        flag = "EdgeTrimp_Power",
+        callback = function(v) edgeTrimpPower = v end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["EdgeTrimp"] = function(v) edgeTrimpEnabled = v end
+end
+
+--[[
+===========================
 SUPERJUMP
 ===========================
 ]]--
