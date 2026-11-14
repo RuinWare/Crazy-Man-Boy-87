@@ -708,7 +708,7 @@ REMOVE BREACHER LAG
 ===========================
 ]]--
 do
-VisTab:CreateDivider({ text = "Optimization" })
+VisTab:CreateDivider({ text = "Tools" })
 
 VisTab:CreateToggle({
     name = "Remove Breacher Lag",
@@ -765,6 +765,82 @@ end
     end,
 })
 end
+
+--[[
+===========================
+HIDE NVV
+===========================
+]]--
+
+do
+	local hideVignetteEnabled = false
+	local savedVignette = nil
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	-- Helper to safely get the NightVision folder
+	local function getNightVisionFolder()
+		local playerGui = LP:FindFirstChild("PlayerGui")
+		if not playerGui then return nil end
+		
+		local gameGui = playerGui:FindFirstChild("Game")
+		if not gameGui then return nil end
+		
+		local hud = gameGui:FindFirstChild("HUD")
+		if not hud then return nil end
+		
+		return hud:FindFirstChild("NightVision")
+	end
+
+	VisTab:CreateToggle({
+		name = "Remove Night Vision Vignette",
+		value = false,
+		callback = function(v)
+			hideVignetteEnabled = v
+			
+			if v then
+				-- Save the original and delete it
+				local nv = getNightVisionFolder()
+				local vignette = nv and nv:FindFirstChild("Vignette")
+				
+				if vignette and not savedVignette then
+					savedVignette = vignette:Clone()
+					vignette:Destroy()
+				end
+			else
+				-- Restore the original
+				if savedVignette then
+					local nv = getNightVisionFolder()
+					if nv and not nv:FindFirstChild("Vignette") then
+						savedVignette:Clone().Parent = nv
+					end
+					savedVignette = nil
+				end
+			end
+		end,
+	})
+
+	-- Enforce deletion every frame to prevent the game from recreating it
+	RunService.Heartbeat:Connect(function()
+		if hideVignetteEnabled then
+			local nv = getNightVisionFolder()
+			if nv then
+				local vignette = nv:FindFirstChild("Vignette")
+				if vignette then
+					-- If we haven't saved it yet, save it now before destroying
+					if not savedVignette then
+						savedVignette = vignette:Clone()
+					end
+					vignette:Destroy()
+				end
+			end
+		end
+	end)
+end
+
 --[[
 ===========================
 RES STRECHER
