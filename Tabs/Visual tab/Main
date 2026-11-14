@@ -860,3 +860,147 @@ VisTab:CreateInput({
 	end,
 })
 end
+
+--[[
+===========================
+SPOOFING
+===========================
+]]--
+
+do
+    local Plr = game.Players.LocalPlayer
+    getgenv().spoofState = getgenv().spoofState or {}
+
+    local function escPattern(s) return s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0") end
+    local function escRepl(s)    return s:gsub("%%", "%%%%") end
+
+    local function makeSpoofer(flag, getOriginal)
+        local api = { active = false, name = getOriginal() }
+        local function getState() return getgenv().spoofState[flag] end
+
+        local function render(label)
+            local state = getState()
+            if not state then return end
+            local real = state.originals[label]
+            if real == nil then return end
+            local desired = real:gsub(state.escName, state.nameRepl)
+            if label.Text ~= desired then
+                state.lastSet[label] = desired
+                label.Text = desired
+            end
+        end
+
+        local function renderAll()
+            local state = getState()
+            if not state then return end
+            for label in pairs(state.hooked) do pcall(render, label) end
+        end
+
+        local function attach(label)
+            local state = getState()
+            if not state then return end
+            if state.originals[label] == nil then
+                if not label.Text:find(getOriginal(), 1, true) then return end
+                state.originals[label] = label.Text
+            end
+            render(label)
+            if state.hooked[label] then return end
+            state.hooked[label] = true
+            table.insert(state.hooks, label:GetPropertyChangedSignal("Text"):Connect(function()
+                local st = getState()
+                if not st then return end
+                local cur = label.Text
+                if cur == st.lastSet[label] then return end
+                st.originals[label] = cur
+                render(label)
+            end))
+        end
+
+        function api.setName(newName)
+            if not newName or newName == "" then return end
+            api.name = newName
+            local state = getState()
+            if state then
+                state.nameRepl = escRepl(newName)
+                renderAll()
+            end
+        end
+
+        function api.on()
+            local prev = getgenv().spoofState[flag]
+            if prev then
+                for _, c in ipairs(prev.hooks) do c:Disconnect() end
+            end
+            local state = {
+                originals = (prev and prev.originals) or setmetatable({}, {__mode="k"}),
+                hooked    = (prev and prev.hooked)    or setmetatable({}, {__mode="k"}),
+                lastSet   = (prev and prev.lastSet)   or setmetatable({}, {__mode="k"}),
+                hooks = {},
+                escName  = escPattern(getOriginal()),
+                nameRepl = escRepl(api.name),
+            }
+            getgenv().spoofState[flag] = state
+            for _, v in next, game:GetDescendants() do
+                if v.ClassName == "TextLabel" then attach(v) end
+            end
+            table.insert(state.hooks, game.DescendantAdded:Connect(function(v)
+                if v.ClassName == "TextLabel" then attach(v) end
+            end))
+            api.active = true
+        end
+
+        function api.off()
+            local state = getState()
+            if not state then return end
+            for _, c in ipairs(state.hooks) do c:Disconnect() end
+            for label, real in pairs(state.originals) do
+                if label.Parent then pcall(function() label.Text = real end) end
+            end
+            getgenv().spoofState[flag] = nil
+            api.active = false
+        end
+
+        return api
+    end
+
+    local usernameSpoofer = makeSpoofer("username",    function() return Plr.Name        end)
+    local displaySpoofer  = makeSpoofer("displayName", function() return Plr.DisplayName end)
+
+    VisTab:CreateDivider({ text = "Spoofing" })
+
+    VisTab:CreateToggle({
+        name = "Spoof Username",
+        flag = "SpoofUsername",
+        value = false,
+        callback = function(v)
+            if v then usernameSpoofer.on() else usernameSpoofer.off() end
+        end,
+    })
+
+    VisTab:CreateInput({
+        name = "Username:",
+        value = Plr.Name,
+        placeholder = "New username",
+        callback = function(text)
+            if text ~= "" then usernameSpoofer.setName(text) end
+        end,
+    })
+
+    VisTab:CreateToggle({
+        name = "Spoof Display Name",
+        flag = "SpoofDisplayName",
+        value = false,
+        callback = function(v)
+            if v then displaySpoofer.on() else displaySpoofer.off() end
+        end,
+    })
+
+    VisTab:CreateInput({
+        name = "Display Name:",
+        value = Plr.DisplayName,
+        placeholder = "New display name",
+        callback = function(text)
+            if text ~= "" then displaySpoofer.setName(text) end
+        end,
+    })
+end
