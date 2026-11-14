@@ -271,7 +271,39 @@ do
         return data
     end
 
-    -- Cache bounds once per rig
+    -- Collects rigs from workspace.Players first, then workspace.Rigs.
+    -- If a name appears in both, workspace.Players wins (Rigs version skipped).
+    local function collectRigs()
+        local result = {}
+        local seen = {}
+        local nameInPlayers = {}
+
+        local playersFolder = workspace:FindFirstChild("Players")
+        if playersFolder then
+            for _, child in ipairs(playersFolder:GetChildren()) do
+                if (child:IsA("Model") or child:IsA("BasePart")) and not seen[child] then
+                    seen[child] = true
+                    nameInPlayers[child.Name] = true
+                    table.insert(result, child)
+                end
+            end
+        end
+
+        local rigsFolder = workspace:FindFirstChild("Rigs")
+        if rigsFolder then
+            for _, child in ipairs(rigsFolder:GetChildren()) do
+                if (child:IsA("Model") or child:IsA("BasePart")) and not seen[child] then
+                    if not nameInPlayers[child.Name] then
+                        seen[child] = true
+                        table.insert(result, child)
+                    end
+                end
+            end
+        end
+
+        return result
+    end
+
     local function computeBounds(rig, isPlayer)
         if isPlayer then
             local hrp = rig:FindFirstChild("HumanoidRootPart")
@@ -320,14 +352,10 @@ do
             return
         end
 
-        local rigsFolder = workspace:FindFirstChild("Rigs")
-        if not rigsFolder then return end
-
         local seen = {}
 
-        for _, rig in ipairs(rigsFolder:GetChildren()) do
+        for _, rig in ipairs(collectRigs()) do
             if rig.Name == player.Name then continue end
-            if not (rig:IsA("Model") or rig:IsA("BasePart")) then continue end
 
             local isPlayer = playerNames[rig.Name] == true
             local shouldRender = (isPlayer and showPlayers) or (not isPlayer and showNextbots)
@@ -338,7 +366,6 @@ do
                 continue
             end
 
-            -- Quick behind-camera + distance check before expensive ops
             local refPos
             if isPlayer then
                 local hrp = rig:FindFirstChild("HumanoidRootPart")
@@ -370,7 +397,6 @@ do
                 data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer)
             end
 
-            -- Refresh bounds if anchor disappeared (respawn, etc.)
             if not data.anchor or not data.anchor.Parent then
                 data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer)
             end
@@ -394,7 +420,6 @@ do
             local tDistColor = isPlayer and distanceColorPlayers or distanceColorNextbots
             local tTracerColor = isPlayer and tracerColorPlayers or tracerColorNextbots
 
-            -- BOX
             if optBox and onScreen then
                 data.boxContainer.Visible = true
                 local boxHeight = math.abs(botScreen.Y - topScreen.Y)
@@ -440,7 +465,6 @@ do
                 data.boxContainer.Visible = false
             end
 
-            -- CHAMS
             if optChams then
                 if isPlayer then
                     if not data.highlight then
@@ -491,7 +515,6 @@ do
                 if data.chamsBox.Visible then data.chamsBox.Visible = false end
             end
 
-            -- NAME
             if optName and topOn then
                 data.nameLabel.Visible = true
                 data.nameLabel.Text = rig.Name
@@ -504,7 +527,6 @@ do
                 data.nameLabel.Visible = false
             end
 
-            -- DISTANCE
             if optDistance and topOn then
                 data.distLabel.Visible = true
                 local distStuds = (centerWorld - camPos).Magnitude
@@ -518,7 +540,6 @@ do
                 data.distLabel.Visible = false
             end
 
-            -- TRACERS
             if optTracers and centerOn then
                 local fromPos
                 if tracerPart == "Bottom" then
