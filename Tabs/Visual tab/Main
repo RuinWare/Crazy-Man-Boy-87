@@ -1642,7 +1642,7 @@ do
 
 	VisTab:CreateColorPicker({
 		name = "Health",
-		color = Color3.fromRGB(255, 50, 50), -- Default red
+		color = Color3.fromRGB(255,255, 255), -- Default red
 		callback = function(color)
 			healthColor = color
 			if hudEnabled then applyColors() end
