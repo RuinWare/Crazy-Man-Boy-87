@@ -1068,7 +1068,7 @@ do
     })
 end
 
--- avatar 6.0
+-- avatar 4.0
 
 do
 	local avatarEnabled = false
@@ -1092,7 +1092,7 @@ do
 		return nil
 	end
 
-	-- Helper to apply the description to a specific rig (Used for applying OTHER avatars)
+	-- Helper to apply the description to a specific rig
 	local function applyToRig(rig, desc)
 		local hum = rig:FindFirstChildOfClass("Humanoid")
 		if not hum then return end
@@ -1140,48 +1140,6 @@ do
 		end
 	end
 
-	-- NEW: Recovery function that uses the Headless method to fix baldness
-	local function recoverRig(rig)
-		local hum = rig:FindFirstChildOfClass("Humanoid")
-		if not hum then return end
-		
-		-- Clear old items
-		for _, item in ipairs(rig:GetDescendants()) do
-			if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
-				item:Destroy()
-			end
-		end
-		
-		local head = rig:FindFirstChild("Head")
-		if head then
-			for _, item in ipairs(head:GetChildren()) do
-				if item:IsA("Decal") then item:Destroy() end
-			end
-		end
-
-		-- Fetch own appearance
-		local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(LP.UserId) end)
-		if aSuccess and appearance then
-			for _, item in ipairs(appearance:GetDescendants()) do
-				if item:IsA("Accessory") then
-					-- THE HEADLESS FIX: Direct parenting stops the baldness and rigs it right
-					item:Clone().Parent = rig
-				elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
-					item:Clone().Parent = rig
-				end
-			end
-		end
-		
-		-- Force apply Face
-		local myDesc = getDesc(LP.Name)
-		if myDesc and myDesc.Face > 0 and head then
-			local face = Instance.new("Decal")
-			face.Name = "face"
-			face.Texture = "rbxassetid://" .. myDesc.Face
-			face.Parent = head
-		end
-	end
-
 	VisTab:CreateToggle({
 		name = "Local Avatar Changer",
 		value = false,
@@ -1197,13 +1155,16 @@ do
 					end)
 				end
 			else
-				-- Revert everything to LocalPlayer using the FIXED recovery method
+				-- Revert everything to LocalPlayer
 				task.spawn(function()
-					local rigs = workspace:FindFirstChild("Rigs")
-					if rigs then
-						for _, rig in ipairs(rigs:GetChildren()) do
-							if rig.Name == LP.Name then
-								recoverRig(rig) -- Uses the new headless logic
+					local myDesc = getDesc(LP.Name)
+					if myDesc then
+						local rigs = workspace:FindFirstChild("Rigs")
+						if rigs then
+							for _, rig in ipairs(rigs:GetChildren()) do
+								if rig.Name == LP.Name then
+									applyToRig(rig, myDesc)
+								end
 							end
 						end
 					end
