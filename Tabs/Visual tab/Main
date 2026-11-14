@@ -1226,3 +1226,178 @@ do
 		end
 	end)
 end
+
+-- others avatar v1.0
+
+do
+	local avatarEnabled = false
+	local targetUsername = ""
+	local cachedDesc = nil
+	local targetUserId = nil
+	local appliedRigs = {}
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	-- Helper to fetch the description and UserId
+	local function getDesc(username)
+		local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
+		if ok and userId then
+			local dOk, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
+			if dOk then 
+				return desc, userId
+			end
+		end
+		return nil, nil
+	end
+
+	-- Helper to apply the description to a specific rig
+	local function applyToRig(rig, desc, userId)
+		local hum = rig:FindFirstChildOfClass("Humanoid")
+		if not hum then return end
+		
+		-- Clear old items
+		for _, item in ipairs(rig:GetDescendants()) do
+			if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+				item:Destroy()
+			end
+		end
+		
+		local head = rig:FindFirstChild("Head")
+		if head then
+			for _, item in ipairs(head:GetChildren()) do
+				if item:IsA("Decal") then item:Destroy() end
+			end
+		end
+
+		-- Apply description
+		local successApply = pcall(function()
+			hum:ApplyDescription(desc)
+		end)
+
+		-- Fallback for custom rigs
+		if not successApply and userId then
+			local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
+			if aSuccess and appearance then
+				for _, item in ipairs(appearance:GetDescendants()) do
+					if item:IsA("Accessory") then
+						pcall(function() hum:AddAccessory(item:Clone()) end)
+					elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+						item:Clone().Parent = rig
+					end
+				end
+			end
+		end
+		
+		-- Force apply Face
+		if desc.Face > 0 and head then
+			local face = Instance.new("Decal")
+			face.Name = "face"
+			face.Texture = "rbxassetid://" .. desc.Face
+			face.Parent = head
+		end
+	end
+
+	VisTab:CreateToggle({
+		name = "Others Avatar Spoofer",
+		value = false,
+		callback = function(v)
+			avatarEnabled = v
+			appliedRigs = {}
+			
+			if v then
+				cachedDesc = nil
+				targetUserId = nil
+				if targetUsername ~= "" then
+					task.spawn(function()
+						cachedDesc, targetUserId = getDesc(targetUsername)
+					end)
+				end
+			else
+				-- Revert everything to their own actual avatars
+				task.spawn(function()
+					local rigs = workspace:FindFirstChild("Rigs")
+					if rigs then
+						for _, rig in ipairs(rigs:GetChildren()) do
+							-- Check if it's a real player
+							local plr = Players:FindFirstChild(rig.Name)
+							if plr and plr ~= LP then
+								local myDesc, myId = getDesc(plr.Name)
+								if myDesc then
+									applyToRig(rig, myDesc, myId)
+									task.wait(0.1) -- Small delay to prevent rate limits
+								end
+							end
+						end
+					end
+				end)
+			end
+		end,
+	})
+
+	VisTab:CreateInput({
+		name = "Username:",
+		placeholder = "Enter username",
+		removeTextAfterFocusLost = false,
+		callback = function(text)
+			targetUsername = text
+			cachedDesc = nil
+			targetUserId = nil
+			appliedRigs = {}
+			
+			if avatarEnabled and targetUsername ~= "" then
+				task.spawn(function()
+					cachedDesc, targetUserId = getDesc(targetUsername)
+				end)
+			end
+		end,
+	})
+
+	-- Live updating loop
+	RunService.Heartbeat:Connect(function()
+		if not avatarEnabled then return end
+		if not targetUsername or targetUsername == "" then return end
+		
+		-- Wait for description to load
+		if not cachedDesc then
+			cachedDesc, targetUserId = getDesc(targetUsername)
+			if not cachedDesc then return end
+		end
+
+		-- Build a table of valid players (excluding LocalPlayer)
+		local validPlayers = {}
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= LP then
+				validPlayers[plr.Name] = true
+			end
+		end
+
+		local rigs = workspace:FindFirstChild("Rigs")
+		if not rigs then return end
+		
+		local activeRigs = {}
+		
+		for _, rig in ipairs(rigs:GetChildren()) do
+			-- NEXTBOT CHECK: Only edit rigs that match an actual player in the game
+			if validPlayers[rig.Name] then
+				activeRigs[rig] = true
+				
+				-- If we haven't applied the avatar to this specific rig yet, do it now
+				if not appliedRigs[rig] then
+					appliedRigs[rig] = true
+					applyToRig(rig, cachedDesc, targetUserId)
+				end
+			end
+		end
+		
+		-- Cleanup the cache
+		for rig in pairs(appliedRigs) do
+			if not activeRigs[rig] then
+				appliedRigs[rig] = nil
+			end
+		end
+	end)
+end
