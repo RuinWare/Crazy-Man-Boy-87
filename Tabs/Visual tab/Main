@@ -1073,9 +1073,8 @@ end
 do
 	local avatarEnabled = false
 	local targetUsername = ""
-	local cachedAppearance = nil
 	local cachedDesc = nil
-	local appliedRigs = {} 
+	local appliedRigs = {} -- Tracks which rigs have already been modified
 	
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
@@ -1083,25 +1082,24 @@ do
 
 	VisTab:CreateDivider()
 
-	local function getData(username)
+	-- Helper to fetch the description and cache it
+	local function getDesc(username)
 		local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
 		if ok and userId then
-			local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
 			local dOk, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
-			if aSuccess and desc then
-				return appearance, desc
-			end
+			if dOk then return desc end
 		end
-		return nil, nil
+		return nil
 	end
 
-	local function applyToRig(rig, appearance, desc)
+	-- Helper to apply the description to a specific rig (Used for applying OTHER avatars)
+	local function applyToRig(rig, desc)
 		local hum = rig:FindFirstChildOfClass("Humanoid")
 		if not hum then return end
-
-		-- 1. Clear old items (Hair, Hats, Clothes, R15 Meshes)
+		
+		-- Clear old items
 		for _, item in ipairs(rig:GetDescendants()) do
-			if item:IsA("Accessory") or item:IsA("CharacterMesh") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("MeshPart") then
+			if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
 				item:Destroy()
 			end
 		end
@@ -1109,77 +1107,103 @@ do
 		local head = rig:FindFirstChild("Head")
 		if head then
 			for _, item in ipairs(head:GetChildren()) do
-				if item:IsA("Decal") and item.Name == "face" then item:Destroy() end
+				if item:IsA("Decal") then item:Destroy() end
 			end
 		end
 
-		-- 2. Apply Appearance (THE HEADLESS FIX: Direct Parent instead of AddAccessory)
-		if appearance then
-			for _, item in ipairs(appearance:GetChildren()) do
-				if item:IsA("Accessory") then
-					-- Check for R15 Layered Clothing (which breaks camera)
-					local isLayered = false
-					for _, child in ipairs(item:GetDescendants()) do
-						if child:IsA("WrapLayer") or child:IsA("WrapTarget") then
-							isLayered = true
-							break
-						end
-					end
-					
-					if not isLayered then
-						-- Direct parenting fixes the "bald" issue
+		-- Apply description
+		local successApply = pcall(function()
+			hum:ApplyDescription(desc)
+		end)
+
+		-- Fallback for custom rigs
+		if not successApply then
+			local userId = Players:GetUserIdFromNameAsync(desc.Name)
+			local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
+			if aSuccess and appearance then
+				for _, item in ipairs(appearance:GetDescendants()) do
+					if item:IsA("Accessory") then
+						pcall(function() hum:AddAccessory(item:Clone()) end)
+					elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
 						item:Clone().Parent = rig
 					end
-				elseif item:IsA("CharacterMesh") then
-					-- This forces the Woman body type safely without R15 MeshParts
-					item:Clone().Parent = rig
-				elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") then
-					item:Clone().Parent = rig
 				end
 			end
 		end
-
-		-- 3. Apply Face (using HumanoidDescription exactly like you said)
-		if desc and desc.Face > 0 and head then
+		
+		-- Force apply Face
+		if desc.Face > 0 and head then
 			local face = Instance.new("Decal")
 			face.Name = "face"
 			face.Texture = "rbxassetid://" .. desc.Face
 			face.Parent = head
 		end
+	end
+
+	-- NEW: Recovery function that uses the Headless method to fix baldness
+	local function recoverRig(rig)
+		local hum = rig:FindFirstChildOfClass("Humanoid")
+		if not hum then return end
 		
-		-- 4. Final sweep: Destroy any R15 MeshParts that somehow got in
-		for _, item in ipairs(rig:GetChildren()) do
-			if item:IsA("MeshPart") then
+		-- Clear old items
+		for _, item in ipairs(rig:GetDescendants()) do
+			if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
 				item:Destroy()
 			end
+		end
+		
+		local head = rig:FindFirstChild("Head")
+		if head then
+			for _, item in ipairs(head:GetChildren()) do
+				if item:IsA("Decal") then item:Destroy() end
+			end
+		end
+
+		-- Fetch own appearance
+		local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(LP.UserId) end)
+		if aSuccess and appearance then
+			for _, item in ipairs(appearance:GetDescendants()) do
+				if item:IsA("Accessory") then
+					-- THE HEADLESS FIX: Direct parenting stops the baldness and rigs it right
+					item:Clone().Parent = rig
+				elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+					item:Clone().Parent = rig
+				end
+			end
+		end
+		
+		-- Force apply Face
+		local myDesc = getDesc(LP.Name)
+		if myDesc and myDesc.Face > 0 and head then
+			local face = Instance.new("Decal")
+			face.Name = "face"
+			face.Texture = "rbxassetid://" .. myDesc.Face
+			face.Parent = head
 		end
 	end
 
 	VisTab:CreateToggle({
-		name = "Avatar Changer",
+		name = "Local Avatar Changer",
 		value = false,
 		callback = function(v)
 			avatarEnabled = v
-			appliedRigs = {}
+			appliedRigs = {} -- Reset cache
 			
 			if v then
-				cachedAppearance = nil
 				cachedDesc = nil
 				if targetUsername ~= "" then
 					task.spawn(function()
-						cachedAppearance, cachedDesc = getData(targetUsername)
+						cachedDesc = getDesc(targetUsername)
 					end)
 				end
 			else
+				-- Revert everything to LocalPlayer using the FIXED recovery method
 				task.spawn(function()
-					local myApp, myDesc = getData(LP.Name)
-					if myApp and myDesc then
-						local rigs = workspace:FindFirstChild("Rigs")
-						if rigs then
-							for _, rig in ipairs(rigs:GetChildren()) do
-								if rig.Name == LP.Name then
-									applyToRig(rig, myApp, myDesc)
-								end
+					local rigs = workspace:FindFirstChild("Rigs")
+					if rigs then
+						for _, rig in ipairs(rigs:GetChildren()) do
+							if rig.Name == LP.Name then
+								recoverRig(rig) -- Uses the new headless logic
 							end
 						end
 					end
@@ -1189,30 +1213,31 @@ do
 	})
 
 	VisTab:CreateInput({
-		name = "Username",
+		name = "Username:",
 		placeholder = "Enter username",
 		removeTextAfterFocusLost = false,
 		callback = function(text)
 			targetUsername = text
-			cachedAppearance = nil
-			cachedDesc = nil
-			appliedRigs = {}
+			cachedDesc = nil -- Reset cache so it fetches the new name
+			appliedRigs = {} -- Force all rigs to update to the new name
 			
 			if avatarEnabled and targetUsername ~= "" then
 				task.spawn(function()
-					cachedAppearance, cachedDesc = getData(targetUsername)
+					cachedDesc = getDesc(targetUsername)
 				end)
 			end
 		end,
 	})
 
+	-- Live updating loop
 	RunService.Heartbeat:Connect(function()
 		if not avatarEnabled then return end
 		if not targetUsername or targetUsername == "" then return end
 		
-		if not cachedAppearance or not cachedDesc then
-			cachedAppearance, cachedDesc = getData(targetUsername)
-			if not cachedAppearance or not cachedDesc then return end
+		-- Wait for the description to load
+		if not cachedDesc then
+			cachedDesc = getDesc(targetUsername)
+			if not cachedDesc then return end
 		end
 
 		local rigs = workspace:FindFirstChild("Rigs")
@@ -1224,13 +1249,15 @@ do
 			if rig.Name == LP.Name then
 				activeRigs[rig] = true
 				
+				-- If we haven't applied the avatar to this specific rig yet, do it now
 				if not appliedRigs[rig] then
 					appliedRigs[rig] = true
-					applyToRig(rig, cachedAppearance, cachedDesc)
+					applyToRig(rig, cachedDesc)
 				end
 			end
 		end
 		
+		-- Cleanup the cache to prevent memory leaks from destroyed rigs
 		for rig in pairs(appliedRigs) do
 			if not activeRigs[rig] then
 				appliedRigs[rig] = nil
