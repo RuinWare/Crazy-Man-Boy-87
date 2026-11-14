@@ -4759,63 +4759,6 @@ _G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else
 end
 
 --[[
-===========================
-NOCLIP
-===========================
-]]--
-
-do
-	local noclipEnabled = false
-	local Players = game:GetService("Players")
-	local RunService = game:GetService("RunService")
-	local LP = Players.LocalPlayer
-
-	tab:CreateDivider()
-
-	tab:CreateToggle({
-		name = "Noclip",
-		value = false,
-		callback = function(v)
-			noclipEnabled = v
-			
-			-- Instantly restore collisions when turned off
-			if not v then
-				local rigs = workspace:FindFirstChild("Rigs")
-				if rigs then
-					for _, rig in ipairs(rigs:GetChildren()) do
-						if rig.Name == LP.Name then
-							for _, descendant in ipairs(rig:GetDescendants()) do
-								if descendant:IsA("BasePart") then
-									descendant.CanCollide = true
-								end
-							end
-						end
-					end
-				end
-			end
-		end,
-	})
-
-	-- Update every physics step to ensure collisions stay off
-	RunService.Stepped:Connect(function()
-		if not noclipEnabled then return end
-		
-		local rigs = workspace:FindFirstChild("Rigs")
-		if rigs then
-			for _, rig in ipairs(rigs:GetChildren()) do
-				if rig.Name == LP.Name then
-					for _, descendant in ipairs(rig:GetDescendants()) do
-						if descendant:IsA("BasePart") then
-							descendant.CanCollide = false
-						end
-					end
-				end
-			end
-		end
-	end)
-end
-
---[[
 ============================================================================
 Fly
 ============================================================================
@@ -5902,7 +5845,7 @@ H and k
 buildExtras(VisTab, window)
 
 -- more
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/995100c282573341fe7e296e2ab30540f4c5282f/Tabs/Visual%20tab/Main"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual tab/Main"))()
 
 --[[
 ============================================================================
