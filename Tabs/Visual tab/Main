@@ -853,7 +853,7 @@ VisTab:CreateToggle({
 
 VisTab:CreateInput({
 	name = "Amount:",
-	value "1",
+	value "",
 	placeholder = "0.00",
 	callback = function(text)
 		RESAMOUNT1 = tonumber(text) or 1
