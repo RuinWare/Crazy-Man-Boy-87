@@ -895,9 +895,9 @@ do
         -- Game camera rebuilds CFrame next frame automatically, snaps back
     end
 
-    tab:CreateDivider()
+    VisTab:CreateDivider()
 
-    tab:CreateToggle({
+    VisTab:CreateToggle({
         name = "3rd Person",
         currentValue = false,
         flag = "ThirdPerson_Toggle",
@@ -907,7 +907,7 @@ do
         end,
     })
 
-    tab:CreateSlider({
+    VisTab:CreateSlider({
         name = "Zoom Distance",
         range = {1, 50},
         increment = 0.5,
