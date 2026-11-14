@@ -5,7 +5,7 @@ local window = Rayfield:CreateWindow({
     subtitle = "Evade",
     sidebarLayout = true,
 })
--- tab
+-- tabb
 local tab = window:CreateTab({ name = "Test", icon = 0 })
 
 do
@@ -22,18 +22,15 @@ do
 		callback = function(v)
 			noclipEnabled = v
 			
-			-- When turning off, restore collisions
+			-- When turning off, restore EVERYTHING to normal
 			if not v then
-				local rigs = workspace:FindFirstChild("Rigs")
-				if rigs then
-					for _, rig in ipairs(rigs:GetChildren()) do
-						if rig.Name == LP.Name then
-							for _, descendant in ipairs(rig:GetDescendants()) do
-								if descendant:IsA("BasePart") then
-									descendant.CanCollide = true
-									descendant.CanTouch = true
-								end
-							end
+				local rig = workspace.Rigs:FindFirstChild(LP.Name)
+				if rig then
+					for _, part in ipairs(rig:GetDescendants()) do
+						if part:IsA("BasePart") then
+							part.CanCollide = true
+							part.CanTouch = true
+							part.CanQuery = true
 						end
 					end
 				end
@@ -41,22 +38,25 @@ do
 		end,
 	})
 
-	-- Every frame, disable collisions on all parts of the rig
+	-- Apply every physics step so the game can't fight it
 	RunService.Stepped:Connect(function()
 		if not noclipEnabled then return end
 		
-		local rigs = workspace:FindFirstChild("Rigs")
-		if rigs then
-			for _, rig in ipairs(rigs:GetChildren()) do
-				if rig.Name == LP.Name then
-					-- Loops through Torso, TorsoRot, Head, Arms, Legs, ArmRot, Joints, etc.
-					for _, descendant in ipairs(rig:GetDescendants()) do
-						if descendant:IsA("BasePart") then
-							descendant.CanCollide = false
-							descendant.CanTouch = false
-							-- We leave CanQuery alone so your camera doesn't bug out
-						end
+		local rig = workspace.Rigs:FindFirstChild(LP.Name)
+		if rig then
+			for _, part in ipairs(rig:GetDescendants()) do
+				if part:IsA("BasePart") then
+					
+					-- Disable physical collisions
+					part.CanCollide = false
+					part.CanTouch = false
+					
+					-- Disable raycasts on the BODY so the game's wall detection ignores you.
+					-- We leave the Head's CanQuery alone so your camera doesn't bug out.
+					if part.Name ~= "Head" then
+						part.CanQuery = false
 					end
+					
 				end
 			end
 		end
