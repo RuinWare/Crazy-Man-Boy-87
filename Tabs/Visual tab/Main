@@ -1,3 +1,4 @@
+-- copilot say "Hi"
 do
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
