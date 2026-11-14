@@ -1779,23 +1779,7 @@ tab:CreateSlider({
 })
 
 --[[
-===========================
-Crouch spam
-===========================
-]]--
-
-do
-	local crouchSpamEnabled = false
-	local spamSpeed = 0.1
-	local targetState = false
-	local originalState = nil
-	local crouchTable = nil
-	local crouchKey = nil
-	
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local RunService = game:GetService("RunService")
-
-	-- Helper to safely locate the CharacterService module
+ module
 	local function getCharacterService()
 		local services = ReplicatedStorage:FindFirstChild("Services")
 		if not services then return nil end
@@ -1897,6 +1881,8 @@ do
 		end
 	end)
 end
+]]--
+
 
 --[[
 ============================================================================
@@ -4586,6 +4572,63 @@ _G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else
         flag = "PlayerRotate_Roll",
         callback = function(v) roll = v end,
     })
+end
+
+--[[
+===========================
+NOCLIP
+===========================
+]]--
+
+do
+	local noclipEnabled = false
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	tab:CreateDivider()
+
+	tab:CreateToggle({
+		name = "Noclip",
+		value = false,
+		callback = function(v)
+			noclipEnabled = v
+			
+			-- Instantly restore collisions when turned off
+			if not v then
+				local rigs = workspace:FindFirstChild("Rigs")
+				if rigs then
+					for _, rig in ipairs(rigs:GetChildren()) do
+						if rig.Name == LP.Name then
+							for _, descendant in ipairs(rig:GetDescendants()) do
+								if descendant:IsA("BasePart") then
+									descendant.CanCollide = true
+								end
+							end
+						end
+					end
+				end
+			end
+		end,
+	})
+
+	-- Update every physics step to ensure collisions stay off
+	RunService.Stepped:Connect(function()
+		if not noclipEnabled then return end
+		
+		local rigs = workspace:FindFirstChild("Rigs")
+		if rigs then
+			for _, rig in ipairs(rigs:GetChildren()) do
+				if rig.Name == LP.Name then
+					for _, descendant in ipairs(rig:GetDescendants()) do
+						if descendant:IsA("BasePart") then
+							descendant.CanCollide = false
+						end
+					end
+				end
+			end
+		end
+	end)
 end
 
 --[[
