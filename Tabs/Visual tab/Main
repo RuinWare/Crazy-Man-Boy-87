@@ -1068,7 +1068,7 @@ do
     })
 end
 
--- avatar
+-- avatar 2.0
 
 do
 	local avatarEnabled = false
@@ -1078,54 +1078,65 @@ do
 
 	VisTab:CreateDivider()
 
-	-- Helper to clear existing avatar items from the rig
-	local function clearAvatar(rig)
-		for _, child in ipairs(rig:GetChildren()) do
-			if child:IsA("Accessory") or child:IsA("Shirt") or child:IsA("Pants") or child:IsA("BodyColors") then
-				child:Destroy()
-			end
-		end
-		-- Also clear accessories that might have parented to body parts
-		for _, part in ipairs(rig:GetDescendants()) do
-			if part:IsA("Accessory") then
-				part:Destroy()
-			end
-		end
-	end
-
-	-- Helper to apply an avatar by UserId
 	local function applyAvatar(userId)
 		local rig = workspace.Rigs:FindFirstChild(LP.Name)
 		if not rig then return end
-		
 		local hum = rig:FindFirstChildOfClass("Humanoid")
 		if not hum then return end
 
-		-- Fetch the appearance model from Roblox
-		local success, appearance = pcall(function()
-			return Players:GetCharacterAppearanceAsync(userId)
+		-- 1. Fetch the user's HumanoidDescription
+		local success, desc = pcall(function()
+			return Players:GetHumanoidDescriptionFromUserId(userId)
 		end)
 
-		if success and appearance then
-			clearAvatar(rig)
-			
-			-- Clone the fetched appearance onto the rig
-			for _, item in ipairs(appearance:GetChildren()) do
-				if item:IsA("Accessory") then
-					-- Humanoid:AddAccessory correctly rigs the item to the attachment points
-					pcall(function() hum:AddAccessory(item:Clone()) end)
-				elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") then
-					-- We ignore CharacterMesh (R15 packages) to prevent bugs on the custom rig
-					item:Clone().Parent = rig
+		if success and desc then
+			-- 2. Clear ALL existing avatar items from the rig so they don't overlap
+			for _, item in ipairs(rig:GetDescendants()) do
+				if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+					item:Destroy()
 				end
 			end
+			
+			local head = rig:FindFirstChild("Head")
+			if head then
+				for _, item in ipairs(head:GetChildren()) do
+					if item:IsA("Decal") then item:Destroy() end
+				end
+			end
+
+			-- 3. Apply the description (Handles Body Pack, Accessories, Clothes, Face)
+			local successApply = pcall(function()
+				hum:ApplyDescription(desc)
+			end)
+
+			-- 4. Fallback if the custom rig rejects ApplyDescription
+			if not successApply then
+				local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
+				if aSuccess and appearance then
+					for _, item in ipairs(appearance:GetDescendants()) do
+						if item:IsA("Accessory") then
+							pcall(function() hum:AddAccessory(item:Clone()) end)
+						elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+							item:Clone().Parent = rig
+						end
+					end
+				end
+			end
+			
+			-- 5. Force apply Face (in case it glitched)
+			if desc.Face > 0 and head then
+				local face = Instance.new("Decal")
+				face.Name = "face"
+				face.Texture = "rbxassetid://" .. desc.Face
+				face.Parent = head
+			end
 		else
-			window:Notify({ title = "Avatar Changer", content = "Failed to load avatar data.", duration = 3 })
+			window:Notify({ title = "Avatar Changer", content = "Failed to load HumanoidDescription.", duration = 3 })
 		end
 	end
 
 	VisTab:CreateToggle({
-		name = "Avatar Spoofer",
+		name = "Avatar Changer",
 		value = false,
 		callback = function(v)
 			avatarEnabled = v
@@ -1142,20 +1153,21 @@ do
 					end)
 				end
 			else
-				-- Revert to LocalPlayer's avatar when turned off
-				applyAvatar(LP.UserId)
+				-- Revert to LocalPlayer's avatar
+				task.spawn(function()
+					applyAvatar(LP.UserId)
+				end)
 			end
 		end,
 	})
 
 	VisTab:CreateInput({
 		name = "Username",
-		placeholder = "Enter a username",
+		placeholder = "Enter username",
 		removeTextAfterFocusLost = false,
 		callback = function(text)
 			targetUsername = text
 			
-			-- If the toggle is already on and they type a new name, update instantly
 			if avatarEnabled and targetUsername ~= "" then
 				task.spawn(function()
 					local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(targetUsername) end)
