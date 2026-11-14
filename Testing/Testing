@@ -5,17 +5,13 @@ local window = Rayfield:CreateWindow({
     subtitle = "Evade",
     sidebarLayout = true,
 })
-
+-- tab
 local tab = window:CreateTab({ name = "Test", icon = 0 })
 
 do
 	local noclipEnabled = false
-	local noclipSpeed = 55
-	local originalSpeed = 16
-	
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
-	local UserInputService = game:GetService("UserInputService")
 	local LP = Players.LocalPlayer
 
 	tab:CreateDivider()
@@ -26,32 +22,14 @@ do
 		callback = function(v)
 			noclipEnabled = v
 			
-			local rigs = workspace:FindFirstChild("Rigs")
-			if rigs then
-				for _, rig in ipairs(rigs:GetChildren()) do
-					if rig.Name == LP.Name then
-						local hum = rig:FindFirstChild("Humanoid")
-						
-						if v then
-							-- Store original speed and disable the game's movement checks
-							if hum then
-								originalSpeed = hum.WalkSpeed
-								hum.WalkSpeed = 0 
-							end
-						else
-							-- Restore speed
-							if hum then
-								hum.WalkSpeed = originalSpeed
-							end
-						end
-
-						-- Toggle Collisions (We DO NOT touch CanQuery to prevent camera glitches)
-						for _, descendant in ipairs(rig:GetDescendants()) do
-							if descendant:IsA("BasePart") then
-								if v then
-									descendant.CanCollide = false
-									descendant.CanTouch = false
-								else
+			-- When turning off, restore collisions
+			if not v then
+				local rigs = workspace:FindFirstChild("Rigs")
+				if rigs then
+					for _, rig in ipairs(rigs:GetChildren()) do
+						if rig.Name == LP.Name then
+							for _, descendant in ipairs(rig:GetDescendants()) do
+								if descendant:IsA("BasePart") then
 									descendant.CanCollide = true
 									descendant.CanTouch = true
 								end
@@ -63,49 +41,21 @@ do
 		end,
 	})
 
-	-- Force movement every frame using CFrame vftihgxogiurtxggiiudtfbghii. vbuikgfdshguikfdbxigfuk
-	RunService.RenderStepped:Connect(function(dt)
+	-- Every frame, disable collisions on all parts of the rig
+	RunService.Stepped:Connect(function()
 		if not noclipEnabled then return end
 		
 		local rigs = workspace:FindFirstChild("Rigs")
-		if not rigs then return end
-		
-		for _, rig in ipairs(rigs:GetChildren()) do
-			if rig.Name == LP.Name then
-				-- Find the root part (TorsoRot is usually the main physics part for custom rigs)
-				local root = rig:FindFirstChild("TorsoRot") or rig:FindFirstChild("Torso") or rig:FindFirstChild("HumanoidRootPart")
-				local hum = rig:FindFirstChild("Humanoid")
-				local cam = workspace.CurrentCamera
-				
-				if root and cam then
-					local dir = Vector3.new(0, 0, 0)
-					
-					-- Get movement direction from WASD
-					local moveDir = hum and hum.MoveDirection or Vector3.new(0, 0, 0)
-					if moveDir.Magnitude > 0 then
-						dir = moveDir
-					else
-						-- Fallback to raw input just in case the game blocks MoveDirection
-						if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
-						if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
-						if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
-						if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
-						
-						if dir.Magnitude > 0 then
-							dir = Vector3.new(dir.X, 0, dir.Z).Unit -- Flatten to horizontal
+		if rigs then
+			for _, rig in ipairs(rigs:GetChildren()) do
+				if rig.Name == LP.Name then
+					-- Loops through Torso, TorsoRot, Head, Arms, Legs, ArmRot, Joints, etc.
+					for _, descendant in ipairs(rig:GetDescendants()) do
+						if descendant:IsA("BasePart") then
+							descendant.CanCollide = false
+							descendant.CanTouch = false
+							-- We leave CanQuery alone so your camera doesn't bug out
 						end
-					end
-					
-					-- Vertical movement (Space to go up, Left Ctrl to go down)
-					if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-						dir = dir + Vector3.new(0, 1, 0)
-					elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-						dir = dir - Vector3.new(0, 1, 0)
-					end
-					
-					-- Manually push the rig
-					if dir.Magnitude > 0 then
-						root.CFrame = root.CFrame + (dir * noclipSpeed * dt)
 					end
 				end
 			end
