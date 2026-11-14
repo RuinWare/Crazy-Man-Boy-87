@@ -1665,3 +1665,73 @@ do
 		end
 	end)
 end
+
+--[[
+===========================
+HIDE HUD
+===========================
+]]--
+
+do
+	local hideHudEnabled = false
+	local hideJumpEnabled = false
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Hide HUD",
+		value = false,
+		callback = function(v)
+			hideHudEnabled = v
+		end,
+	})
+
+	VisTab:CreateToggle({
+		name = "Hide Mobile Jump Button",
+		value = false,
+		callback = function(v)
+			hideJumpEnabled = v
+		end,
+	})
+
+	-- Enforce visibility every frame to prevent the game from overriding it
+	RunService.Heartbeat:Connect(function()
+		local playerGui = LP:FindFirstChild("PlayerGui")
+		if not playerGui then return end
+
+		-- Locate the HUD
+		local gameGui = playerGui:FindFirstChild("Game")
+		local hud = gameGui and gameGui:FindFirstChild("HUD")
+		
+		-- Locate the Mobile Jump Button
+		local touchGui = playerGui:FindFirstChild("TouchGui")
+		local touchFrame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
+		local jumpButton = touchFrame and touchFrame:FindFirstChild("JumpButton")
+
+		if hideHudEnabled then
+			-- Hide Main HUD
+			if hud then 
+				hud.Enabled = false 
+			end
+			
+			-- Handle Jump Button only if main HUD is hidden
+			if jumpButton then
+				jumpButton.Visible = not hideJumpEnabled
+			end
+		else
+			-- Restore everything when main HUD toggle is off
+			if hud then 
+				hud.Enabled = true 
+			end
+			
+			-- Force Jump Button visible regardless of its own toggle
+			if jumpButton then
+				jumpButton.Visible = true
+			end
+		end
+	end)
+end
