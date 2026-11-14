@@ -708,6 +708,8 @@ REMOVE BREACHER LAG
 ===========================
 ]]--
 
+VisTab:CreateDivider({ text = "Optimization" })
+
 VisTab:CreateToggle({
     name = "Remove Breacher Lag",
     flag = "RBLREMOVEBREACHERLAG",
@@ -761,4 +763,99 @@ if _G.RuinWarePortalLagThread then
    end
 end
     end,
+})
+
+--[[
+===========================
+RES STRECHER
+===========================
+]]--
+
+-- declare
+local RunService = game:GetService("RunService")
+
+local BIND_RESTORE = "StretchResolutionRestore"
+local BIND_STRETCH = "StretchResolutionStretch"
+local currentAmount = nil
+local originalCFrame = nil
+local stretchEnabled = true
+local RESAMOUNT1 = 1
+
+local function stopStretch()
+	if currentAmount ~= nil then
+		RunService:UnbindFromRenderStep(BIND_RESTORE)
+		RunService:UnbindFromRenderStep(BIND_STRETCH)
+		local cam = workspace.CurrentCamera
+		if originalCFrame and cam then
+			cam.CFrame = originalCFrame
+		end
+		originalCFrame = nil
+	end
+	currentAmount = nil
+end
+
+local function setStretch(amount)
+	if amount == nil then return end
+	if amount == currentAmount then return end
+
+	stopStretch()
+
+	if amount == 1 then
+		currentAmount = 1
+		return
+	end
+
+	currentAmount = amount
+
+	RunService:BindToRenderStep(
+		BIND_RESTORE,
+		Enum.RenderPriority.Camera.Value - 1,
+		function()
+			local cam = workspace.CurrentCamera
+			if cam and originalCFrame then
+				cam.CFrame = originalCFrame
+			end
+		end
+	)
+
+	RunService:BindToRenderStep(
+		BIND_STRETCH,
+		Enum.RenderPriority.Camera.Value + 1,
+		function()
+			local cam = workspace.CurrentCamera
+			if not cam then return end
+			originalCFrame = cam.CFrame
+			cam.CFrame = cam.CFrame
+				* CFrame.new(0, 0, 0, 1, 0, 0, 0, amount, 0, 0, 0, 1)
+		end
+	)
+end
+
+-- per-tick update of the stretch from RESAMOUNT1
+RunService.Heartbeat:Connect(function()
+	if not stretchEnabled then
+		stopStretch()
+		return
+	end
+	setStretch(tonumber(RESAMOUNT1) or 1)
+end)
+
+VisTab:CreateDivider({ text = "Camera" })
+
+VisTab:CreateToggle({
+	name = "Resolution Stretcher",
+	flag = "resstrecheromgggg",
+	value = true,
+	callback = function(value)
+		stretchEnabled = value
+	end,
+})
+
+tab:CreateInput({
+	name = "Max players",
+	value = "",
+	placeholder = "0.00",
+	callback = function(text)
+		RESAMOUNT1 = tonumber(text) or 1
+	end,
 })
