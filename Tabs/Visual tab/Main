@@ -177,7 +177,6 @@ do
         boxContainer.Parent = gui
         data.boxContainer = boxContainer
 
-        -- Fill FIRST so it renders behind the outline (sides/corners have higher ZIndex)
         local fillFrame = Instance.new("Frame")
         fillFrame.BorderSizePixel = 0
         fillFrame.BackgroundTransparency = 1
@@ -196,7 +195,6 @@ do
         fillImage.Parent = boxContainer
         data.fillImage = fillImage
 
-        -- Outline (ZIndex 2, above fill)
         data.sides = {}
         for i = 1, 4 do
             local f = Instance.new("Frame")
@@ -276,7 +274,6 @@ do
         data.topOffset = 0
         data.botOffset = 0
         data.source = nil
-        data.hasJoints = false
         return data
     end
 
@@ -311,6 +308,8 @@ do
         return result
     end
 
+    -- Called live (no caching) — cheap because Humanoid is O(1) and Motor6D scan only
+    -- runs if Humanoid is missing
     local function rigHasJoints(rig)
         if rig:FindFirstChildOfClass("Humanoid") then return true end
         for _, d in ipairs(rig:GetDescendants()) do
@@ -319,7 +318,6 @@ do
         return false
     end
 
-    -- Model bounds helper (works for BasePart or Model)
     local function modelBounds(target)
         if target:IsA("BasePart") then
             return target, target.Size.Y / 2, -target.Size.Y / 2
@@ -339,7 +337,6 @@ do
         return nil
     end
 
-    -- Compute bounds depending on source/type
     local function computeBounds(rig, isPlayer, source)
         if isPlayer then
             local hrp = rig:FindFirstChild("HumanoidRootPart")
@@ -348,12 +345,9 @@ do
             if not okBB or not cf then return nil end
             return hrp, (cf.Position.Y + sz.Y / 2) - hrp.Position.Y, (cf.Position.Y - sz.Y / 2) - hrp.Position.Y
         end
-
         if source == "players" then
-            -- workspace.Players nextbots: use the model itself
             return modelBounds(rig)
         else
-            -- workspace.Rigs nextbots: use Hitbox child
             local hb = rig:FindFirstChild("Hitbox")
             if not hb then return nil end
             return modelBounds(hb)
@@ -409,7 +403,6 @@ do
                     end
                 end
             else
-                -- Players folder nextbot: use model's own position
                 if rig:IsA("BasePart") then
                     refPos = rig.Position
                 else
@@ -437,15 +430,12 @@ do
             if not data then
                 data = buildRigElements()
                 data.source = source
-                data.hasJoints = rigHasJoints(rig)
                 rigData[rig] = data
                 data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer, source)
             end
 
-            -- If source changed (moved between folders) or anchor died, recompute
             if data.source ~= source or not data.anchor or not data.anchor.Parent then
                 data.source = source
-                data.hasJoints = rigHasJoints(rig)
                 data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer, source)
             end
 
@@ -468,17 +458,12 @@ do
             local tDistColor = isPlayer and distanceColorPlayers or distanceColorNextbots
             local tTracerColor = isPlayer and tracerColorPlayers or tracerColorNextbots
 
-            local currentBoxWidth = 0
             if optBox and onScreen then
                 data.boxContainer.Visible = true
                 local boxHeight = math.abs(botScreen.Y - topScreen.Y)
-                currentBoxWidth = boxHeight * 0.55 * boxSize
-                local px = math.floor(topScreen.X - currentBoxWidth / 2 + 0.5)
-                local py = math.floor(topScreen.Y + 0.5)
-                local pw = math.floor(currentBoxWidth + 0.5)
-                local ph = math.floor(boxHeight + 0.5)
-                data.boxContainer.Position = UDim2.fromOffset(px, py)
-                data.boxContainer.Size = UDim2.fromOffset(pw, ph)
+                local boxWidth = boxHeight * 0.55 * boxSize
+                data.boxContainer.Position = UDim2.fromOffset(math.floor(topScreen.X - boxWidth / 2 + 0.5), math.floor(topScreen.Y + 0.5))
+                data.boxContainer.Size = UDim2.fromOffset(math.floor(boxWidth + 0.5), math.floor(boxHeight + 0.5))
 
                 local isFull = (boxType == "Full")
                 for i = 1, 4 do
@@ -516,9 +501,18 @@ do
 
             -- CHAMS
             if optChams then
-                if data.hasJoints then
-                    -- Jointed rig (player or jointed nextbot) → Highlight on rig itself
-                    if not data.highlight then
+                -- LIVE check: players always Highlight, nextbots check each frame
+                local useModelHighlight = isPlayer
+                if not useModelHighlight then
+                    useModelHighlight = rigHasJoints(rig)
+                end
+
+                if useModelHighlight then
+                    -- Recreate highlight if missing or destroyed
+                    if not data.highlight or not data.highlight.Parent then
+                        if data.highlight then
+                            pcall(function() data.highlight:Destroy() end)
+                        end
                         local h = Instance.new("Highlight")
                         h.FillColor = chamsColor
                         h.FillTransparency = chamsTransparency
@@ -532,10 +526,13 @@ do
                     end
                     if data.chamsBox.Visible then data.chamsBox.Visible = false end
                 else
-                    -- Non-jointed nextbot → Hitbox (if Rigs) or box chams (if Players)
+                    -- Non-jointed nextbot
                     local hb = source == "rigs" and rig:FindFirstChild("Hitbox") or nil
                     if hb and (hb:IsA("BasePart") or hb:IsA("Model")) then
-                        if not data.highlight then
+                        if not data.highlight or not data.highlight.Parent then
+                            if data.highlight then
+                                pcall(function() data.highlight:Destroy() end)
+                            end
                             local h = Instance.new("Highlight")
                             h.FillColor = chamsColor
                             h.FillTransparency = chamsTransparency
@@ -586,7 +583,6 @@ do
                 data.distLabel.TextColor3 = tDistColor
                 data.distLabel.TextTransparency = distanceTransparency
                 data.distLabel.TextStrokeTransparency = distanceTransparency
-                -- Positioned clearly to the right of the name (name spans X-100 to X+100)
                 data.distLabel.Position = UDim2.fromOffset(math.floor(topScreen.X + 110 + 0.5), math.floor(topScreen.Y - 20 + 0.5))
                 data.distLabel.Size = UDim2.fromOffset(100, 16)
             elseif data.distLabel.Visible then
