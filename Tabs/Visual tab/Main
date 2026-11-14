@@ -1032,7 +1032,7 @@ do
     VisTab:CreateDivider({ text = "Spoofing" })
 
     VisTab:CreateToggle({
-        name = "Spoof Username",
+        name = "Local Spoof Username",
         flag = "SpoofUsername",
         value = false,
         callback = function(v)
@@ -1050,7 +1050,7 @@ do
     })
 
     VisTab:CreateToggle({
-        name = "Spoof Display Name",
+        name = "Local Spoof Display Name",
         flag = "SpoofDisplayName",
         value = false,
         callback = function(v)
@@ -1144,7 +1144,7 @@ do
 	end
 
 	VisTab:CreateToggle({
-		name = "Avatar Spoofer",
+		name = "Local Avatar Spoofer",
 		value = false,
 		callback = function(v)
 			avatarEnabled = v
@@ -1170,7 +1170,7 @@ do
 	})
 
 	VisTab:CreateInput({
-		name = "Username",
+		name = "Username:",
 		placeholder = "Enter username",
 		removeTextAfterFocusLost = false,
 		callback = function(text)
