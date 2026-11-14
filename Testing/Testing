@@ -10,17 +10,13 @@ local tab = window:CreateTab({ name = "Test", icon = 0 })
 
 do
 	local noclipEnabled = false
+	local noclipSpeed = 55
+	local originalSpeed = 16
+	
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
-	local PhysicsService = game:GetService("PhysicsService")
+	local UserInputService = game:GetService("UserInputService")
 	local LP = Players.LocalPlayer
-
-	-- Create a custom collision group for Noclip
-	pcall(function()
-		PhysicsService:RegisterCollisionGroup("NoclipGroup")
-		PhysicsService:CollisionGroupSetCollidable("NoclipGroup", "Default", false)
-		PhysicsService:CollisionGroupSetCollidable("NoclipGroup", "NoclipGroup", false)
-	end)
 
 	tab:CreateDivider()
 
@@ -30,18 +26,34 @@ do
 		callback = function(v)
 			noclipEnabled = v
 			
-			-- Instantly restore everything when turned off
-			if not v then
-				local rigs = workspace:FindFirstChild("Rigs")
-				if rigs then
-					for _, rig in ipairs(rigs:GetChildren()) do
-						if rig.Name == LP.Name then
-							for _, descendant in ipairs(rig:GetDescendants()) do
-								if descendant:IsA("BasePart") then
+			local rigs = workspace:FindFirstChild("Rigs")
+			if rigs then
+				for _, rig in ipairs(rigs:GetChildren()) do
+					if rig.Name == LP.Name then
+						local hum = rig:FindFirstChild("Humanoid")
+						
+						if v then
+							-- Store original speed and disable the game's movement checks
+							if hum then
+								originalSpeed = hum.WalkSpeed
+								hum.WalkSpeed = 0 
+							end
+						else
+							-- Restore speed
+							if hum then
+								hum.WalkSpeed = originalSpeed
+							end
+						end
+
+						-- Toggle Collisions (We DO NOT touch CanQuery to prevent camera glitches)
+						for _, descendant in ipairs(rig:GetDescendants()) do
+							if descendant:IsA("BasePart") then
+								if v then
+									descendant.CanCollide = false
+									descendant.CanTouch = false
+								else
 									descendant.CanCollide = true
 									descendant.CanTouch = true
-									descendant.CanQuery = true
-									pcall(function() descendant.CollisionGroup = "Default" end)
 								end
 							end
 						end
@@ -51,43 +63,49 @@ do
 		end,
 	})
 
-	-- Update every physics step to fight the game's map protection
-	RunService.Stepped:Connect(function()
+	-- Force movement every frame using CFrame
+	RunService.RenderStepped:Connect(function(dt)
 		if not noclipEnabled then return end
 		
 		local rigs = workspace:FindFirstChild("Rigs")
-		if rigs then
-			for _, rig in ipairs(rigs:GetChildren()) do
-				if rig.Name == LP.Name then
-					-- Loop through every single part in the rig
-					for _, descendant in ipairs(rig:GetDescendants()) do
-						if descendant:IsA("BasePart") then
-							-- 1. Disable standard physics
-							descendant.CanCollide = false
-							descendant.CanTouch = false
-							descendant.CanQuery = false 
-							
-							-- 2. Apply the invisible collision group
-							pcall(function() descendant.CollisionGroup = "NoclipGroup" end)
-							
-							-- 3. Clear velocity so the game can't push you backwards
-							if descendant.AssemblyLinearVelocity.Magnitude > 0 then
-								descendant.AssemblyLinearVelocity = Vector3.new(0, descendant.AssemblyLinearVelocity.Y, 0)
-							end
+		if not rigs then return end
+		
+		for _, rig in ipairs(rigs:GetChildren()) do
+			if rig.Name == LP.Name then
+				-- Find the root part (TorsoRot is usually the main physics part for custom rigs)
+				local root = rig:FindFirstChild("TorsoRot") or rig:FindFirstChild("Torso") or rig:FindFirstChild("HumanoidRootPart")
+				local hum = rig:FindFirstChild("Humanoid")
+				local cam = workspace.CurrentCamera
+				
+				if root and cam then
+					local dir = Vector3.new(0, 0, 0)
+					
+					-- Get movement direction from WASD
+					local moveDir = hum and hum.MoveDirection or Vector3.new(0, 0, 0)
+					if moveDir.Magnitude > 0 then
+						dir = moveDir
+					else
+						-- Fallback to raw input just in case the game blocks MoveDirection
+						if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
+						if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
+						if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+						if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+						
+						if dir.Magnitude > 0 then
+							dir = Vector3.new(dir.X, 0, dir.Z).Unit -- Flatten to horizontal
 						end
 					end
 					
-					-- Make sure joints are also phantom
-					local joints = rig:FindFirstChild("Joints")
-					if joints then
-						for _, joint in ipairs(joints:GetDescendants()) do
-							if joint:IsA("BasePart") then
-								joint.CanCollide = false
-								joint.CanTouch = false
-								joint.CanQuery = false
-								pcall(function() joint.CollisionGroup = "NoclipGroup" end)
-							end
-						end
+					-- Vertical movement (Space to go up, Left Ctrl to go down)
+					if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+						dir = dir + Vector3.new(0, 1, 0)
+					elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+						dir = dir - Vector3.new(0, 1, 0)
+					end
+					
+					-- Manually push the rig
+					if dir.Magnitude > 0 then
+						root.CFrame = root.CFrame + (dir * noclipSpeed * dt)
 					end
 				end
 			end
@@ -95,7 +113,7 @@ do
 	end)
 end
 
--- new
+-- new new
 
 window:Notify({
     title = "All Loaded",
