@@ -1068,13 +1068,13 @@ do
     })
 end
 
--- avatar 5.0
+-- avatar 6.0
 
 do
 	local avatarEnabled = false
 	local targetUsername = ""
 	local cachedAppearance = nil
-	local cachedFaceId = 0
+	local cachedDesc = nil
 	local appliedRigs = {} 
 	
 	local Players = game:GetService("Players")
@@ -1083,28 +1083,25 @@ do
 
 	VisTab:CreateDivider()
 
-	-- Helper to fetch the appearance and face ID
 	local function getData(username)
 		local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
 		if ok and userId then
 			local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
 			local dOk, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
-			
-			if aSuccess and appearance then
-				local faceId = (dOk and desc) and desc.Face or 0
-				return appearance, faceId
+			if aSuccess and desc then
+				return appearance, desc
 			end
 		end
-		return nil, 0
+		return nil, nil
 	end
 
-	local function applyToRig(rig, appearance, faceId)
+	local function applyToRig(rig, appearance, desc)
 		local hum = rig:FindFirstChildOfClass("Humanoid")
 		if not hum then return end
-		
-		-- 1. Clear old items
+
+		-- 1. Clear old items (Hair, Hats, Clothes, R15 Meshes)
 		for _, item in ipairs(rig:GetDescendants()) do
-			if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+			if item:IsA("Accessory") or item:IsA("CharacterMesh") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("MeshPart") then
 				item:Destroy()
 			end
 		end
@@ -1112,27 +1109,49 @@ do
 		local head = rig:FindFirstChild("Head")
 		if head then
 			for _, item in ipairs(head:GetChildren()) do
-				if item:IsA("Decal") then item:Destroy() end
+				if item:IsA("Decal") and item.Name == "face" then item:Destroy() end
 			end
 		end
 
-		-- 2. Manually apply items (No R15 MeshParts)
-		for _, item in ipairs(appearance:GetChildren()) do
-			if item:IsA("Accessory") then
-				-- THE HEADLESS FIX: Use AddAccessory so it rigs perfectly
-				pcall(function() hum:AddAccessory(item:Clone()) end)
-			elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
-				-- CharacterMesh applies the Woman body type without R15 parts
-				item:Clone().Parent = rig
+		-- 2. Apply Appearance (THE HEADLESS FIX: Direct Parent instead of AddAccessory)
+		if appearance then
+			for _, item in ipairs(appearance:GetChildren()) do
+				if item:IsA("Accessory") then
+					-- Check for R15 Layered Clothing (which breaks camera)
+					local isLayered = false
+					for _, child in ipairs(item:GetDescendants()) do
+						if child:IsA("WrapLayer") or child:IsA("WrapTarget") then
+							isLayered = true
+							break
+						end
+					end
+					
+					if not isLayered then
+						-- Direct parenting fixes the "bald" issue
+						item:Clone().Parent = rig
+					end
+				elseif item:IsA("CharacterMesh") then
+					-- This forces the Woman body type safely without R15 MeshParts
+					item:Clone().Parent = rig
+				elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") then
+					item:Clone().Parent = rig
+				end
 			end
 		end
-		
-		-- 3. Force apply Face
-		if faceId > 0 and head then
+
+		-- 3. Apply Face (using HumanoidDescription exactly like you said)
+		if desc and desc.Face > 0 and head then
 			local face = Instance.new("Decal")
 			face.Name = "face"
-			face.Texture = "rbxassetid://" .. faceId
+			face.Texture = "rbxassetid://" .. desc.Face
 			face.Parent = head
+		end
+		
+		-- 4. Final sweep: Destroy any R15 MeshParts that somehow got in
+		for _, item in ipairs(rig:GetChildren()) do
+			if item:IsA("MeshPart") then
+				item:Destroy()
+			end
 		end
 	end
 
@@ -1145,20 +1164,21 @@ do
 			
 			if v then
 				cachedAppearance = nil
+				cachedDesc = nil
 				if targetUsername ~= "" then
 					task.spawn(function()
-						cachedAppearance, cachedFaceId = getData(targetUsername)
+						cachedAppearance, cachedDesc = getData(targetUsername)
 					end)
 				end
 			else
 				task.spawn(function()
-					local myApp, myFace = getData(LP.Name)
-					if myApp then
+					local myApp, myDesc = getData(LP.Name)
+					if myApp and myDesc then
 						local rigs = workspace:FindFirstChild("Rigs")
 						if rigs then
 							for _, rig in ipairs(rigs:GetChildren()) do
 								if rig.Name == LP.Name then
-									applyToRig(rig, myApp, myFace)
+									applyToRig(rig, myApp, myDesc)
 								end
 							end
 						end
@@ -1175,11 +1195,12 @@ do
 		callback = function(text)
 			targetUsername = text
 			cachedAppearance = nil
+			cachedDesc = nil
 			appliedRigs = {}
 			
 			if avatarEnabled and targetUsername ~= "" then
 				task.spawn(function()
-					cachedAppearance, cachedFaceId = getData(targetUsername)
+					cachedAppearance, cachedDesc = getData(targetUsername)
 				end)
 			end
 		end,
@@ -1189,9 +1210,9 @@ do
 		if not avatarEnabled then return end
 		if not targetUsername or targetUsername == "" then return end
 		
-		if not cachedAppearance then
-			cachedAppearance, cachedFaceId = getData(targetUsername)
-			if not cachedAppearance then return end
+		if not cachedAppearance or not cachedDesc then
+			cachedAppearance, cachedDesc = getData(targetUsername)
+			if not cachedAppearance or not cachedDesc then return end
 		end
 
 		local rigs = workspace:FindFirstChild("Rigs")
@@ -1205,7 +1226,7 @@ do
 				
 				if not appliedRigs[rig] then
 					appliedRigs[rig] = true
-					applyToRig(rig, cachedAppearance, cachedFaceId)
+					applyToRig(rig, cachedAppearance, cachedDesc)
 				end
 			end
 		end
