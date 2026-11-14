@@ -2309,6 +2309,205 @@ do
 end
 
 --[[
+===========================
+SUPERJUMP
+===========================
+]]--
+
+do
+    local superJumpEnabled = false
+    local superJumpYVelocity = 100
+    local superJumpXVelocity = 50
+    local superJumpDecaying = false
+    local superJumpDecayRate = 5
+
+    local mobileButtonEnabled = false
+    local MOBILE_BUTTON_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-body-bhtton" -- FILL THIS IN with your Button MB body URL
+    local mobileButtonFlag = "MB_SuperJump"
+
+    local sjHum, sjRoot
+
+    local function sjAttach(char)
+        sjHum = char:WaitForChild("Humanoid")
+        sjRoot = char:WaitForChild("HumanoidRootPart")
+    end
+
+    if player.Character then task.spawn(sjAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(sjAttach, c) end)
+
+    local function triggerSuperJump()
+        if not superJumpEnabled then return end
+        if not sjRoot or not sjRoot.Parent then return end
+        if not sjHum or sjHum.Health <= 0 then return end
+
+        local look = sjRoot.CFrame.LookVector
+        local forward = Vector3.new(look.X, 0, look.Z)
+        if forward.Magnitude > 0.001 then forward = forward.Unit end
+
+        sjRoot.AssemblyLinearVelocity = Vector3.new(
+            forward.X * superJumpXVelocity,
+            superJumpYVelocity,
+            forward.Z * superJumpXVelocity
+        )
+
+        superJumpDecaying = true
+    end
+
+    RunService.Heartbeat:Connect(function(dt)
+        if not superJumpDecaying then return end
+        if not sjRoot or not sjRoot.Parent then
+            superJumpDecaying = false
+            return
+        end
+
+        local vel = sjRoot.AssemblyLinearVelocity
+        local horizontal = Vector3.new(vel.X, 0, vel.Z)
+
+        if horizontal.Magnitude < 1 then
+            superJumpDecaying = false
+            return
+        end
+
+        local decay = math.exp(-superJumpDecayRate * dt)
+        horizontal = horizontal * decay
+
+        sjRoot.AssemblyLinearVelocity = Vector3.new(horizontal.X, vel.Y, horizontal.Z)
+    end)
+
+    local function runSource(src)
+        if not src or not loadstring then return end
+        local ok, fn = pcall(loadstring, src)
+        if ok and fn then pcall(fn) end
+    end
+
+    local DELETE_BODY = [==[
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
+local TAG = "DraggableBoxGui"
+local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+local function collectGuis()
+	local list, seen = {}, {}
+	local function add(inst)
+		if inst:IsA("ScreenGui") and not seen[inst] then
+			seen[inst] = true
+			list[#list + 1] = inst
+		end
+	end
+	for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
+	local function scan(container)
+		if not container then return end
+		local ok, children = pcall(function() return container:GetChildren() end)
+		if not ok then return end
+		for _, child in ipairs(children) do
+			if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
+		end
+	end
+	scan(playerGui)
+	pcall(function() scan(game:GetService("CoreGui")) end)
+	if gethui then pcall(function() scan(gethui()) end) end
+	return list
+end
+local FADE_TIME = 0.12
+local SHRINK_TIME = 0.15
+local function fade(obj, time, props, style, direction)
+	TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out), props):Play()
+end
+local function remove(gui)
+	local scale = gui:FindFirstChild("PopScale", true)
+	if not scale then gui:Destroy() return end
+	fade(scale, SHRINK_TIME, { Scale = 0.75 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	for _, d in ipairs(gui:GetDescendants()) do
+		if d:IsA("UIStroke") then fade(d, FADE_TIME, { Transparency = 1 })
+		elseif d:IsA("GuiObject") then
+			fade(d, FADE_TIME, { BackgroundTransparency = 1 })
+			if d:IsA("TextLabel") or d:IsA("TextButton") then fade(d, FADE_TIME, { TextTransparency = 1 })
+			elseif d:IsA("ImageLabel") then fade(d, FADE_TIME, { ImageTransparency = 1 })
+			elseif d:IsA("CanvasGroup") then fade(d, FADE_TIME, { GroupTransparency = 1 }) end
+		end
+	end
+	task.delay(SHRINK_TIME + 0.02, function() if gui.Parent then gui:Destroy() end end)
+end
+for _, gui in ipairs(collectGuis()) do
+	if gui:GetAttribute("Flag") == FLAG then remove(gui) end
+end
+]==]
+
+    local function buildMobileButtonSource()
+        if not MOBILE_BUTTON_URL or MOBILE_BUTTON_URL == "" then return nil end
+        local ok, body = pcall(game.HttpGet, game, MOBILE_BUTTON_URL)
+        if not ok or type(body) ~= "string" then return nil end
+        local header = 'local TEXT = "Super Jump"\n'
+            .. 'local FLAG = ' .. string.format("%q", mobileButtonFlag) .. '\n'
+            .. 'local function RunCode()\n'
+            .. 'if _G.RWCallbacks and _G.RWCallbacks["SuperJumpTrigger"] then\n'
+            .. '_G.RWCallbacks["SuperJumpTrigger"]()\n'
+            .. 'end\n'
+            .. 'end\n'
+        return header .. body
+    end
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["SuperJumpTrigger"] = triggerSuperJump
+    _G.RWCallbacks["SuperJump"] = function(v) superJumpEnabled = v end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Super Jump",
+        currentValue = false,
+        flag = "SuperJump_Toggle",
+        callback = function(v) superJumpEnabled = v end,
+    })
+
+    tab:CreateKeybind({
+        name = "Super Jump Key",
+        currentKeybind = "Q",
+        holdToInteract = false,
+        flag = "SuperJump_Key",
+        callback = function()
+            triggerSuperJump()
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Y Velocity",
+        range = {10, 500},
+        increment = 1,
+        suffix = "",
+        currentValue = 100,
+        flag = "SuperJump_YVelocity",
+        callback = function(v) superJumpYVelocity = v end,
+    })
+
+    tab:CreateSlider({
+        name = "X Velocity",
+        range = {0, 500},
+        increment = 1,
+        suffix = "",
+        currentValue = 50,
+        flag = "SuperJump_XVelocity",
+        callback = function(v) superJumpXVelocity = v end,
+    })
+
+    tab:CreateToggle({
+        name = "Mobile Button",
+        currentValue = false,
+        flag = "SuperJump_MobileButton",
+        callback = function(v)
+            mobileButtonEnabled = v
+            if v then
+                local src = buildMobileButtonSource()
+                if src then runSource(src) end
+            else
+                local deleteSrc = 'local FLAG = ' .. string.format("%q", mobileButtonFlag) .. '\n' .. DELETE_BODY
+                runSource(deleteSrc)
+            end
+        end,
+    })
+end
+
+--[[
 ============================================================================
 F JUMP
 ============================================================================
