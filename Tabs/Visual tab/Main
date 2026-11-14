@@ -1068,7 +1068,7 @@ do
     })
 end
 
--- avatar 2.0
+-- avatar 3.0
 
 do
 	local avatarEnabled = false
@@ -1144,7 +1144,7 @@ do
 	end
 
 	VisTab:CreateToggle({
-		name = "Avatar Changer",
+		name = "Avatar Spoofer",
 		value = false,
 		callback = function(v)
 			avatarEnabled = v
