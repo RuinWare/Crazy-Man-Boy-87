@@ -1079,59 +1079,67 @@ do
 	VisTab:CreateDivider()
 
 	local function applyAvatar(userId)
-		local rig = workspace.Rigs:FindFirstChild(LP.Name)
-		if not rig then return end
-		local hum = rig:FindFirstChildOfClass("Humanoid")
-		if not hum then return end
-
-		-- 1. Fetch the user's HumanoidDescription
+		-- 1. Fetch the HumanoidDescription ONCE
 		local success, desc = pcall(function()
 			return Players:GetHumanoidDescriptionFromUserId(userId)
 		end)
 
-		if success and desc then
-			-- 2. Clear ALL existing avatar items from the rig so they don't overlap
-			for _, item in ipairs(rig:GetDescendants()) do
-				if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
-					item:Destroy()
-				end
-			end
-			
-			local head = rig:FindFirstChild("Head")
-			if head then
-				for _, item in ipairs(head:GetChildren()) do
-					if item:IsA("Decal") then item:Destroy() end
-				end
-			end
+		if not success or not desc then
+			window:Notify({ title = "Avatar Changer", content = "Failed to load HumanoidDescription.", duration = 3 })
+			return
+		end
 
-			-- 3. Apply the description (Handles Body Pack, Accessories, Clothes, Face)
-			local successApply = pcall(function()
-				hum:ApplyDescription(desc)
-			end)
+		local rigs = workspace:FindFirstChild("Rigs")
+		if not rigs then return end
 
-			-- 4. Fallback if the custom rig rejects ApplyDescription
-			if not successApply then
-				local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
-				if aSuccess and appearance then
-					for _, item in ipairs(appearance:GetDescendants()) do
-						if item:IsA("Accessory") then
-							pcall(function() hum:AddAccessory(item:Clone()) end)
-						elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
-							item:Clone().Parent = rig
+		-- 2. Loop through ALL rigs matching the player's name
+		for _, rig in ipairs(rigs:GetChildren()) do
+			if rig.Name == LP.Name then
+				local hum = rig:FindFirstChildOfClass("Humanoid")
+				
+				if hum then
+					-- 3. Clear ALL existing avatar items from this specific rig
+					for _, item in ipairs(rig:GetDescendants()) do
+						if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+							item:Destroy()
 						end
+					end
+					
+					local head = rig:FindFirstChild("Head")
+					if head then
+						for _, item in ipairs(head:GetChildren()) do
+							if item:IsA("Decal") then item:Destroy() end
+						end
+					end
+
+					-- 4. Apply the description to this rig
+					local successApply = pcall(function()
+						hum:ApplyDescription(desc)
+					end)
+
+					-- 5. Fallback if the custom rig rejects ApplyDescription
+					if not successApply then
+						local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
+						if aSuccess and appearance then
+							for _, item in ipairs(appearance:GetDescendants()) do
+								if item:IsA("Accessory") then
+									pcall(function() hum:AddAccessory(item:Clone()) end)
+								elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+									item:Clone().Parent = rig
+								end
+							end
+						end
+					end
+					
+					-- 6. Force apply Face (in case it glitched on this specific rig)
+					if desc.Face > 0 and head then
+						local face = Instance.new("Decal")
+						face.Name = "face"
+						face.Texture = "rbxassetid://" .. desc.Face
+						face.Parent = head
 					end
 				end
 			end
-			
-			-- 5. Force apply Face (in case it glitched)
-			if desc.Face > 0 and head then
-				local face = Instance.new("Decal")
-				face.Name = "face"
-				face.Texture = "rbxassetid://" .. desc.Face
-				face.Parent = head
-			end
-		else
-			window:Notify({ title = "Avatar Changer", content = "Failed to load HumanoidDescription.", duration = 3 })
 		end
 	end
 
@@ -1153,7 +1161,7 @@ do
 					end)
 				end
 			else
-				-- Revert to LocalPlayer's avatar
+				-- Revert ALL rigs to LocalPlayer's avatar
 				task.spawn(function()
 					applyAvatar(LP.UserId)
 				end)
