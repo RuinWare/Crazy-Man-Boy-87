@@ -851,9 +851,9 @@ VisTab:CreateToggle({
 	end,
 })
 
-tab:CreateInput({
-	name = "Max players",
-	value = "",
+VisTab:CreateInput({
+	name = "Amount:",
+	value "1",
 	placeholder = "0.00",
 	callback = function(text)
 		RESAMOUNT1 = tonumber(text) or 1
