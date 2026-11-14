@@ -97,7 +97,6 @@ do
     local optName = false
     local optDistance = false
     local optTracers = false
-    local debugMode = false
 
     local boxSize = 1
     local boxType = "Full"
@@ -144,87 +143,27 @@ do
     Players.PlayerAdded:Connect(refreshPlayerNames)
     Players.PlayerRemoving:Connect(function(p) playerNames[p.Name] = nil end)
 
-    -- ============================================================
-    -- BOUNDING BOX HELPER (works for Model OR BasePart)
-    -- ============================================================
-    local function getRigBounds(rig)
-        if rig:IsA("BasePart") then
-            return rig.CFrame, rig.Size
-        end
-
-        if rig:IsA("Model") then
-            local okBB, cf, sz = pcall(function()
-                return rig:GetBoundingBox()
-            end)
-            if okBB and cf and sz and sz.Magnitude > 0.01 then
-                return cf, sz
-            end
-
-            -- Fallback: PrimaryPart or first BasePart
-            local ref = rig.PrimaryPart
-            if not ref then
-                for _, d in ipairs(rig:GetDescendants()) do
-                    if d:IsA("BasePart") then
-                        ref = d
-                        break
-                    end
-                end
-            end
-            if ref then
-                return ref.CFrame, ref.Size
-            end
-        end
-
-        return nil, nil
-    end
-
-    -- ============================================================
-    -- RIG COLLECTION (Rigs + subfolders + other common nextbot spots)
-    -- ============================================================
-    local function collectRigs()
-        local list = {}
-        local seen = {}
-
-        local function addFrom(container, depth)
-            if not container or (depth or 0) > 3 then return end
-            for _, child in ipairs(container:GetChildren()) do
-                if child:IsA("Model") or child:IsA("BasePart") then
-                    if not seen[child] then
-                        seen[child] = true
-                        list[#list + 1] = child
-                    end
-                elseif child:IsA("Folder") then
-                    addFrom(child, (depth or 0) + 1)
-                end
-            end
-        end
-
-        local rigsFolder = workspace:FindFirstChild("Rigs")
-        if rigsFolder then
-            addFrom(rigsFolder, 0)
-        end
-
-        -- Common nextbot containers if Rigs doesn't have them
-        for _, folderName in ipairs({ "Nextbots", "NPCs", "Enemies", "Entities", "Characters", "Mobs" }) do
-            local folder = workspace:FindFirstChild(folderName)
-            if folder then addFrom(folder, 0) end
-        end
-
-        return list
-    end
-
-    -- ============================================================
-    -- PER-RIG DATA
-    -- ============================================================
     local rigData = {}
 
-    local function hasJoints(rig)
-        if rig:IsA("BasePart") then return false end
-        if rig:FindFirstChildOfClass("Humanoid") then return true end
-        for _, d in ipairs(rig:GetDescendants()) do
-            if d:IsA("Motor6D") then return true end
+    local function hideData(data)
+        if data.boxContainer and data.boxContainer.Visible then data.boxContainer.Visible = false end
+        if data.chamsBox and data.chamsBox.Visible then data.chamsBox.Visible = false end
+        if data.nameLabel and data.nameLabel.Visible then data.nameLabel.Visible = false end
+        if data.distLabel and data.distLabel.Visible then data.distLabel.Visible = false end
+        if data.tracer and data.tracer.Visible then data.tracer.Visible = false end
+        if data.highlight then
+            pcall(function() data.highlight:Destroy() end)
+            data.highlight = nil
         end
-        return false
+    end
+
+    local function clearRigData(data)
+        if data.boxContainer then data.boxContainer:Destroy() end
+        if data.chamsBox then data.chamsBox:Destroy() end
+        if data.nameLabel then data.nameLabel:Destroy() end
+        if data.distLabel then data.distLabel:Destroy() end
+        if data.tracer then data.tracer:Destroy() end
+        if data.highlight then pcall(function() data.highlight:Destroy() end) end
     end
 
     local function buildRigElements()
@@ -326,28 +265,40 @@ do
         data.tracer = tracer
 
         data.highlight = nil
+        data.anchor = nil
+        data.topOffset = 0
+        data.botOffset = 0
         return data
     end
 
-    local function clearRigData(data)
-        if data.boxContainer then data.boxContainer:Destroy() end
-        if data.chamsBox then data.chamsBox:Destroy() end
-        if data.nameLabel then data.nameLabel:Destroy() end
-        if data.distLabel then data.distLabel:Destroy() end
-        if data.tracer then data.tracer:Destroy() end
-        if data.highlight then pcall(function() data.highlight:Destroy() end) end
-    end
-
-    local function hideData(data)
-        if data.boxContainer then data.boxContainer.Visible = false end
-        if data.chamsBox then data.chamsBox.Visible = false end
-        if data.nameLabel then data.nameLabel.Visible = false end
-        if data.distLabel then data.distLabel.Visible = false end
-        if data.tracer then data.tracer.Visible = false end
-        if data.highlight then
-            pcall(function() data.highlight:Destroy() end)
-            data.highlight = nil
+    -- Cache bounds once per rig
+    local function computeBounds(rig, isPlayer)
+        if isPlayer then
+            local hrp = rig:FindFirstChild("HumanoidRootPart")
+            if not hrp then return nil end
+            local okBB, cf, sz = pcall(function() return rig:GetBoundingBox() end)
+            if not okBB or not cf then return nil end
+            return hrp, (cf.Position.Y + sz.Y / 2) - hrp.Position.Y, (cf.Position.Y - sz.Y / 2) - hrp.Position.Y
         end
+
+        local hb = rig:FindFirstChild("Hitbox")
+        if not hb then return nil end
+        if hb:IsA("BasePart") then
+            return hb, hb.Size.Y / 2, -hb.Size.Y / 2
+        end
+        if hb:IsA("Model") then
+            local anchor = hb.PrimaryPart
+            if not anchor then
+                for _, d in ipairs(hb:GetDescendants()) do
+                    if d:IsA("BasePart") then anchor = d break end
+                end
+            end
+            if not anchor then return nil end
+            local okBB, cf, sz = pcall(function() return hb:GetBoundingBox() end)
+            if not okBB or not cf then return nil end
+            return anchor, (cf.Position.Y + sz.Y / 2) - anchor.Position.Y, (cf.Position.Y - sz.Y / 2) - anchor.Position.Y
+        end
+        return nil
     end
 
     local function projectPoint(worldPos)
@@ -357,29 +308,29 @@ do
         return sp, onScreen and sp.Z > 0
     end
 
-    -- ============================================================
-    -- RENDER LOOP
-    -- ============================================================
     RunService.RenderStepped:Connect(function()
         local cam = workspace.CurrentCamera
         if not cam then return end
         local viewportSize = cam.ViewportSize
+        local camPos = cam.CFrame.Position
+        local camLook = cam.CFrame.LookVector
 
         if not espEnabled then
             for _, data in pairs(rigData) do hideData(data) end
             return
         end
 
-        local rigs = collectRigs()
+        local rigsFolder = workspace:FindFirstChild("Rigs")
+        if not rigsFolder then return end
+
         local seen = {}
 
-        for _, rig in ipairs(rigs) do
+        for _, rig in ipairs(rigsFolder:GetChildren()) do
             if rig.Name == player.Name then continue end
-            if not rig.Parent then continue end
+            if not (rig:IsA("Model") or rig:IsA("BasePart")) then continue end
 
             local isPlayer = playerNames[rig.Name] == true
-            local isNextbot = not isPlayer
-            local shouldRender = (isPlayer and showPlayers) or (isNextbot and showNextbots)
+            local shouldRender = (isPlayer and showPlayers) or (not isPlayer and showNextbots)
 
             if not shouldRender then
                 local data = rigData[rig]
@@ -387,42 +338,73 @@ do
                 continue
             end
 
-            seen[rig] = true
-
-            local cf, sz = getRigBounds(rig)
-            if not cf or not sz then
-                if debugMode then
-                    warn("[ESP] No bounds for:", rig.Name, "| Class:", rig.ClassName)
+            -- Quick behind-camera + distance check before expensive ops
+            local refPos
+            if isPlayer then
+                local hrp = rig:FindFirstChild("HumanoidRootPart")
+                if hrp then refPos = hrp.Position end
+            else
+                local hb = rig:FindFirstChild("Hitbox")
+                if hb and hb:IsA("BasePart") then refPos = hb.Position
+                elseif hb then
+                    for _, d in ipairs(hb:GetDescendants()) do
+                        if d:IsA("BasePart") then refPos = d.Position break end
+                    end
                 end
+            end
+            if not refPos then continue end
+
+            local toRig = refPos - camPos
+            if toRig:Dot(camLook) < 0 or toRig.Magnitude > 500 then
+                local data = rigData[rig]
+                if data then hideData(data) end
                 continue
             end
+
+            seen[rig] = true
 
             local data = rigData[rig]
             if not data then
                 data = buildRigElements()
                 rigData[rig] = data
+                data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer)
             end
+
+            -- Refresh bounds if anchor disappeared (respawn, etc.)
+            if not data.anchor or not data.anchor.Parent then
+                data.anchor, data.topOffset, data.botOffset = computeBounds(rig, isPlayer)
+            end
+
+            if not data.anchor then
+                hideData(data)
+                continue
+            end
+
+            local anchorPos = data.anchor.Position
+            local topWorld = Vector3.new(anchorPos.X, anchorPos.Y + data.topOffset, anchorPos.Z)
+            local botWorld = Vector3.new(anchorPos.X, anchorPos.Y + data.botOffset, anchorPos.Z)
+            local centerWorld = (topWorld + botWorld) / 2
+
+            local topScreen, topOn = projectPoint(topWorld)
+            local botScreen, botOn = projectPoint(botWorld)
+            local centerScreen, centerOn = projectPoint(centerWorld)
+            local onScreen = topOn and botOn and centerOn
 
             local tNameColor = isPlayer and nameColorPlayers or nameColorNextbots
             local tDistColor = isPlayer and distanceColorPlayers or distanceColorNextbots
             local tTracerColor = isPlayer and tracerColorPlayers or tracerColorNextbots
 
-            local topWorld = cf.Position + Vector3.new(0, sz.Y / 2, 0)
-            local bottomWorld = cf.Position - Vector3.new(0, sz.Y / 2, 0)
-            local centerWorld = cf.Position
-
-            local topScreen, topOn = projectPoint(topWorld)
-            local bottomScreen, bottomOn = projectPoint(bottomWorld)
-            local centerScreen, centerOn = projectPoint(centerWorld)
-            local onScreen = topOn and bottomOn and centerOn
-
             -- BOX
             if optBox and onScreen then
                 data.boxContainer.Visible = true
-                local boxHeight = math.abs(bottomScreen.Y - topScreen.Y)
+                local boxHeight = math.abs(botScreen.Y - topScreen.Y)
                 local boxWidth = boxHeight * 0.55 * boxSize
-                data.boxContainer.Position = UDim2.fromOffset(topScreen.X - boxWidth / 2, topScreen.Y)
-                data.boxContainer.Size = UDim2.fromOffset(boxWidth, boxHeight)
+                local px = math.floor(topScreen.X - boxWidth / 2 + 0.5)
+                local py = math.floor(topScreen.Y + 0.5)
+                local pw = math.floor(boxWidth + 0.5)
+                local ph = math.floor(boxHeight + 0.5)
+                data.boxContainer.Position = UDim2.fromOffset(px, py)
+                data.boxContainer.Size = UDim2.fromOffset(pw, ph)
 
                 local isFull = (boxType == "Full")
                 for i = 1, 4 do
@@ -454,14 +436,13 @@ do
                     data.fillImage.ImageTransparency = 1
                     data.fillFrame.BackgroundTransparency = 1
                 end
-            else
+            elseif data.boxContainer.Visible then
                 data.boxContainer.Visible = false
             end
 
             -- CHAMS
-            local jointed = hasJoints(rig)
             if optChams then
-                if jointed and (rig:IsA("Model")) then
+                if isPlayer then
                     if not data.highlight then
                         local h = Instance.new("Highlight")
                         h.FillColor = chamsColor
@@ -474,30 +455,40 @@ do
                         data.highlight.FillColor = chamsColor
                         data.highlight.FillTransparency = chamsTransparency
                     end
-                    data.chamsBox.Visible = false
+                    if data.chamsBox.Visible then data.chamsBox.Visible = false end
                 else
-                    if data.highlight then
-                        pcall(function() data.highlight:Destroy() end)
-                        data.highlight = nil
-                    end
-                    if onScreen then
+                    local hb = rig:FindFirstChild("Hitbox")
+                    if hb and (hb:IsA("BasePart") or hb:IsA("Model")) then
+                        if not data.highlight then
+                            local h = Instance.new("Highlight")
+                            h.FillColor = chamsColor
+                            h.FillTransparency = chamsTransparency
+                            h.OutlineTransparency = 1
+                            h.Parent = hb
+                            data.highlight = h
+                        else
+                            if data.highlight.Parent ~= hb then data.highlight.Parent = hb end
+                            data.highlight.FillColor = chamsColor
+                            data.highlight.FillTransparency = chamsTransparency
+                        end
+                        if data.chamsBox.Visible then data.chamsBox.Visible = false end
+                    elseif onScreen then
+                        if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
                         data.chamsBox.Visible = true
-                        local boxHeight = math.abs(bottomScreen.Y - topScreen.Y)
+                        local boxHeight = math.abs(botScreen.Y - topScreen.Y)
                         local boxWidth = boxHeight * 0.55 * boxSize
-                        data.chamsBox.Position = UDim2.fromOffset(topScreen.X - boxWidth / 2, topScreen.Y)
-                        data.chamsBox.Size = UDim2.fromOffset(boxWidth, boxHeight)
+                        data.chamsBox.Position = UDim2.fromOffset(math.floor(topScreen.X - boxWidth / 2 + 0.5), math.floor(topScreen.Y + 0.5))
+                        data.chamsBox.Size = UDim2.fromOffset(math.floor(boxWidth + 0.5), math.floor(boxHeight + 0.5))
                         data.chamsBox.BackgroundColor3 = chamsColor
                         data.chamsBox.BackgroundTransparency = chamsTransparency
                     else
-                        data.chamsBox.Visible = false
+                        if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
+                        if data.chamsBox.Visible then data.chamsBox.Visible = false end
                     end
                 end
             else
-                if data.highlight then
-                    pcall(function() data.highlight:Destroy() end)
-                    data.highlight = nil
-                end
-                data.chamsBox.Visible = false
+                if data.highlight then pcall(function() data.highlight:Destroy() end) data.highlight = nil end
+                if data.chamsBox.Visible then data.chamsBox.Visible = false end
             end
 
             -- NAME
@@ -507,23 +498,23 @@ do
                 data.nameLabel.TextColor3 = tNameColor
                 data.nameLabel.TextTransparency = nameTransparency
                 data.nameLabel.TextStrokeTransparency = nameTransparency
-                data.nameLabel.Position = UDim2.fromOffset(topScreen.X - 100, topScreen.Y - 20)
+                data.nameLabel.Position = UDim2.fromOffset(math.floor(topScreen.X - 100 + 0.5), math.floor(topScreen.Y - 20 + 0.5))
                 data.nameLabel.Size = UDim2.fromOffset(200, 16)
-            else
+            elseif data.nameLabel.Visible then
                 data.nameLabel.Visible = false
             end
 
             -- DISTANCE
             if optDistance and topOn then
                 data.distLabel.Visible = true
-                local distStuds = (centerWorld - cam.CFrame.Position).Magnitude
+                local distStuds = (centerWorld - camPos).Magnitude
                 data.distLabel.Text = "[" .. math.floor(distStuds) .. "m]"
                 data.distLabel.TextColor3 = tDistColor
                 data.distLabel.TextTransparency = distanceTransparency
                 data.distLabel.TextStrokeTransparency = distanceTransparency
-                data.distLabel.Position = UDim2.fromOffset(topScreen.X + 5, topScreen.Y - 20)
+                data.distLabel.Position = UDim2.fromOffset(math.floor(topScreen.X + 5 + 0.5), math.floor(topScreen.Y - 20 + 0.5))
                 data.distLabel.Size = UDim2.fromOffset(100, 16)
-            else
+            elseif data.distLabel.Visible then
                 data.distLabel.Visible = false
             end
 
@@ -544,12 +535,12 @@ do
                 local mid = (fromPos + toPos) / 2
 
                 data.tracer.Visible = true
-                data.tracer.Position = UDim2.fromOffset(mid.X, mid.Y)
-                data.tracer.Size = UDim2.fromOffset(length, 1)
+                data.tracer.Position = UDim2.fromOffset(math.floor(mid.X + 0.5), math.floor(mid.Y + 0.5))
+                data.tracer.Size = UDim2.fromOffset(math.floor(length + 0.5), 1)
                 data.tracer.Rotation = angle
                 data.tracer.BackgroundColor3 = tTracerColor
                 data.tracer.BackgroundTransparency = tracerTransparency
-            else
+            elseif data.tracer.Visible then
                 data.tracer.Visible = false
             end
         end
@@ -562,9 +553,6 @@ do
         end
     end)
 
-    -- ============================================================
-    -- UI
-    -- ============================================================
     VisTab:CreateDivider({ text = "ESP" })
 
     VisTab:CreateToggle({
@@ -572,13 +560,6 @@ do
         currentValue = false,
         flag = "ESP_Toggle",
         callback = function(v) espEnabled = v end,
-    })
-
-    VisTab:CreateToggle({
-        name = "ESP Debug",
-        currentValue = false,
-        flag = "ESP_Debug",
-        callback = function(v) debugMode = v end,
     })
 
     VisTab:CreateDropdown({
