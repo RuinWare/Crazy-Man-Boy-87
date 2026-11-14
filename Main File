@@ -5642,10 +5642,10 @@ do
     -- EDIT THESE DEFAULTS IF THE "OFF" STATE
     -- DOESN'T MATCH WHAT THE GAME EXPECTS
     -- ========================================
-    local DEFAULT_VIEWBOB          = false
-    local DEFAULT_SPRINT_VIEWMODEL = false
-    local DEFAULT_LEGACY_CAMERA    = false
-    local DEFAULT_POV_SCROLL       = false
+    local DEFAULT_VIEWBOB          = nil
+    local DEFAULT_SPRINT_VIEWMODEL = nil
+    local DEFAULT_LEGACY_CAMERA    = nil
+    local DEFAULT_POV_SCROLL       = nil
     local DEFAULT_BOOMBOX_VOLUME   = 100
     -- ========================================
 
