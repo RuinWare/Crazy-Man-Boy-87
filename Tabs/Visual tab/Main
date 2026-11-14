@@ -1,4 +1,3 @@
--- cmon github copilot say "Hi"
 do
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -1669,7 +1668,7 @@ end
 
 --[[
 ===========================
-HIDE HUD v2.0
+HIDE HUD v2.1 (patched)
 ===========================
 ]]--
 
@@ -1688,6 +1687,21 @@ do
 		value = false,
 		callback = function(v)
 			hideHudEnabled = v
+			if not v then
+				-- One-time restore so the game can take back over
+				local playerGui = LP:FindFirstChild("PlayerGui")
+				local gameGui = playerGui and playerGui:FindFirstChild("Game")
+				local hud = gameGui and gameGui:FindFirstChild("HUD")
+				if hud then
+					if hud:IsA("ScreenGui") then hud.Enabled = true else hud.Visible = true end
+				end
+				if gameGui and gameGui:IsA("ScreenGui") then gameGui.Enabled = true end
+				
+				local touchGui = playerGui and playerGui:FindFirstChild("TouchGui")
+				local touchFrame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
+				local jumpButton = touchFrame and touchFrame:FindFirstChild("JumpButton")
+				if jumpButton then jumpButton.Visible = true end
+			end
 		end,
 	})
 
@@ -1699,16 +1713,16 @@ do
 		end,
 	})
 
-	-- RenderStepped is perfect for UI because it runs right before the frame is drawn
 	RunService.RenderStepped:Connect(function()
+		-- IF MAIN TOGGLE IS OFF, STOP COMPLETELY. LET THE GAME HANDLE IT.
+		if not hideHudEnabled then return end
+		
 		local playerGui = LP:FindFirstChild("PlayerGui")
 		if not playerGui then return end
 
-		-- Safely find the Game UI
 		local gameGui = playerGui:FindFirstChild("Game")
 		local hud = gameGui and gameGui:FindFirstChild("HUD")
 
-		-- Safely find the Touch UI
 		local touchGui = playerGui:FindFirstChild("TouchGui")
 		local jumpButton = nil
 		
@@ -1719,45 +1733,23 @@ do
 			end
 		end
 
-		if hideHudEnabled then
-			-- HIDE MAIN HUD
-			if hud then
-				if hud:IsA("ScreenGui") then
-					hud.Enabled = false
-				else
-					hud.Visible = false -- For Frames/Folders
-					-- Fallback: hide the GameGui if it's a ScreenGui
-					if gameGui and gameGui:IsA("ScreenGui") then
-						gameGui.Enabled = false
-					end
-				end
-			elseif gameGui and gameGui:IsA("ScreenGui") then
-				-- If "HUD" doesn't exist, just hide the whole Game UI
-				gameGui.Enabled = false
-			end
-			
-			-- HANDLE JUMP BUTTON
-			if jumpButton then
-				jumpButton.Visible = not hideJumpEnabled
-			end
-		else
-			-- RESTORE EVERYTHING
-			if hud then
-				if hud:IsA("ScreenGui") then
-					hud.Enabled = true
-				else
-					hud.Visible = true
+		-- HIDE MAIN HUD
+		if hud then
+			if hud:IsA("ScreenGui") then
+				hud.Enabled = false
+			else
+				hud.Visible = false
+				if gameGui and gameGui:IsA("ScreenGui") then
+					gameGui.Enabled = false
 				end
 			end
-			
-			if gameGui and gameGui:IsA("ScreenGui") then
-				gameGui.Enabled = true
-			end
-			
-			-- Force jump button visible if main toggle is off
-			if jumpButton then
-				jumpButton.Visible = true
-			end
+		elseif gameGui and gameGui:IsA("ScreenGui") then
+			gameGui.Enabled = false
+		end
+		
+		-- HANDLE JUMP BUTTON
+		if jumpButton then
+			jumpButton.Visible = not hideJumpEnabled
 		end
 	end)
 end
