@@ -1024,7 +1024,7 @@ do
 		hiddenObjects = {}
 	end
 
-	VisTab:CreateDivider()
+	VisTab:CreateDivider({ text = "Lighting" })
 
 	VisTab:CreateToggle({
 		name = "Fullbright",
@@ -1278,6 +1278,103 @@ do
 		-- HANDLE JUMP BUTTON
 		if jumpButton then
 			jumpButton.Visible = not hideJumpEnabled
+		end
+	end)
+end
+
+--[[
+===========================
+HIDE PLYS
+===========================
+]]--
+
+do
+	local hidePlayersEnabled = false
+	local showFriendsEnabled = false
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+	
+	-- Hidden folder kept in memory (unparented) so the game doesn't see the rigs
+	local hiddenFolder = Instance.new("Folder")
+	hiddenFolder.Name = "HiddenPlayerRigs"
+	
+	-- Tracks rigs we hid and their original parent so we can restore them
+	local hiddenRigs = {}
+
+	-- Helper to check if a rig belongs to a friend
+	local function isFriend(player)
+		local success, result = pcall(function()
+			return LP:IsFriendsWith(player.UserId)
+		end)
+		return success and result
+	end
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Hide Players",
+		value = false,
+		callback = function(v)
+			hidePlayersEnabled = v
+			
+			if not v then
+				-- Restore all hidden rigs to their original locations
+				for rig, originalParent in pairs(hiddenRigs) do
+					if rig and originalParent then
+						pcall(function()
+							rig.Parent = originalParent
+						end)
+					end
+				end
+				hiddenRigs = {}
+			end
+		end,
+	})
+
+	VisTab:CreateToggle({
+		name = "Show Friends",
+		value = false,
+		callback = function(v)
+			showFriendsEnabled = v
+		end,
+	})
+
+	-- Enforce hiding every frame to catch newly spawned rigs
+	RunService.Heartbeat:Connect(function()
+		if not hidePlayersEnabled then return end
+		
+		-- Check both workspace.Rigs and workspace.Players
+		local containers = {
+			workspace:FindFirstChild("Rigs"),
+			workspace:FindFirstChild("Players")
+		}
+		
+		for _, container in ipairs(containers) do
+			if container then
+				for _, rig in ipairs(container:GetChildren()) do
+					-- Ensure it's a real player (prevents deleting Nextbots)
+					local plr = Players:FindFirstChild(rig.Name)
+					
+					if plr and plr ~= LP then
+						local shouldHide = true
+						
+						-- Check if we should keep friends visible
+						if showFriendsEnabled and isFriend(plr) then
+							shouldHide = false
+						end
+						
+						if shouldHide then
+							-- If it's not already hidden, hide it
+							if rig.Parent ~= hiddenFolder then
+								hiddenRigs[rig] = container
+								rig.Parent = hiddenFolder
+							end
+						end
+					end
+				end
+			end
 		end
 	end)
 end
