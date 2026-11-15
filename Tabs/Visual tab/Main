@@ -708,7 +708,7 @@ REMOVE BREACHER LAG
 ===========================
 ]]--
 do
-VisTab:CreateDivider({ text = "Tools" })
+VisTab:CreateDivider({ "Game" })
 
 VisTab:CreateToggle({
     name = "Remove Breacher Lag",
@@ -837,6 +837,73 @@ do
 					vignette:Destroy()
 				end
 			end
+		end
+	end)
+end
+
+--[[
+===========================
+ROUND TIMER
+===========================
+]]--
+
+do
+	local roundTimerEnabled = false
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	-- Helper to safely traverse the long UI path
+	local function getTimerElement()
+		local playerGui = LP:FindFirstChild("PlayerGui")
+		if not playerGui then return nil end
+		
+		local gameGui = playerGui:FindFirstChild("Game")
+		if not gameGui then return nil end
+		
+		local hud = gameGui:FindFirstChild("HUD")
+		if not hud then return nil end
+		
+		local overlay = hud:FindFirstChild("Overlay")
+		if not overlay then return nil end
+		
+		local roundOverlay = overlay:FindFirstChild("RoundOverlay")
+		if not roundOverlay then return nil end
+		
+		local roundTimer = roundOverlay:FindFirstChild("RoundTimer")
+		if not roundTimer then return nil end
+		
+		local ingameRoundTimer = roundTimer:FindFirstChild("IngameRoundTimer")
+		if not ingameRoundTimer then return nil end
+		
+		return ingameRoundTimer:FindFirstChild("Timer")
+	end
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Round Timer",
+		value = false,
+		callback = function(v)
+			roundTimerEnabled = v
+			
+			if not v then
+				-- Turn it invisible once and stop
+				local timer = getTimerElement()
+				if timer then
+					timer.Visible = false
+				end
+			end
+		end,
+	})
+
+	-- Loop only runs when toggle is on
+	RunService.RenderStepped:Connect(function()
+		if not roundTimerEnabled then return end
+		
+		local timer = getTimerElement()
+		if timer then
+			timer.Visible = true
 		end
 	end)
 end
