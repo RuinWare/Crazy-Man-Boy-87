@@ -853,8 +853,8 @@ do
 	local RunService = game:GetService("RunService")
 	local LP = Players.LocalPlayer
 
-	-- Helper to safely traverse the long UI path
-	local function getTimerElement()
+	-- Helper to safely traverse the long UI path and get the IngameRoundTimer
+	local function getIngameTimer()
 		local playerGui = LP:FindFirstChild("PlayerGui")
 		if not playerGui then return nil end
 		
@@ -873,10 +873,7 @@ do
 		local roundTimer = roundOverlay:FindFirstChild("RoundTimer")
 		if not roundTimer then return nil end
 		
-		local ingameRoundTimer = roundTimer:FindFirstChild("IngameRoundTimer")
-		if not ingameRoundTimer then return nil end
-		
-		return ingameRoundTimer:FindFirstChild("Timer")
+		return roundTimer:FindFirstChild("IngameRoundTimer")
 	end
 
 	VisTab:CreateDivider()
@@ -888,10 +885,12 @@ do
 			roundTimerEnabled = v
 			
 			if not v then
-				-- Turn it invisible once and stop
-				local timer = getTimerElement()
-				if timer then
-					timer.Visible = false
+				-- Turn both invisible once and stop
+				local ingameTimer = getIngameTimer()
+				if ingameTimer then
+					ingameTimer.Visible = false
+					local timerText = ingameTimer:FindFirstChild("Timer")
+					if timerText then timerText.Visible = false end
 				end
 			end
 		end,
@@ -901,9 +900,11 @@ do
 	RunService.RenderStepped:Connect(function()
 		if not roundTimerEnabled then return end
 		
-		local timer = getTimerElement()
-		if timer then
-			timer.Visible = true
+		local ingameTimer = getIngameTimer()
+		if ingameTimer then
+			ingameTimer.Visible = true
+			local timerText = ingameTimer:FindFirstChild("Timer")
+			if timerText then timerText.Visible = true end
 		end
 	end)
 end
