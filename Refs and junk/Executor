@@ -1,8 +1,10 @@
+-- Code Runner
+
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-local TITLE = "RuinWare Executor"
-local SUBTITLE = "Universal"
+local TITLE = "Code Runner"
+local SUBTITLE = "Write, Save, and Run lua."
 local FLAG = "RWEXECUTOR"                           -- name of this window (DeleteGuiByFlag can remove it)
 local SAVE_FILE = "RuinWare_Executor_Scripts.json"         -- where your scripts are saved
 local START_SIZE = Vector2.new(580, 380)
@@ -15,7 +17,7 @@ local TITLE_COLOR = Color3.fromRGB(245, 245, 245)   -- off-white, because black 
 local SUBTITLE_COLOR = Color3.fromRGB(140, 140, 150)
 local SIDEBAR_COLOR = Color3.fromRGB(0, 0, 0)       -- full black
 local EDITOR_COLOR = SUBTITLE_COLOR:Lerp(Color3.new(0, 0, 0), 0.84) -- the subtitle gray, darkened so code is readable
-local CODE_SIZE = 11
+local DEFAULT_TEXT_SIZE = 14                    -- starting size of the code (changeable in Settings)
 local SCREEN_MARGIN = 6
 local DRAG_FOLLOW_SPEED = 9                         -- lower = the window trails the drag bar more
 local RESIZE_FOLLOW_SPEED = 26
@@ -29,6 +31,9 @@ local ICON_FILE = "rbxassetid://84710966599036"
 local ICON_RENAME = "rbxassetid://138570826481183"
 local ICON_DELETE = "rbxassetid://71855002670984"   -- also used by the Clear button
 local ICON_ERROR = "rbxassetid://139101153957019"
+local ICON_SETTINGS = "rbxassetid://140694242057630"
+local ICON_TEXTSIZE = "rbxassetid://131412776187171"
+local ICON_CLIPBOARD = "rbxassetid://120971718520457"
 
 -- Soft shadow under the window (the glow image, recolored black)
 local SHADOW_ASSET = "rbxassetid://138843696730147"
@@ -53,7 +58,7 @@ local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 local TextService = game:GetService("TextService")
 
-local TAG = "RWEXECUTOR" -- same tag as the mobile buttons, so DestroyAllGuis / DeleteGuiByFlag work on this too
+local TAG = "RWEXECUTOR"
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -95,6 +100,9 @@ local PILL_SIZE = Vector2.new(88, 34)
 ----------------------------------------------------------------
 -- Helpers
 ----------------------------------------------------------------
+local themed = {} -- things that change color with Light / Dark mode: { object, property, themeKey }
+local bind        -- defined once the themes exist
+
 local function tween(obj, time, props, style, direction)
 	local t = TweenService:Create(
 		obj,
@@ -385,6 +393,7 @@ local function makeScrollbar(scroll, host, rightInset, topInset, bottomInset, zi
 		ZIndex = zindex,
 	}, thumb)
 	corner(bar, UDim.new(1, 0))
+	bind(bar, "BackgroundColor3", "icon")
 
 	local fadeToken = 0
 	local dragging = false
@@ -507,8 +516,12 @@ pcall(function()
 	if getgenv then memoryStore = getgenv() end
 end)
 
+local function defaultSettings()
+	return { textSize = DEFAULT_TEXT_SIZE, mode = "dark", warnings = true }
+end
+
 local function defaultData()
-	return { scripts = { { name = "Script 1.lua", code = "" } }, selected = 1, sidebar = 0.28 }
+	return { scripts = { { name = "Script 1.lua", code = "" } }, selected = 1, sidebar = 0.28, settings = defaultSettings() }
 end
 
 local function loadData()
@@ -537,10 +550,63 @@ local function loadData()
 			result.sidebar = math.clamp(tonumber(raw.sidebar) or 0.28, 0, 0.6)
 		end
 	end
+
+	if type(raw) == "table" and type(raw.settings) == "table" then
+		local saved = raw.settings
+		local size = tonumber(saved.textSize)
+		if size then result.settings.textSize = math.clamp(math.floor(size), 8, 32) end
+		if saved.mode == "light" or saved.mode == "dark" then result.settings.mode = saved.mode end
+		if type(saved.warnings) == "boolean" then result.settings.warnings = saved.warnings end
+	end
 	return result
 end
 
 local data = loadData()
+local codeSize = data.settings.textSize
+
+----------------------------------------------------------------
+-- Themes (Dark is the default, Light changes every color and fades between them)
+----------------------------------------------------------------
+local THEMES = {
+	dark = {
+		bodyT = BODY_TRANSPARENCY, bodyLightT = 1,
+		title = TITLE_COLOR, strong = OFFWHITE, icon = WHITE, sub = SUBTITLE_COLOR,
+		idleIcon = Color3.fromRGB(150, 150, 160), hoverIcon = WHITE,
+		sidebar = SIDEBAR_COLOR, editor = EDITOR_COLOR, rim = WHITE, line = WHITE, caret = WHITE,
+		menuBg = Color3.fromRGB(26, 26, 31),
+		runBg = OFFWHITE, runFg = BLACK, grayBg = BUTTON_GRAY, grayFg = WHITE,
+		toggleOff = Color3.fromRGB(70, 70, 78),
+		code = {
+			default = "#d4d4d4", keyword = "#c586c0", constant = "#569cd6", builtin = "#4fc1d9",
+			func = "#dcdcaa", property = "#9cdcfe", string = "#98c379", number = "#d19a66",
+			comment = "#6b6b76", operator = "#b9b9c2", error = "#ff5555", flash = "#000000",
+		},
+	},
+	light = {
+		bodyT = 1, bodyLightT = BODY_TRANSPARENCY,
+		title = Color3.fromRGB(20, 20, 24), strong = Color3.fromRGB(28, 28, 34), icon = Color3.fromRGB(24, 24, 28),
+		sub = Color3.fromRGB(110, 110, 122),
+		idleIcon = Color3.fromRGB(150, 150, 160), hoverIcon = BLACK,
+		sidebar = Color3.fromRGB(246, 246, 249), editor = Color3.fromRGB(238, 238, 243),
+		rim = Color3.fromRGB(96, 96, 108), line = Color3.fromRGB(30, 30, 36), caret = BLACK,
+		menuBg = Color3.fromRGB(252, 252, 254),
+		runBg = Color3.fromRGB(18, 18, 20), runFg = WHITE,
+		grayBg = Color3.fromRGB(206, 206, 214), grayFg = BLACK,
+		toggleOff = Color3.fromRGB(190, 190, 198),
+		code = {
+			default = "#24242b", keyword = "#9b2fb0", constant = "#1f5fbf", builtin = "#0f7d96",
+			func = "#8a6d00", property = "#1b5fa8", string = "#2c7a2c", number = "#b35c00",
+			comment = "#8a8a96", operator = "#5a5a66", error = "#d42a2a", flash = "#000000",
+		},
+	},
+}
+local theme = THEMES[data.settings.mode] or THEMES.dark
+
+-- Colors an object from the current theme now, and remembers it so a theme change can fade it later
+function bind(obj, prop, key)
+	themed[#themed + 1] = { obj, prop, key }
+	obj[prop] = theme[key]
+end
 
 local function writeData()
 	if canUseFiles then
@@ -568,7 +634,7 @@ local screenGui = make("ScreenGui", {
 	Name = randomName(20),
 	ResetOnSpawn = false,
 	IgnoreGuiInset = true,
-	DisplayOrder = 2147483646, -- above every other GUI
+	DisplayOrder = 2147483645, -- above every other GUI (2 below the maximum)
 	OnTopOfCoreBlur = true,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 }, nil)
@@ -622,12 +688,14 @@ local busy = false
 local pillCenter = nil
 local flashLine, liveErrorLine = nil, nil
 local lineCount = 1
+local settingsOpen = false   -- true while the Settings menu replaces the editor
 local connections = {}
 
 -- functions that get defined further down
 local render, layout, buildList, applySelection, selectScript, addScript
 local openMenu, closeMenu, beginRename, openDeletePopup
 local showToast, hideToast, execute, setOpen, followCaret, scheduleLiveCheck
+local updateCaret, updateSelection, applyTheme, applyTextSize, setSettingsOpen, confirmPopup
 
 local holder = make("Frame", {
 	Name = "Holder",
@@ -653,13 +721,32 @@ make("UIGradient", { -- the black background gradient
 	Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(40, 40, 50)),
 	Rotation = 60,
 }, body)
-glass(body, UDim.new(0, CORNER), 0.9, { noGloss = true, noDepth = true })
+bind(body, "BackgroundTransparency", "bodyT")
+
+-- Light mode: a white layer with its own gradient that fades in over the black one
+local bodyLight = make("Frame", {
+	Name = "BodyLight",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 1,
+}, body)
+corner(bodyLight, UDim.new(0, CORNER))
+make("UIGradient", {
+	Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(232, 232, 240)),
+	Rotation = 60,
+}, bodyLight)
+bind(bodyLight, "BackgroundTransparency", "bodyLightT")
+
+local bodyStroke = glass(body, UDim.new(0, CORNER), 0.9, { noGloss = true, noDepth = true })
+bind(bodyStroke, "Color", "rim")
 
 -- Title, subtitle and the close button
 local titleLabel = make("TextLabel", {
 	Name = "Title",
 	Position = UDim2.fromOffset(PAD + 6, 10),
-	Size = UDim2.new(1, -(PAD * 2 + 56), 0, 20),
+	Size = UDim2.new(1, -(PAD * 2 + 104), 0, 20),
 	BackgroundTransparency = 1,
 	Text = TITLE,
 	TextColor3 = TITLE_COLOR,
@@ -672,7 +759,7 @@ local titleLabel = make("TextLabel", {
 local subtitleLabel = make("TextLabel", {
 	Name = "Subtitle",
 	Position = UDim2.fromOffset(PAD + 6, 31),
-	Size = UDim2.new(1, -(PAD * 2 + 56), 0, 16),
+	Size = UDim2.new(1, -(PAD * 2 + 104), 0, 16),
 	BackgroundTransparency = 1,
 	Text = SUBTITLE,
 	TextColor3 = SUBTITLE_COLOR,
@@ -683,36 +770,44 @@ local subtitleLabel = make("TextLabel", {
 	ZIndex = 3,
 }, body)
 
-local closeButton = make("TextButton", {
-	Name = "Close",
-	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -PAD, 0, 26),
-	Size = UDim2.fromOffset(40, 40),
-	BackgroundColor3 = WHITE,
-	BackgroundTransparency = 1,
-	Text = "",
-	AutoButtonColor = false,
-	Selectable = false,
-	ZIndex = 4,
-}, body)
-corner(closeButton, UDim.new(1, 0))
-local closeScale = make("UIScale", { Scale = 1 }, closeButton)
-local closeIcon = makeIcon(closeButton, ICON_CLOSE, OFFWHITE, 28, {
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	ZIndex = 5,
-})
-closeButton.MouseEnter:Connect(function()
-	tween(closeButton, 0.25, { BackgroundTransparency = 0.86 })
-	tween(closeIcon, 0.4, { Rotation = 90, ImageColor3 = ERROR_RED }, Enum.EasingStyle.Back)
-end)
-closeButton.MouseLeave:Connect(function()
-	tween(closeButton, 0.3, { BackgroundTransparency = 1 })
-	tween(closeIcon, 0.4, { Rotation = 0, ImageColor3 = OFFWHITE }, Enum.EasingStyle.Back)
-end)
-attachPress(closeButton, closeScale, 0.8)
+bind(titleLabel, "TextColor3", "title")
+bind(subtitleLabel, "TextColor3", "sub")
+
+-- Icons in the header: gray and slightly see-through, they turn white and fully visible when hovered
+local function makeHeaderIcon(name, image, offsetX)
+	local button = make("TextButton", {
+		Name = name,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -(PAD + offsetX), 0, 26),
+		Size = UDim2.fromOffset(40, 40),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 4,
+	}, body)
+	local icon = makeIcon(button, image, theme.idleIcon, 28, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		ImageTransparency = 0.15,
+		ZIndex = 5,
+	})
+	button.MouseEnter:Connect(function()
+		tween(icon, 0.3, { ImageColor3 = theme.hoverIcon, ImageTransparency = 0 }, Enum.EasingStyle.Quad)
+	end)
+	button.MouseLeave:Connect(function()
+		tween(icon, 0.35, { ImageColor3 = theme.idleIcon, ImageTransparency = 0.15 }, Enum.EasingStyle.Quad)
+	end)
+	return button, icon
+end
+
+local closeButton = makeHeaderIcon("Close", ICON_CLOSE, 0)
+local settingsButton = makeHeaderIcon("Settings", ICON_SETTINGS, 44)
 closeButton.Activated:Connect(function()
 	task.spawn(setOpen, false)
+end)
+settingsButton.Activated:Connect(function()
+	setSettingsOpen(not settingsOpen)
 end)
 
 ----------------------------------------------------------------
@@ -727,8 +822,9 @@ local sidebar = make("Frame", {
 	ZIndex = 2,
 }, body)
 corner(sidebar, UDim.new(0, 22))
+bind(sidebar, "BackgroundColor3", "sidebar")
 
-make("TextLabel", {
+local sideTitle = make("TextLabel", {
 	Name = "SideTitle",
 	Position = UDim2.fromOffset(16, 10),
 	Size = UDim2.new(1, -60, 0, 18),
@@ -740,6 +836,7 @@ make("TextLabel", {
 	FontFace = UI_FONT_BOLD,
 	ZIndex = 3,
 }, sidebar)
+bind(sideTitle, "TextColor3", "sub")
 
 local addButton = make("TextButton", {
 	Name = "Add",
@@ -754,6 +851,7 @@ local addButton = make("TextButton", {
 	ZIndex = 4,
 }, sidebar)
 corner(addButton, UDim.new(1, 0))
+bind(addButton, "BackgroundColor3", "icon")
 local addScale = make("UIScale", { Scale = 1 }, addButton)
 local plusHolder = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
@@ -772,6 +870,7 @@ for _, size in ipairs({ Vector2.new(12, 2), Vector2.new(2, 12) }) do
 		ZIndex = 5,
 	}, plusHolder)
 	corner(bar, UDim.new(1, 0))
+	bind(bar, "BackgroundColor3", "strong")
 end
 addButton.MouseEnter:Connect(function()
 	tween(addButton, 0.25, { BackgroundTransparency = 0.88 })
@@ -820,16 +919,35 @@ local editorPanel = make("Frame", {
 	ZIndex = 2,
 }, body)
 corner(editorPanel, UDim.new(0, 22))
-glass(editorPanel, UDim.new(0, 22), 0.7, { noGloss = true, noDepth = true })
+bind(editorPanel, "BackgroundColor3", "editor")
+local editorStroke = glass(editorPanel, UDim.new(0, 22), 0.7, { noGloss = true, noDepth = true })
+bind(editorStroke, "Color", "rim")
 
-local lineH
-do
+-- The Settings menu: it sits where the editor is and covers it (filled in further down)
+local settingsPanel = make("Frame", {
+	Name = "SettingsPanel",
+	BackgroundColor3 = EDITOR_COLOR,
+	BackgroundTransparency = 0.1,
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	Visible = false,
+	ZIndex = 3,
+}, body)
+corner(settingsPanel, UDim.new(0, 22))
+bind(settingsPanel, "BackgroundColor3", "editor")
+local settingsStroke = glass(settingsPanel, UDim.new(0, 22), 0.7, { noGloss = true, noDepth = true })
+bind(settingsStroke, "Color", "rim")
+
+local lineH, charW = 16, 8
+local function measureFont()
 	local huge = Vector2.new(100000, 100000)
-	local one = TextService:GetTextSize("A", CODE_SIZE, CODE_FONT, huge).Y
-	local two = TextService:GetTextSize("A\nA", CODE_SIZE, CODE_FONT, huge).Y
+	local one = TextService:GetTextSize("A", codeSize, CODE_FONT, huge).Y
+	local two = TextService:GetTextSize("A\nA", codeSize, CODE_FONT, huge).Y
 	lineH = two - one
-	if lineH < 1 then lineH = math.ceil(CODE_SIZE * 1.2) end
+	if lineH < 1 then lineH = math.ceil(codeSize * 1.2) end
+	charW = TextService:GetTextSize(("A"):rep(40), codeSize, CODE_FONT, huge).X / 40
 end
+measureFont()
 
 -- line numbers (stay put when scrolling sideways, follow when scrolling up and down)
 local gutterClip = make("Frame", {
@@ -847,13 +965,14 @@ local gutterLabel = make("TextLabel", {
 	BackgroundTransparency = 1,
 	Text = "1",
 	TextColor3 = SUBTITLE_COLOR,
-	TextSize = CODE_SIZE,
+	TextSize = codeSize,
 	TextXAlignment = Enum.TextXAlignment.Right,
 	TextYAlignment = Enum.TextYAlignment.Top,
 	Font = CODE_FONT,
 	ZIndex = 3,
 }, gutterClip)
-make("Frame", {
+bind(gutterLabel, "TextColor3", "sub")
+local gutterLine = make("Frame", {
 	Name = "GutterLine",
 	Position = UDim2.fromOffset(GUTTER_W, 8),
 	Size = UDim2.new(0, 1, 1, -16),
@@ -862,6 +981,7 @@ make("Frame", {
 	BorderSizePixel = 0,
 	ZIndex = 3,
 }, editorPanel)
+bind(gutterLine, "BackgroundColor3", "line")
 
 local scroll = make("ScrollingFrame", {
 	Name = "CodeScroll",
@@ -885,6 +1005,45 @@ local flashBar = make("Frame", {
 	ZIndex = 1,
 }, scroll)
 
+-- selected text is drawn by the script too (the real text box is hidden)
+local selectionFrames = {}
+local function selectionFrame(index)
+	local frame = selectionFrames[index]
+	if frame then return frame end
+	frame = make("Frame", {
+		Name = "Selection" .. index,
+		BackgroundColor3 = Color3.fromRGB(70, 130, 255),
+		BackgroundTransparency = 0.65,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 1,
+	}, scroll)
+	selectionFrames[index] = frame
+	return frame
+end
+
+-- the typing cursor: a white line that fades in and out slowly
+local caret = make("Frame", {
+	Name = "Caret",
+	Size = UDim2.fromOffset(2, lineH),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 5,
+}, scroll)
+corner(caret, UDim.new(1, 0))
+bind(caret, "BackgroundColor3", "caret")
+
+-- The real text box lives inside a fully transparent CanvasGroup: you can still tap and type in it,
+-- but its own cursor and selection are hidden, so only the script's caret (below) shows
+local editorGroup = make("CanvasGroup", {
+	Name = "EditorGroup",
+	Size = UDim2.fromOffset(10, 10),
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BackgroundTransparency = 1,
+	GroupTransparency = 1,
+	ZIndex = 4,
+}, scroll)
 local editor = make("TextBox", {
 	Name = "Editor",
 	Size = UDim2.fromOffset(10, 10),
@@ -892,16 +1051,17 @@ local editor = make("TextBox", {
 	BackgroundTransparency = 1,
 	Text = "",
 	TextColor3 = WHITE,
-	TextTransparency = 1, -- the colored copy underneath is what you see; the cursor and selection stay visible
-	TextSize = CODE_SIZE,
+	TextTransparency = 1, -- the colored copy underneath is what you see
+	TextSize = codeSize,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextYAlignment = Enum.TextYAlignment.Top,
 	TextWrapped = false,
 	MultiLine = true,
 	ClearTextOnFocus = false,
+	ShowNativeInput = false, -- type right in the box on mobile, so the cursor is where you type
 	Font = CODE_FONT,
 	ZIndex = 4,
-}, scroll)
+}, editorGroup)
 make("UIPadding", {
 	PaddingLeft = UDim.new(0, PADX),
 	PaddingTop = UDim.new(0, PADY),
@@ -910,53 +1070,56 @@ make("UIPadding", {
 }, editor)
 
 local codeBar = makeScrollbar(scroll, editorPanel, 4, 8, 50, 7)
+local codeBar = makeScrollbar(scroll, editorPanel, 4, 8, 50, 7)
 
--- Run and Clear
-local function makeActionButton(name, text, width, bg, fg, image, slot)
+-- Run, Run Clipboard and Clear
+local function makeActionButton(name, text, width, bgKey, fgKey, image, slot)
 	local button = make("TextButton", {
 		Name = name,
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, -(34 + slot), 1, -10),
 		Size = UDim2.fromOffset(width, 32),
-		BackgroundColor3 = bg,
 		Text = "",
 		AutoButtonColor = false,
 		Selectable = false,
 		ZIndex = 8,
 	}, editorPanel)
+	bind(button, "BackgroundColor3", bgKey)
 	corner(button, UDim.new(1, 0))
 	local stroke = glass(button, UDim.new(1, 0), 0.9, { glossH = 12, depthH = 10 })
 	local strokeBase = stroke.Transparency
 	local scale = make("UIScale", { Scale = 1 }, button)
-	makeIcon(button, image, fg, 15, {
+	local icon = makeIcon(button, image, WHITE, 15, {
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 12, 0.5, 0),
 		ZIndex = 9,
 	})
-	make("TextLabel", {
-		Position = UDim2.new(0, 34, 0.5, -8),
-		Size = UDim2.new(1, -40, 0, 16),
+	bind(icon, "ImageColor3", fgKey)
+	local label = make("TextLabel", {
+		Position = UDim2.new(0, 33, 0.5, -8),
+		Size = UDim2.new(1, -38, 0, 16),
 		BackgroundTransparency = 1,
 		Text = text,
-		TextColor3 = fg,
 		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		FontFace = UI_FONT_BOLD,
 		ZIndex = 9,
 	}, button)
+	bind(label, "TextColor3", fgKey)
 	button.MouseEnter:Connect(function()
-		tween(button, 0.2, { BackgroundColor3 = bg:Lerp(WHITE, 0.14) })
+		tween(button, 0.2, { BackgroundColor3 = theme[bgKey]:Lerp(WHITE, 0.14) })
 		tween(stroke, 0.25, { Transparency = 0 })
 	end)
 	button.MouseLeave:Connect(function()
-		tween(button, 0.3, { BackgroundColor3 = bg })
+		tween(button, 0.3, { BackgroundColor3 = theme[bgKey] })
 		tween(stroke, 0.35, { Transparency = strokeBase })
 	end)
 	attachPress(button, scale, 0.93)
 	return button
 end
-local clearButton = makeActionButton("Clear", "Clear", 92, BUTTON_GRAY, WHITE, ICON_DELETE, 0)
-local runButton = makeActionButton("Run", "Run", 84, OFFWHITE, BLACK, ICON_RUN, 100)
+local clearButton = makeActionButton("Clear", "Clear", 84, "grayBg", "grayFg", ICON_DELETE, 0)
+local clipboardButton = makeActionButton("RunClipboard", "Run Clipboard", 132, "grayBg", "grayFg", ICON_CLIPBOARD, 92)
+local runButton = makeActionButton("Run", "Run", 76, "runBg", "runFg", ICON_RUN, 232)
 
 ----------------------------------------------------------------
 -- Divider (drag it to change how wide the sidebar is), resize corner, drag bar
@@ -981,6 +1144,7 @@ local dividerPill = make("Frame", {
 	ZIndex = 6,
 }, divider)
 corner(dividerPill, UDim.new(1, 0))
+bind(dividerPill, "BackgroundColor3", "line")
 divider.MouseEnter:Connect(function()
 	if not drag.kind then
 		tween(dividerPill, 0.25, { BackgroundTransparency = 0.4, Size = UDim2.fromOffset(4, 46) }, Enum.EasingStyle.Back)
@@ -1027,6 +1191,7 @@ do
 			ZIndex = 8,
 		}, iconGroup)
 		corner(dot, UDim.new(1, 0))
+		bind(dot, "BackgroundColor3", "icon")
 	end
 end
 handle.MouseEnter:Connect(function()
@@ -1059,6 +1224,7 @@ local bar = make("Frame", {
 	ZIndex = 8,
 }, dragHit)
 corner(bar, UDim.new(1, 0))
+bind(bar, "BackgroundColor3", "line")
 dragHit.MouseEnter:Connect(function()
 	if drag.kind ~= "move" then tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end
 end)
@@ -1090,7 +1256,9 @@ local menu = make("Frame", {
 	ZIndex = 26,
 }, body)
 corner(menu, UDim.new(0, 22))
-glass(menu, UDim.new(0, 22), 1.1, { glossH = 12, depthH = 12 })
+bind(menu, "BackgroundColor3", "menuBg")
+local menuStroke = glass(menu, UDim.new(0, 22), 1.1, { glossH = 12, depthH = 12 })
+bind(menuStroke, "Color", "rim")
 local menuScale = make("UIScale", { Scale = 1 }, menu)
 
 local function makeMenuOption(text, image, color, y, tint)
@@ -1107,12 +1275,12 @@ local function makeMenuOption(text, image, color, y, tint)
 	}, menu)
 	corner(option, UDim.new(0, 14))
 	local scale = make("UIScale", { Scale = 1 }, option)
-	makeIcon(option, image, color, 16, {
+	local optionIcon = makeIcon(option, image, color, 16, {
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 11, 0.5, 0),
 		ZIndex = 28,
 	})
-	make("TextLabel", {
+	local optionLabel = make("TextLabel", {
 		Position = UDim2.new(0, 36, 0.5, -8),
 		Size = UDim2.new(1, -42, 0, 16),
 		BackgroundTransparency = 1,
@@ -1130,9 +1298,11 @@ local function makeMenuOption(text, image, color, y, tint)
 		tween(option, 0.25, { BackgroundTransparency = 1 })
 	end)
 	attachPress(option, scale, 0.95)
-	return option
+	return option, optionIcon, optionLabel
 end
-local renameOption = makeMenuOption("Rename", ICON_RENAME, WHITE, 6, WHITE)
+local renameOption, renameIcon, renameLabel = makeMenuOption("Rename", ICON_RENAME, WHITE, 6, WHITE)
+bind(renameIcon, "ImageColor3", "icon")
+bind(renameLabel, "TextColor3", "icon")
 local deleteOption = makeMenuOption("Delete", ICON_DELETE, DELETE_TEXT, 42, DELETE_RED)
 local menuFades = snapshotFor(menu)
 
@@ -1369,6 +1539,8 @@ function layout()
 	sidebar.Size = UDim2.fromOffset(sideInt, cH)
 	editorPanel.Position = UDim2.fromOffset(PAD + sideInt + gapInt, HEADER_H)
 	editorPanel.Size = UDim2.fromOffset(editorW, cH)
+	settingsPanel.Position = editorPanel.Position
+	settingsPanel.Size = editorPanel.Size
 
 	-- the divider stays grabbable even when the sidebar is hidden (it sits just inside the editor)
 	local pushIn = (1 - math.clamp(sideW / 24, 0, 1)) * 9
@@ -1381,11 +1553,8 @@ end
 ----------------------------------------------------------------
 -- Colored code (Lua syntax highlighting)
 ----------------------------------------------------------------
-local COLORS = {
-	default = "#d4d4d4", keyword = "#c586c0", constant = "#569cd6", builtin = "#4fc1d9",
-	func = "#dcdcaa", property = "#9cdcfe", string = "#98c379", number = "#d19a66",
-	comment = "#6b6b76", operator = "#b9b9c2", error = "#ff5555", flash = "#000000",
-}
+local COLORS = {}
+for key, value in pairs(theme.code) do COLORS[key] = value end
 
 local function toSet(words)
 	local set = {}
@@ -1553,7 +1722,7 @@ local function chunkLabel(index)
 		Text = "",
 		RichText = true,
 		TextColor3 = Color3.fromRGB(212, 212, 212),
-		TextSize = CODE_SIZE,
+		TextSize = codeSize,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextWrapped = false,
@@ -1573,6 +1742,7 @@ function render()
 		local label = chunkLabel(index)
 		local first = (index - 1) * CHUNK + 1
 		label.Visible = true
+		label.TextColor3 = Color3.fromHex(COLORS.default)
 		label.Position = UDim2.fromOffset(PADX, PADY + (first - 1) * lineH)
 		label.Text = table.concat(lines, "\n", first, math.min(index * CHUNK, lineCount))
 	end
@@ -1588,12 +1758,18 @@ end
 -- keep the text box big enough to fill the visible area
 local function fitEditor()
 	local size = scroll.AbsoluteWindowSize
+	editorGroup.Size = UDim2.fromOffset(size.X, size.Y)
 	editor.Size = UDim2.fromOffset(size.X, size.Y)
 end
 scroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(fitEditor)
 scroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
 	gutterLabel.Position = UDim2.fromOffset(0, PADY - scroll.CanvasPosition.Y)
 end)
+
+-- width of some text in the code font (it is monospaced)
+local function textWidth(text)
+	return (utf8.len(text) or #text) * charW
+end
 
 -- keep the cursor on screen while typing
 function followCaret()
@@ -1614,8 +1790,7 @@ function followCaret()
 	end
 
 	local lastLine = before:match("([^\n]*)$") or ""
-	local width = TextService:GetTextSize(lastLine, CODE_SIZE, CODE_FONT, Vector2.new(100000, 100000)).X
-	local caretX = PADX + width
+	local caretX = PADX + textWidth(lastLine)
 	if caretX < x + 12 then
 		x = math.max(0, caretX - 40)
 	elseif caretX > x + view.X - 30 then
@@ -1624,6 +1799,72 @@ function followCaret()
 
 	if x ~= position.X or y ~= position.Y then
 		scroll.CanvasPosition = Vector2.new(math.max(0, x), math.max(0, y))
+	end
+end
+
+-- The typing cursor: always solid right after you move it, then it fades out and in slowly
+local blinkToken = 0
+local lastCursor = nil
+
+local function startBlink()
+	blinkToken += 1
+	local token = blinkToken
+	caret.BackgroundTransparency = 0
+	task.spawn(function()
+		task.wait(0.4)
+		while token == blinkToken and caret.Visible do
+			tween(caret, 0.7, { BackgroundTransparency = 1 }, Enum.EasingStyle.Sine)
+			task.wait(0.75)
+			if token ~= blinkToken or not caret.Visible then break end
+			tween(caret, 0.7, { BackgroundTransparency = 0 }, Enum.EasingStyle.Sine)
+			task.wait(0.75)
+		end
+	end)
+end
+
+function updateCaret()
+	local cursor = editor.CursorPosition
+	if not editor:IsFocused() or cursor < 1 then
+		blinkToken += 1
+		caret.Visible = false
+		return
+	end
+	local before = editor.Text:sub(1, cursor - 1)
+	local _, newlines = before:gsub("\n", "")
+	local lastLine = before:match("([^\n]*)$") or ""
+	caret.Size = UDim2.fromOffset(2, lineH)
+	caret.Position = UDim2.fromOffset(PADX + textWidth(lastLine) - 1, PADY + newlines * lineH)
+	caret.Visible = true
+	startBlink()
+end
+
+-- Selected text: a soft blue band behind the letters, one per line
+function updateSelection()
+	for _, frame in ipairs(selectionFrames) do frame.Visible = false end
+	local a, b = editor.SelectionStart, editor.CursorPosition
+	if not editor:IsFocused() or a < 1 or b < 1 or a == b then return end
+
+	local low, high = math.min(a, b), math.max(a, b) -- the selected letters are low .. high - 1
+	local text = editor.Text
+	local used = 0
+	local lineStart = 1
+	local lineIndex = 0
+	for lineText in (text .. "\n"):gmatch("(.-)\n") do
+		lineIndex += 1
+		local lineEnd = lineStart + #lineText -- where this line's line break is
+		if lineEnd >= low and lineStart < high then
+			local from = math.max(low, lineStart) - lineStart
+			local to = math.min(high, lineEnd) - lineStart
+			local x1 = PADX + textWidth(lineText:sub(1, from))
+			local x2 = PADX + textWidth(lineText:sub(1, to)) + (high > lineEnd and charW * 0.6 or 0)
+			used += 1
+			local frame = selectionFrame(used)
+			frame.Position = UDim2.fromOffset(x1, PADY + (lineIndex - 1) * lineH)
+			frame.Size = UDim2.fromOffset(math.max(2, x2 - x1), lineH)
+			frame.Visible = true
+		end
+		if lineStart >= high then break end
+		lineStart = lineEnd + 1
 	end
 end
 
@@ -1665,10 +1906,40 @@ editor:GetPropertyChangedSignal("Text"):Connect(function()
 	liveErrorLine = nil
 	render()
 	followCaret()
+	updateCaret()
+	updateSelection()
 	scheduleLiveCheck()
 	scheduleSave()
 end)
-editor:GetPropertyChangedSignal("CursorPosition"):Connect(followCaret)
+editor:GetPropertyChangedSignal("CursorPosition"):Connect(function()
+	if editor.CursorPosition >= 1 then lastCursor = editor.CursorPosition end
+	followCaret()
+	updateCaret()
+	updateSelection()
+end)
+editor:GetPropertyChangedSignal("SelectionStart"):Connect(function()
+	updateSelection()
+end)
+editor.Focused:Connect(function()
+	updateCaret()
+	updateSelection()
+end)
+editor.FocusLost:Connect(function(enterPressed)
+	updateCaret()
+	updateSelection()
+	if not enterPressed then return end
+
+	-- Enter should add a new line, not finish typing
+	local text = editor.Text
+	local cursor = math.clamp(lastCursor or (#text + 1), 1, #text + 1)
+	if text:sub(cursor, cursor) ~= "\n" then
+		editor.Text = text:sub(1, cursor - 1) .. "\n" .. text:sub(cursor)
+	end
+	task.defer(function()
+		editor:CaptureFocus()
+		editor.CursorPosition = cursor + 1
+	end)
+end)
 
 ----------------------------------------------------------------
 -- Running code and reporting errors
@@ -1827,9 +2098,18 @@ local function reportError(kind, line, because, onProceed)
 end
 
 -- Runs the code. `skip` holds lines to leave out, `proceeding` means "run it anyway".
-function execute(code, skip, proceeding)
+function execute(code, skip, proceeding, isClipboard)
 	skip = skip or {}
 	hideToast()
+
+	-- code from the clipboard is not in the editor, so its errors only show the notification
+	local function report(kind, line, because, proceed)
+		if isClipboard then
+			showToast(describe(kind, line, because), nil)
+		else
+			reportError(kind, line, because, proceed)
+		end
+	end
 
 	if not loadstring then
 		showToast("Runtime error, this happened because loadstring isn't available here, so code can't be run.", nil)
@@ -1856,12 +2136,12 @@ function execute(code, skip, proceeding)
 		else
 			local because = explain(message, line and lineTextOf(code, line))
 			local proceed = nil
-			if kind == "Parsing" and not proceeding then
+			if kind == "Parsing" and not proceeding and not isClipboard then
 				proceed = function()
 					task.spawn(execute, code, {}, true)
 				end
 			end
-			reportError(kind, line, because, proceed)
+			report(kind, line, because, proceed)
 			return
 		end
 	end
@@ -1870,10 +2150,10 @@ function execute(code, skip, proceeding)
 	if not ok then
 		local message = cleanMessage(runtimeError)
 		local line = errorLineOf(runtimeError)
-		if line and (line < 1 or line > lineCount) then line = nil end
+		if line and (line < 1 or (not isClipboard and line > lineCount)) then line = nil end
 		local because = explain(message, line and lineTextOf(code, line))
 		local proceed = nil
-		if line then
+		if line and not isClipboard then
 			proceed = function()
 				local nextSkip = {}
 				for key, value in pairs(skip) do nextSkip[key] = value end
@@ -1881,13 +2161,34 @@ function execute(code, skip, proceeding)
 				task.spawn(execute, code, nextSkip, true)
 			end
 		end
-		reportError("Runtime", line, because, proceed)
+		report("Runtime", line, because, proceed)
 	end
 end
 
 runButton.Activated:Connect(function()
 	task.spawn(execute, editor.Text, {}, false)
 end)
+
+-- Run Clipboard: reads what is on the clipboard right now and runs it. Nothing is saved, logged
+-- or kept: the text only exists in this one run, and the variable is cleared straight after.
+clipboardButton.Activated:Connect(function()
+	task.spawn(function()
+		hideToast()
+		if type(getclipboard) ~= "function" then
+			showToast("Runtime error, this happened because getclipboard isn't available here, so the clipboard can't be read.", nil)
+			return
+		end
+		local ok, clip = pcall(getclipboard)
+		if not ok or type(clip) ~= "string" or not clip:find("%S") then
+			clip = nil
+			showToast("Runtime error, this happened because the clipboard is empty, so there is nothing to run.", nil)
+			return
+		end
+		execute(clip, {}, false, true)
+		clip = nil -- forget it right away
+	end)
+end)
+
 clearButton.Activated:Connect(function()
 	hideToast()
 	editor.Text = ""
@@ -1907,13 +2208,18 @@ local function loadEditorText()
 	render()
 end
 
+-- A file counts as selected only while the editor is showing (not while Settings is open)
+local function isSelected(index)
+	return not settingsOpen and index == data.selected
+end
+
 local function createItem(index, entry, animate)
-	local selected = index == data.selected
+	local selected = isSelected(index)
 	local item = make("TextButton", {
 		Name = "Item",
 		LayoutOrder = index,
 		Size = UDim2.new(1, 0, 0, animate and 0 or ITEM_H),
-		BackgroundColor3 = WHITE,
+		BackgroundColor3 = theme.icon,
 		BackgroundTransparency = selected and 0.94 or 1,
 		Text = "",
 		AutoButtonColor = false,
@@ -1922,7 +2228,9 @@ local function createItem(index, entry, animate)
 		ZIndex = 4,
 	}, listScroll)
 	corner(item, UDim.new(0, 14))
-	local _, glassParts = glass(item, UDim.new(0, 14), 1.1, { glossH = 10, glossInset = 22, depthH = 10 })
+	-- the liquid glass only shows on the selected file
+	local itemStroke, glassParts = glass(item, UDim.new(0, 14), 1.1, { glossH = 10, glossInset = 22, depthH = 10 })
+	itemStroke.Color = theme.rim
 	if not selected then setGroup(glassParts, 1) end
 
 	local accent = make("Frame", {
@@ -1930,7 +2238,7 @@ local function createItem(index, entry, animate)
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 3, 0.5, 0),
 		Size = UDim2.fromOffset(3, 14),
-		BackgroundColor3 = WHITE,
+		BackgroundColor3 = theme.icon,
 		BackgroundTransparency = selected and 0.15 or 1,
 		BorderSizePixel = 0,
 		ZIndex = 5,
@@ -1943,7 +2251,7 @@ local function createItem(index, entry, animate)
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 8, 0.5, 0),
 		Size = UDim2.fromOffset(28, 28),
-		BackgroundColor3 = WHITE,
+		BackgroundColor3 = theme.icon,
 		BackgroundTransparency = 1,
 		Text = "",
 		AutoButtonColor = false,
@@ -1952,7 +2260,7 @@ local function createItem(index, entry, animate)
 	}, item)
 	corner(iconButton, UDim.new(1, 0))
 	local iconScale = make("UIScale", { Scale = 1 }, iconButton)
-	local fileIcon = makeIcon(iconButton, ICON_FILE, WHITE, 16, {
+	local fileIcon = makeIcon(iconButton, ICON_FILE, theme.icon, 16, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		ImageTransparency = selected and 0.05 or 0.35,
@@ -1965,7 +2273,7 @@ local function createItem(index, entry, animate)
 		Size = UDim2.new(1, -48, 1, 0),
 		BackgroundTransparency = 1,
 		Text = entry.name,
-		TextColor3 = selected and OFFWHITE or SUBTITLE_COLOR,
+		TextColor3 = selected and theme.strong or theme.sub,
 		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -1973,13 +2281,16 @@ local function createItem(index, entry, animate)
 		ZIndex = 5,
 	}, item)
 
-	itemRefs[index] = { item = item, accent = accent, icon = fileIcon, name = nameLabel, glass = glassParts }
+	itemRefs[index] = {
+		item = item, accent = accent, icon = fileIcon, iconButton = iconButton,
+		name = nameLabel, glass = glassParts, stroke = itemStroke,
+	}
 
 	item.MouseEnter:Connect(function()
-		if index ~= data.selected then tween(item, 0.2, { BackgroundTransparency = 0.94 }) end
+		if not isSelected(index) then tween(item, 0.2, { BackgroundTransparency = 0.94 }) end
 	end)
 	item.MouseLeave:Connect(function()
-		if index ~= data.selected then tween(item, 0.25, { BackgroundTransparency = 1 }) end
+		if not isSelected(index) then tween(item, 0.25, { BackgroundTransparency = 1 }) end
 	end)
 	item.Activated:Connect(function()
 		selectScript(index)
@@ -1991,7 +2302,7 @@ local function createItem(index, entry, animate)
 	end)
 	iconButton.MouseLeave:Connect(function()
 		tween(iconButton, 0.25, { BackgroundTransparency = 1 })
-		tween(fileIcon, 0.25, { ImageTransparency = index == data.selected and 0.05 or 0.35 })
+		tween(fileIcon, 0.25, { ImageTransparency = isSelected(index) and 0.05 or 0.35 })
 	end)
 	attachPress(iconButton, iconScale, 0.82)
 	iconButton.Activated:Connect(function()
@@ -2016,19 +2327,30 @@ end
 
 function applySelection()
 	for index, ref in pairs(itemRefs) do
-		local selected = index == data.selected
-		tween(ref.item, 0.25, { BackgroundTransparency = selected and 0.94 or 1 })
+		local selected = isSelected(index)
+		tween(ref.item, 0.25, { BackgroundTransparency = selected and 0.94 or 1, BackgroundColor3 = theme.icon })
 		fadeGroup(ref.glass, selected, 0.3)
-		tween(ref.accent, 0.3, { BackgroundTransparency = selected and 0.15 or 1 })
-		tween(ref.name, 0.25, { TextColor3 = selected and OFFWHITE or SUBTITLE_COLOR })
-		tween(ref.icon, 0.25, { ImageTransparency = selected and 0.05 or 0.35 })
+		tween(ref.stroke, 0.3, { Color = theme.rim })
+		tween(ref.accent, 0.3, { BackgroundTransparency = selected and 0.15 or 1, BackgroundColor3 = theme.icon })
+		tween(ref.name, 0.25, { TextColor3 = selected and theme.strong or theme.sub })
+		tween(ref.icon, 0.25, { ImageTransparency = selected and 0.05 or 0.35, ImageColor3 = theme.icon })
+		tween(ref.iconButton, 0.25, { BackgroundColor3 = theme.icon })
 	end
 end
 
 function selectScript(index)
-	if index == data.selected or not data.scripts[index] then return end
+	if not data.scripts[index] then return end
 	closeMenu()
 	hideToast()
+	if settingsOpen then
+		-- tapping a file while Settings is open brings the editor back with that file
+		data.selected = index
+		loadEditorText()
+		setSettingsOpen(false)
+		scheduleSave()
+		return
+	end
+	if index == data.selected then return end
 	data.selected = index
 	loadEditorText()
 	applySelection()
@@ -2037,6 +2359,7 @@ end
 
 function addScript()
 	closeMenu()
+	if settingsOpen then setSettingsOpen(false) end
 	local used = {}
 	for _, entry in ipairs(data.scripts) do used[entry.name] = true end
 	local number = #data.scripts + 1
@@ -2116,10 +2439,10 @@ function beginRename(index)
 		Name = "RenameBox",
 		Position = UDim2.new(0, 42, 0.5, -12),
 		Size = UDim2.new(1, -50, 0, 24),
-		BackgroundColor3 = WHITE,
+		BackgroundColor3 = theme.icon,
 		BackgroundTransparency = 0.88,
 		Text = entry.name,
-		TextColor3 = WHITE,
+		TextColor3 = theme.strong,
 		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ClearTextOnFocus = false,
@@ -2160,6 +2483,63 @@ local function getPopup()
 	return popupLib or nil
 end
 
+-- backup popup
+local pendingConfirm = nil
+local modalToken = 0
+
+local function closePopup()
+	modalToken += 1
+	local token = modalToken
+	pendingConfirm = nil
+	fadeGroup(modalFades, false, 0.2)
+	tween(dialogScale, 0.2, { Scale = 0.9 }, Enum.EasingStyle.Quad)
+	task.delay(0.22, function()
+		if token == modalToken then modal.Visible = false end
+	end)
+end
+
+-- Asks "Are You Sure?" and calls onConfirm if the player presses Delete
+function confirmPopup(content, onConfirm)
+	local lib = getPopup()
+	if lib then
+		local ok = pcall(function()
+			lib.new({
+				title = "Are You Sure?",
+				content = content,
+				options = {
+					{ text = "Cancel", style = "neutral" },
+					{
+						text = "Delete",
+						style = "danger",
+						callback = function()
+							task.spawn(onConfirm)
+						end,
+					},
+				},
+			})
+		end)
+		if ok then return end
+	end
+
+	-- backup popup
+	modalToken += 1
+	pendingConfirm = onConfirm
+	dialogBody.Text = content
+	modal.Visible = true
+	dialogScale.Scale = 0.88
+	setGroup(modalFades, 1)
+	tween(dialogScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+	fadeGroup(modalFades, true, 0.25)
+end
+
+cancelButton.Activated:Connect(closePopup)
+modal.Activated:Connect(closePopup)
+confirmButton.Activated:Connect(function()
+	local action = pendingConfirm
+	closePopup()
+	if action then task.spawn(action) end
+end)
+
 -- Deletes a script (with a little shrink animation)
 local function deleteEntry(entry)
 	local index = table.find(data.scripts, entry)
@@ -2187,64 +2567,481 @@ local function deleteEntry(entry)
 	scheduleSave()
 end
 
--- backup popup
-local deleteIndex = nil
-local modalToken = 0
-
-local function closePopup()
-	modalToken += 1
-	local token = modalToken
-	deleteIndex = nil
-	fadeGroup(modalFades, false, 0.2)
-	tween(dialogScale, 0.2, { Scale = 0.9 }, Enum.EasingStyle.Quad)
-	task.delay(0.22, function()
-		if token == modalToken then modal.Visible = false end
-	end)
+-- Deletes every script and leaves one fresh empty one
+local function deleteAllScripts()
+	for _, ref in pairs(itemRefs) do
+		tween(ref.item, 0.25, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, Enum.EasingStyle.Quint)
+	end
+	task.wait(0.27)
+	data.scripts = { { name = "Script 1.lua", code = "" } }
+	data.selected = 1
+	buildList()
+	loadEditorText()
+	scheduleSave()
 end
 
+-- Delete from the file menu: with a popup, or straight away if Show Delete Warnings is off
 function openDeletePopup(index)
 	local entry = data.scripts[index]
 	if not entry then return end
-
-	local lib = getPopup()
-	if lib then
-		local ok = pcall(function()
-			lib.new({
-				title = "Are You Sure?",
-				content = ("Are you sure you want to delete %s?"):format(entry.name),
-				options = {
-					{ text = "Cancel", style = "neutral" },
-					{
-						text = "Delete",
-						style = "danger",
-						callback = function()
-							task.spawn(deleteEntry, entry)
-						end,
-					},
-				},
-			})
-		end)
-		if ok then return end
+	if data.settings.warnings == false then
+		task.spawn(deleteEntry, entry)
+		return
 	end
-
-	-- backup popup
-	modalToken += 1
-	deleteIndex = index
-	dialogBody.Text = ("Are you sure you want to delete %s?"):format(entry.name)
-	modal.Visible = true
-	dialogScale.Scale = 0.88
-	setGroup(modalFades, 1)
-	tween(dialogScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
-	fadeGroup(modalFades, true, 0.25)
+	confirmPopup(("Are you sure you want to delete %s?"):format(entry.name), function()
+		deleteEntry(entry)
+	end)
 end
 
-cancelButton.Activated:Connect(closePopup)
-modal.Activated:Connect(closePopup)
-confirmButton.Activated:Connect(function()
-	local entry = deleteIndex and data.scripts[deleteIndex]
-	closePopup()
-	if entry then task.spawn(deleteEntry, entry) end
+----------------------------------------------------------------
+-- Settings menu (everything in it is saved)
+----------------------------------------------------------------
+local TEXT_SIZES = { 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24 }
+local TOGGLE_ON = Color3.fromRGB(52, 199, 89)
+local settingRefreshers = {} -- functions that redraw a setting's current value
+local allDropdowns = {}
+
+function applyTextSize(size)
+	codeSize = size
+	measureFont()
+	gutterLabel.TextSize = size
+	editor.TextSize = size
+	for _, label in pairs(chunkLabels) do label.TextSize = size end
+	flashBar.Size = UDim2.fromOffset(0, lineH)
+	caret.Size = UDim2.fromOffset(2, lineH)
+	render()
+	followCaret()
+	updateCaret()
+	updateSelection()
+end
+
+-- Switches Light / Dark: every color fades to the new theme, and the code text crossfades
+function applyTheme(animate)
+	theme = THEMES[data.settings.mode] or THEMES.dark
+	for _, entry in ipairs(themed) do
+		local value = theme[entry[3]]
+		if animate then
+			tween(entry[1], 0.4, { [entry[2]] = value }, Enum.EasingStyle.Quad)
+		else
+			entry[1][entry[2]] = value
+		end
+	end
+	for key, value in pairs(theme.code) do COLORS[key] = value end
+	applySelection()
+	for _, refresh in ipairs(settingRefreshers) do refresh() end
+
+	if animate then
+		task.spawn(function()
+			for _, label in pairs(chunkLabels) do tween(label, 0.18, { TextTransparency = 1 }, Enum.EasingStyle.Quad) end
+			task.wait(0.2)
+			render()
+			for _, label in pairs(chunkLabels) do tween(label, 0.25, { TextTransparency = 0 }, Enum.EasingStyle.Quad) end
+		end)
+	else
+		render()
+	end
+end
+
+local settingsTitle = make("TextLabel", {
+	Name = "SettingsTitle",
+	Position = UDim2.fromOffset(22, 14),
+	Size = UDim2.new(1, -44, 0, 22),
+	BackgroundTransparency = 1,
+	Text = "Settings",
+	TextSize = 18,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	FontFace = UI_FONT_BOLD,
+	ZIndex = 4,
+}, settingsPanel)
+bind(settingsTitle, "TextColor3", "title")
+local settingsHint = make("TextLabel", {
+	Name = "SettingsHint",
+	Position = UDim2.fromOffset(22, 38),
+	Size = UDim2.new(1, -44, 0, 16),
+	BackgroundTransparency = 1,
+	Text = "Everything here is saved automatically",
+	TextSize = 11,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	FontFace = UI_FONT,
+	ZIndex = 4,
+}, settingsPanel)
+bind(settingsHint, "TextColor3", "sub")
+
+local settingsScroll = make("ScrollingFrame", {
+	Name = "SettingsList",
+	Position = UDim2.fromOffset(0, 66),
+	Size = UDim2.new(1, 0, 1, -66),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 0,
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollingDirection = Enum.ScrollingDirection.Y,
+	ZIndex = 4,
+}, settingsPanel)
+make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, settingsScroll)
+make("UIPadding", {
+	PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 22),
+	PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 16),
+}, settingsScroll)
+makeScrollbar(settingsScroll, settingsPanel, 4, 66, 12, 6)
+
+-- a rounded row with a soft edge
+local function styleRow(frame)
+	bind(frame, "BackgroundColor3", "icon")
+	frame.BackgroundTransparency = 0.94
+	corner(frame, UDim.new(0, 16))
+	local rim = glass(frame, UDim.new(0, 16), 0.6, { noGloss = true, noDepth = true })
+	bind(rim, "Color", "rim")
+end
+
+-- A dropdown: tap it and the options slide open under it
+local function makeDropdown(order, labelText, iconImage, options, getValue, display, onPick)
+	local closedHeight = 50
+	local listHeight = #options * 34 + 8
+	local container = make("Frame", {
+		Name = labelText,
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, closedHeight),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		ZIndex = 5,
+	}, settingsScroll)
+	local header = make("TextButton", {
+		Name = "Header",
+		Position = UDim2.fromOffset(2, 2),
+		Size = UDim2.new(1, -4, 0, 46),
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 5,
+	}, container)
+	styleRow(header)
+
+	local left = 18
+	if iconImage then
+		local icon = makeIcon(header, iconImage, WHITE, 18, {
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 16, 0.5, 0),
+			ZIndex = 6,
+		})
+		bind(icon, "ImageColor3", "icon")
+		left = 44
+	end
+	local label = make("TextLabel", {
+		Position = UDim2.new(0, left, 0, 0),
+		Size = UDim2.new(1, -(left + 120), 1, 0),
+		BackgroundTransparency = 1,
+		Text = labelText,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		FontFace = UI_FONT_BOLD,
+		ZIndex = 6,
+	}, header)
+	bind(label, "TextColor3", "strong")
+	local valueLabel = make("TextLabel", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -40, 0.5, 0),
+		Size = UDim2.fromOffset(100, 20),
+		BackgroundTransparency = 1,
+		Text = "",
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		FontFace = UI_FONT,
+		ZIndex = 6,
+	}, header)
+	bind(valueLabel, "TextColor3", "sub")
+
+	-- a small "v" that flips over when the dropdown is open
+	local chevron = make("Frame", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -16, 0.5, 0),
+		Size = UDim2.fromOffset(12, 12),
+		BackgroundTransparency = 1,
+		ZIndex = 6,
+	}, header)
+	for _, spec in ipairs({ { -3, 45 }, { 3, -45 } }) do
+		local arm = make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, spec[1], 0.5, 0),
+			Size = UDim2.fromOffset(7, 2),
+			Rotation = spec[2],
+			BorderSizePixel = 0,
+			ZIndex = 6,
+		}, chevron)
+		corner(arm, UDim.new(1, 0))
+		bind(arm, "BackgroundColor3", "sub")
+	end
+
+	local list = make("Frame", {
+		Name = "Options",
+		Position = UDim2.fromOffset(2, closedHeight + 4),
+		Size = UDim2.new(1, -4, 0, listHeight),
+		BackgroundTransparency = 0.96,
+		BorderSizePixel = 0,
+		ZIndex = 5,
+	}, container)
+	bind(list, "BackgroundColor3", "icon")
+	corner(list, UDim.new(0, 14))
+	make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, list)
+	make("UIPadding", {
+		PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4),
+		PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4),
+	}, list)
+
+	local optionButtons = {}
+	local self = {}
+	local open = false
+
+	local function setOpenState(state)
+		open = state
+		tween(container, 0.4, {
+			Size = UDim2.new(1, 0, 0, state and (closedHeight + 4 + listHeight + 2) or closedHeight),
+		}, Enum.EasingStyle.Quint)
+		tween(chevron, 0.4, { Rotation = state and 180 or 0 }, Enum.EasingStyle.Quint)
+	end
+
+	local function refresh()
+		local current = getValue()
+		for index, button in ipairs(optionButtons) do
+			tween(button, 0.2, { BackgroundTransparency = options[index].value == current and 0.88 or 1 })
+		end
+		valueLabel.Text = tostring(display(current))
+	end
+
+	for index, option in ipairs(options) do
+		local button = make("TextButton", {
+			LayoutOrder = index,
+			Size = UDim2.new(1, 0, 0, 34),
+			BackgroundTransparency = 1,
+			Text = option.text,
+			TextSize = 13,
+			FontFace = UI_FONT,
+			AutoButtonColor = false,
+			Selectable = false,
+			ZIndex = 6,
+		}, list)
+		bind(button, "BackgroundColor3", "icon")
+		bind(button, "TextColor3", "strong")
+		corner(button, UDim.new(0, 10))
+		button.MouseEnter:Connect(function()
+			if getValue() ~= option.value then tween(button, 0.2, { BackgroundTransparency = 0.93 }) end
+		end)
+		button.MouseLeave:Connect(function()
+			if getValue() ~= option.value then tween(button, 0.25, { BackgroundTransparency = 1 }) end
+		end)
+		button.Activated:Connect(function()
+			onPick(option.value)
+			refresh()
+			setOpenState(false)
+		end)
+		optionButtons[index] = button
+	end
+
+	header.MouseEnter:Connect(function() tween(header, 0.2, { BackgroundTransparency = 0.88 }) end)
+	header.MouseLeave:Connect(function() tween(header, 0.25, { BackgroundTransparency = 0.94 }) end)
+	header.Activated:Connect(function()
+		if not open then
+			for _, other in ipairs(allDropdowns) do
+				if other ~= self then other.close() end
+			end
+		end
+		setOpenState(not open)
+	end)
+
+	self.refresh = refresh
+	self.close = function() setOpenState(false) end
+	allDropdowns[#allDropdowns + 1] = self
+	settingRefreshers[#settingRefreshers + 1] = refresh
+	refresh()
+	return self
+end
+
+-- A button row (Delete All Scripts, Reset All Settings)
+local function makeSettingsButton(order, text, iconImage, danger)
+	local button = make("TextButton", {
+		Name = text,
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 46),
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 5,
+	}, settingsScroll)
+	styleRow(button)
+	local scale = make("UIScale", { Scale = 1 }, button)
+	local left = 18
+	if iconImage then
+		local icon = makeIcon(button, iconImage, danger and DELETE_TEXT or WHITE, 18, {
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 16, 0.5, 0),
+			ZIndex = 6,
+		})
+		if not danger then bind(icon, "ImageColor3", "icon") end
+		left = 44
+	end
+	local label = make("TextLabel", {
+		Position = UDim2.new(0, left, 0, 0),
+		Size = UDim2.new(1, -(left + 12), 1, 0),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextColor3 = DELETE_TEXT,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		FontFace = UI_FONT_BOLD,
+		ZIndex = 6,
+	}, button)
+	if not danger then bind(label, "TextColor3", "strong") end
+	button.MouseEnter:Connect(function() tween(button, 0.2, { BackgroundTransparency = 0.88 }) end)
+	button.MouseLeave:Connect(function() tween(button, 0.25, { BackgroundTransparency = 0.94 }) end)
+	attachPress(button, scale, 0.97)
+	return button
+end
+
+-- A toggle row with a switch at the right end
+local function makeToggleRow(order, text, getValue, setValue)
+	local row = make("TextButton", {
+		Name = text,
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 46),
+		Text = "",
+		AutoButtonColor = false,
+		Selectable = false,
+		ZIndex = 5,
+	}, settingsScroll)
+	styleRow(row)
+	local scale = make("UIScale", { Scale = 1 }, row)
+	local label = make("TextLabel", {
+		Position = UDim2.new(0, 18, 0, 0),
+		Size = UDim2.new(1, -90, 1, 0),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		FontFace = UI_FONT_BOLD,
+		ZIndex = 6,
+	}, row)
+	bind(label, "TextColor3", "strong")
+	local track = make("Frame", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -16, 0.5, 0),
+		Size = UDim2.fromOffset(46, 26),
+		BackgroundColor3 = theme.toggleOff,
+		BorderSizePixel = 0,
+		ZIndex = 6,
+	}, row)
+	corner(track, UDim.new(1, 0))
+	local knob = make("Frame", {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 3, 0.5, 0),
+		Size = UDim2.fromOffset(20, 20),
+		BackgroundColor3 = WHITE,
+		BorderSizePixel = 0,
+		ZIndex = 7,
+	}, track)
+	corner(knob, UDim.new(1, 0))
+
+	local function refresh(animate)
+		local on = getValue()
+		local trackColor = on and TOGGLE_ON or theme.toggleOff
+		local knobPosition = on and UDim2.new(1, -23, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
+		if animate == false then
+			track.BackgroundColor3 = trackColor
+			knob.Position = knobPosition
+		else
+			tween(track, 0.25, { BackgroundColor3 = trackColor }, Enum.EasingStyle.Quad)
+			tween(knob, 0.35, { Position = knobPosition }, Enum.EasingStyle.Back)
+		end
+	end
+	row.MouseEnter:Connect(function() tween(row, 0.2, { BackgroundTransparency = 0.88 }) end)
+	row.MouseLeave:Connect(function() tween(row, 0.25, { BackgroundTransparency = 0.94 }) end)
+	attachPress(row, scale, 0.98)
+	row.Activated:Connect(function()
+		setValue(not getValue())
+		refresh()
+	end)
+	settingRefreshers[#settingRefreshers + 1] = refresh
+	refresh(false)
+	return row
+end
+
+local function resetSettings()
+	data.settings = defaultSettings()
+	applyTextSize(data.settings.textSize)
+	applyTheme(true)
+	for _, dropdown in ipairs(allDropdowns) do dropdown.close() end
+	scheduleSave()
+end
+
+-- the rows
+local textSizeOptions = {}
+for _, size in ipairs(TEXT_SIZES) do
+	textSizeOptions[#textSizeOptions + 1] = { value = size, text = tostring(size) }
+end
+makeDropdown(1, "Editor text size", ICON_TEXTSIZE, textSizeOptions,
+	function() return data.settings.textSize end,
+	function(value) return tostring(value) end,
+	function(value)
+		data.settings.textSize = value
+		applyTextSize(value)
+		scheduleSave()
+	end)
+makeDropdown(2, "Mode", nil, {
+		{ value = "light", text = "Light Mode" },
+		{ value = "dark", text = "Dark Mode" },
+	},
+	function() return data.settings.mode end,
+	function(value) return value == "light" and "Light Mode" or "Dark Mode" end,
+	function(value)
+		data.settings.mode = value
+		applyTheme(true)
+		scheduleSave()
+	end)
+local deleteAllRow = makeSettingsButton(3, "Delete All Scripts", ICON_DELETE, true)
+deleteAllRow.Activated:Connect(function()
+	confirmPopup("Are you sure you want to delete every script? This can't be undone.", deleteAllScripts)
 end)
+makeToggleRow(4, "Show Delete Warnings",
+	function() return data.settings.warnings end,
+	function(value)
+		data.settings.warnings = value
+		scheduleSave()
+	end)
+local resetRow = makeSettingsButton(5, "Reset All Settings", nil, false)
+resetRow.Activated:Connect(resetSettings)
+
+local settingsFades = snapshotFor(settingsPanel)
+local settingsToken = 0
+
+-- Opens / closes the Settings menu. While it is open no file shows as selected.
+function setSettingsOpen(open)
+	if open == settingsOpen then return end
+	settingsOpen = open
+	settingsToken += 1
+	local token = settingsToken
+	closeMenu()
+	hideToast()
+	editor:ReleaseFocus()
+	applySelection()
+
+	if open then
+		for _, dropdown in ipairs(allDropdowns) do dropdown.close() end
+		settingsPanel.Visible = true
+		setGroup(settingsFades, 1)
+		fadeGroup(settingsFades, true, 0.25)
+		task.delay(0.27, function()
+			if token ~= settingsToken or not settingsOpen then return end
+			editorPanel.Visible = false
+			for _, refresh in ipairs(settingRefreshers) do refresh() end
+		end)
+	else
+		editorPanel.Visible = true
+		fadeGroup(settingsFades, false, 0.2)
+		task.delay(0.22, function()
+			if token == settingsToken and not settingsOpen then settingsPanel.Visible = false end
+		end)
+	end
+end
 
 ----------------------------------------------------------------
 -- Moving, resizing and the divider
@@ -2364,9 +3161,9 @@ local function getLibPill()
 		})
 		made.onClick = function()
 			libPillShown = false
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/GuiDeleteExecutor"))()
-            task.wait(0.1)
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Executor"))()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/GuiDeleteExecutor"))()
+			task.wait(0.1)
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Executor"))()
 			made:Hide() -- keep this
 		end
 		return made
