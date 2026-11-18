@@ -1292,6 +1292,73 @@ end
 
 --[[
 ===========================
+KB OVERLAY
+===========================
+]]--
+
+getgenv().KBO_BG_COLOR = Color3.fromRGB(51, 51, 51)
+getgenv().KBO_OP_COLOR = Color3.fromRGB(255, 0, 0)
+getgenv().KBO_BG_TRANS = 0
+
+local KBO_BG = getgenv().KBO_BG_COLOR
+local KBO_OP = getgenv().KBO_OP_COLOR
+local KBO_TR = getgenv().KBO_BG_TRANS
+
+VisTab:CreateToggle({
+    name = "Keyboard Overlay",
+    flag = "KBOVERLAYYY",
+    value = false,
+    callback = function(v)
+        if v then
+            loadstring(game:HttpGet(""))()
+        else
+            loadstring(game:HttpGet(""))()
+        end
+    end,
+})
+
+VisTab:CreateColorPicker({
+    name = "Backround Color",
+    flag = "KBO_BG_PICK",
+    color = KBO_BG,
+    callback = function(color)
+        KBO_BG = Color3.fromRGB(color)
+        getgenv().KBO_BG_COLOR = KBO_BG
+    end,
+})
+
+VisTab:CreateColorPicker({
+    name = "On Press Color",
+    flag = "KBO_OP_PICK",
+    color = KBO_OP,
+    callback = function(color)
+        KBO_OP = Color3.fromRGB(color)
+        getgenv().KBO_OP_COLOR = KBO_OP
+    end,
+})
+
+VisTab:CreateSlider({
+    name = "Backround Transparency",
+    flag = "KBO_TR_SLIDER",
+    range = { 0, 1 },
+    increment = 0.01,
+    value = 0,
+    suffix = "",
+    callback = function(v)
+        KBO_TR = v
+        getgenv().KBO_BG_TRANS = KBO_TR
+    end,
+})
+
+-- per-tick push so anything reading the globals picks up changes
+game:GetService("RunService").Heartbeat:Connect(function()
+    getgenv().KBO_BG_COLOR = KBO_BG
+    getgenv().KBO_OP_COLOR = KBO_OP
+    getgenv().KBO_BG_TRANS = KBO_TR
+end)
+
+--[[
+===========================
 HIDE PLYS
 ===========================
 ]]--
