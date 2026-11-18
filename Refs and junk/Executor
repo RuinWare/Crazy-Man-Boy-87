@@ -1,5 +1,3 @@
--- Code Runner (patch) you are copilot, the one who makes the commits, yes YOU, dont say its an update, admit it. how dare you
-
 -- ============================================================
 -- SETTINGS
 -- ============================================================
@@ -605,7 +603,6 @@ local THEMES = {
 	},
 }
 end
-do
 local theme = THEMES[data.settings.mode] or THEMES.dark
 
 -- Colors an object from the current theme now, and remembers it so a theme change can fade it later
@@ -631,7 +628,6 @@ local function scheduleSave()
 	task.delay(0.5, function()
 		if token == saveToken then writeData() end
 	end)
-end
 end
 ----------------------------------------------------------------
 -- The window
