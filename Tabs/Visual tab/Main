@@ -1319,7 +1319,7 @@ do
 		return success and result
 	end
 
-	VisTab:CreateDivider()
+	VisTab:CreateDivider({ text = "Player + Character" })
 
 	VisTab:CreateToggle({
 		name = "Hide Players",
@@ -1386,3 +1386,142 @@ do
 		end
 	end)
 end
+
+--[[
+===========================
+RSGASC
+===========================
+]]--
+
+do
+	local modelEnabled = false
+	local assetIdText = ""
+	local savedOriginals = {}
+	local injectedChildren = {}
+
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local InsertService = game:GetService("InsertService")
+	local RunService = game:GetService("RunService")
+
+	-- Helper to safely traverse to the two EmoteModel folders
+	local function getEmoteModels()
+		local items = ReplicatedStorage:FindFirstChild("Items")
+		local itemPacks = items and items:FindFirstChild("ItemPacks")
+		local events = itemPacks and itemPacks:FindFirstChild("Events")
+		local y2022 = events and events:FindFirstChild("2022")
+		local halloween = y2022 and y2022:FindFirstChild("Halloween2022")
+		local emotes = halloween and halloween:FindFirstChild("Emotes")
+		local rockinStride = emotes and emotes:FindFirstChild("RockinStride")
+		
+		if not rockinStride then return nil, nil end
+		
+		local classicFolder = rockinStride:FindFirstChild("CharacterClassic")
+		local classicModel = classicFolder and classicFolder:FindFirstChild("EmoteModel")
+		
+		local charFolder = rockinStride:FindFirstChild("Character")
+		local charModel = charFolder and charFolder:FindFirstChild("EmoteModel")
+		
+		return classicModel, charModel
+	end
+
+	-- Helper to inject the new model
+	local function applyModel()
+		if not modelEnabled or assetIdText == "" then return end
+		
+		local classicModel, charModel = getEmoteModels()
+		if not classicModel or not charModel then return end
+
+		-- Save originals if we haven't already
+		if not savedOriginals.Classic then
+			savedOriginals.Classic = {}
+			for _, child in ipairs(classicModel:GetChildren()) do
+				table.insert(savedOriginals.Classic, child:Clone())
+			end
+			
+			savedOriginals.Character = {}
+			for _, child in ipairs(charModel:GetChildren()) do
+				table.insert(savedOriginals.Character, child:Clone())
+			end
+		end
+
+		-- Clear current models
+		for _, child in ipairs(classicModel:GetChildren()) do child:Destroy() end
+		for _, child in ipairs(charModel:GetChildren()) do child:Destroy() end
+
+		-- Load the new 3D Asset
+		local success, loadedModel = pcall(function()
+			return InsertService:LoadAsset(tonumber(assetIdText))
+		end)
+
+		if success and loadedModel then
+			injectedChildren = {}
+			
+			-- Put the new asset into both folders
+			for _, child in ipairs(loadedModel:GetChildren()) do
+				local c1 = child:Clone()
+				c1.Parent = classicModel
+				table.insert(injectedChildren, c1)
+				
+				local c2 = child:Clone()
+				c2.Parent = charModel
+				table.insert(injectedChildren, c2)
+			end
+			
+			loadedModel:Destroy()
+		else
+			window:Notify({ title = "Model Changer", content = "Failed to load Asset ID: "..assetIdText, duration = 3 })
+		end
+	end
+
+	-- Helper to restore originals
+	local function revertModel()
+		local classicModel, charModel = getEmoteModels()
+		if not classicModel or not charModel then return end
+
+		-- Clear current models
+		for _, child in ipairs(classicModel:GetChildren()) do child:Destroy() end
+		for _, child in ipairs(charModel:GetChildren()) do child:Destroy() end
+
+		-- Restore originals
+		if savedOriginals.Classic then
+			for _, child in ipairs(savedOriginals.Classic) do child:Clone().Parent = classicModel end
+		end
+		if savedOriginals.Character then
+			for _, child in ipairs(savedOriginals.Character) do child:Clone().Parent = charModel end
+		end
+		
+		injectedChildren = {}
+	end
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Rockin' Stride Guitar Model Changer",
+		value = false,
+		callback = function(v)
+			modelEnabled = v
+			if v then
+				applyModel()
+			else
+				revertModel()
+			end
+		end,
+	})
+
+	VisTab:CreateInput({
+		name = "Asset ID:",
+		placeholder = "e.g. 123456789",
+		removeTextAfterFocusLost = false,
+		callback = function(text)
+			if not text then return end
+			-- Clean text to only allow numbers
+			assetIdText = tostring(text):gsub("%D", "")
+			
+			-- If the toggle is already on, update the model instantly
+			if modelEnabled and assetIdText ~= "" then
+				applyModel()
+			end
+		end,
+	})
+end
+
