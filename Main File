@@ -844,7 +844,7 @@ M     A     I     N          (     T     A     B     )
 
 local tab = window:CreateTab({ name = "Main", icon = 83935746771599 })
 
-tab:CreateDivider({ text = "Movement" })
+tab:CreateSection({ name = "Movement" })
 
 --[[
 ============================================================================
@@ -2782,7 +2782,7 @@ do
         fireSpeed(speedValue)
     end)
 
-    tab:CreateDivider({ text = "Speed" })
+tab:CreateSection({ name = "Speed" })
 
     tab:CreateToggle({
         name = "Speed Changer",
@@ -3023,8 +3023,7 @@ do
         fireFriction(frictionValue)
     end)
 
-    tab:CreateDivider({ text = "Modifiers" })
-
+tab:CreateSection({ name = "Modifiers" })
 
     tab:CreateToggle({
         name = "Friction Changer",
@@ -3455,7 +3454,7 @@ do
 		end
 	end
 
-	tab:CreateDivider({ text = "Unlock" })
+tab:CreateSection({ name = "Unlock" })
 
 	tab:CreateToggle({
 		name = "Unlock Jump in All States",
