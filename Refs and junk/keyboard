@@ -18,7 +18,7 @@ local KEY_SIZE = 44                                     -- size of a normal key,
 local KEY_GAP = 4                                       -- space between keys, in pixels
 local PADDING = 10                                      -- space between the keys and the edge of the gray box
 local TEXT_SIZE = 14
-local TILT = 8                                          -- tilts the whole keyboard (degrees), 0 = flat
+local TILT = 0                                          -- tilts the whole keyboard (degrees), 0 = flat
 local PRESS_FADE = 0.05                                 -- how fast a key changes color (seconds)
 
 local SPAWN = Vector2.new(0.15, 0.78)                   -- where it first appears (0-1 of the screen)
