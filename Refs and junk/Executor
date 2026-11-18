@@ -3,6 +3,7 @@
 -- ============================================================
 -- SETTINGS
 -- ============================================================
+do
 local TITLE = "Code Runner"
 local SUBTITLE = "Write, Save, and Run lua."
 local FLAG = "RWEXECUTOR"                           -- name of this window (DeleteGuiByFlag can remove it)
@@ -3316,3 +3317,4 @@ task.defer(function()
 	codeBar.update()
 	setOpen(true) -- pops in
 end)
+end
