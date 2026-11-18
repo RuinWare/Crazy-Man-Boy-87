@@ -1389,7 +1389,7 @@ end
 
 --[[
 ===========================
-RSGASC
+RSGASC (patch)
 ===========================
 ]]--
 
@@ -1424,6 +1424,35 @@ do
 		return classicModel, charModel
 	end
 
+	-- Robust asset loader (Bypasses executor restrictions)
+	local function loadAsset(id)
+		-- Method 1: game:GetObjects (Best for client-side executors)
+		local success, objects = pcall(function()
+			return game:GetObjects("rbxassetid://" .. tostring(id))
+		end)
+		
+		if success and objects and #objects > 0 then
+			local holder = Instance.new("Model")
+			holder.Name = "CustomAsset"
+			for _, obj in ipairs(objects) do
+				obj.Parent = holder
+			end
+			return holder
+		end
+		
+		-- Method 2: InsertService
+		local s2, r2 = pcall(function()
+			return InsertService:LoadAsset(tonumber(id))
+		end)
+		
+		if s2 and r2 then
+			return r2
+		end
+		
+		warn("[Model Changer] Failed to load asset. Error:", objects or r2)
+		return nil
+	end
+
 	-- Helper to inject the new model
 	local function applyModel()
 		if not modelEnabled or assetIdText == "" then return end
@@ -1444,16 +1473,14 @@ do
 			end
 		end
 
-		-- Clear current models
-		for _, child in ipairs(classicModel:GetChildren()) do child:Destroy() end
-		for _, child in ipairs(charModel:GetChildren()) do child:Destroy() end
-
-		-- Load the new 3D Asset
-		local success, loadedModel = pcall(function()
-			return InsertService:LoadAsset(tonumber(assetIdText))
-		end)
-
-		if success and loadedModel then
+		-- Load the new 3D Asset FIRST (before destroying old ones)
+		local loadedModel = loadAsset(assetIdText)
+		
+		if loadedModel then
+			-- Only clear current models if the new one loaded successfully
+			for _, child in ipairs(classicModel:GetChildren()) do child:Destroy() end
+			for _, child in ipairs(charModel:GetChildren()) do child:Destroy() end
+			
 			injectedChildren = {}
 			
 			-- Put the new asset into both folders
@@ -1468,8 +1495,13 @@ do
 			end
 			
 			loadedModel:Destroy()
+			print("[Model Changer] Successfully loaded asset ID:", assetIdText)
 		else
-			window:Notify({ title = "Model Changer", content = "Failed to load Asset ID: "..assetIdText, duration = 3 })
+			window:Notify({ 
+				title = "Model Changer", 
+				content = "Failed to load ID: "..assetIdText..". Make sure it's a valid 3D Model ID.", 
+				duration = 5 
+			})
 		end
 	end
 
@@ -1519,9 +1551,8 @@ do
 			
 			-- If the toggle is already on, update the model instantly
 			if modelEnabled and assetIdText ~= "" then
-				applyModel()
+				task.spawn(applyModel) -- task.spawn prevents the UI from freezing while loading
 			end
 		end,
 	})
 end
-
