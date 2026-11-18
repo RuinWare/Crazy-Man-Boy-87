@@ -1389,16 +1389,15 @@ end
 
 --[[
 ===========================
-RSGASC (patch)
+RSGASC (patch v.2.0)
 ===========================
 ]]--
 
 do
 	local modelEnabled = false
 	local assetIdText = ""
-	local savedOriginals = {}
-	local injectedChildren = {}
-
+	local currentAppliedId = nil
+	
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local InsertService = game:GetService("InsertService")
 	local RunService = game:GetService("RunService")
@@ -1424,9 +1423,8 @@ do
 		return classicModel, charModel
 	end
 
-	-- Robust asset loader (Bypasses executor restrictions)
+	-- Extremely robust loader
 	local function loadAsset(id)
-		-- Method 1: game:GetObjects (Best for client-side executors)
 		local success, objects = pcall(function()
 			return game:GetObjects("rbxassetid://" .. tostring(id))
 		end)
@@ -1435,12 +1433,13 @@ do
 			local holder = Instance.new("Model")
 			holder.Name = "CustomAsset"
 			for _, obj in ipairs(objects) do
+				-- Parent everything to preserve the model structure
 				obj.Parent = holder
 			end
 			return holder
 		end
 		
-		-- Method 2: InsertService
+		-- Fallback to InsertService (Sometimes works on client if public)
 		local s2, r2 = pcall(function()
 			return InsertService:LoadAsset(tonumber(id))
 		end)
@@ -1449,80 +1448,67 @@ do
 			return r2
 		end
 		
-		warn("[Model Changer] Failed to load asset. Error:", objects or r2)
 		return nil
 	end
 
 	-- Helper to inject the new model
-	local function applyModel()
+	local function applyModel(cModel, hModel)
 		if not modelEnabled or assetIdText == "" then return end
 		
-		local classicModel, charModel = getEmoteModels()
-		if not classicModel or not charModel then return end
-
-		-- Save originals if we haven't already
-		if not savedOriginals.Classic then
-			savedOriginals.Classic = {}
-			for _, child in ipairs(classicModel:GetChildren()) do
-				table.insert(savedOriginals.Classic, child:Clone())
+		-- Check if it's already applied
+		local function hasCustom(model)
+			if not model then return false end
+			for _, child in ipairs(model:GetChildren()) do
+				if child.Name == "CustomAsset" then return true end
 			end
-			
-			savedOriginals.Character = {}
-			for _, child in ipairs(charModel:GetChildren()) do
-				table.insert(savedOriginals.Character, child:Clone())
-			end
+			return false
 		end
 
-		-- Load the new 3D Asset FIRST (before destroying old ones)
+		if currentAppliedId == assetIdText and hasCustom(cModel) and hasCustom(hModel) then
+			return -- Already applied and still there
+		end
+
+		-- Load the new 3D Asset
 		local loadedModel = loadAsset(assetIdText)
 		
 		if loadedModel then
-			-- Only clear current models if the new one loaded successfully
-			for _, child in ipairs(classicModel:GetChildren()) do child:Destroy() end
-			for _, child in ipairs(charModel:GetChildren()) do child:Destroy() end
-			
-			injectedChildren = {}
-			
-			-- Put the new asset into both folders
+			-- Check if the custom model has a "Handle", if not, create one so the game welds it to your hand
+			local hasHandle = false
 			for _, child in ipairs(loadedModel:GetChildren()) do
-				local c1 = child:Clone()
-				c1.Parent = classicModel
-				table.insert(injectedChildren, c1)
-				
-				local c2 = child:Clone()
-				c2.Parent = charModel
-				table.insert(injectedChildren, c2)
+				if child.Name == "Handle" then hasHandle = true break end
+			end
+			
+			if not hasHandle then
+				local fakeHandle = Instance.new("Part")
+				fakeHandle.Name = "Handle"
+				fakeHandle.Transparency = 1
+				fakeHandle.Size = Vector3.new(1, 1, 1)
+				fakeHandle.CanCollide = false
+				fakeHandle.Parent = loadedModel
+			end
+
+			-- Clear current models
+			if cModel then
+				for _, child in ipairs(cModel:GetChildren()) do child:Destroy() end
+				loadedModel:Clone().Parent = cModel
+			end
+			
+			if hModel then
+				for _, child in ipairs(hModel:GetChildren()) do child:Destroy() end
+				loadedModel:Clone().Parent = hModel
 			end
 			
 			loadedModel:Destroy()
-			print("[Model Changer] Successfully loaded asset ID:", assetIdText)
+			currentAppliedId = assetIdText
+			print("[Model Changer] Successfully applied asset ID:", assetIdText)
 		else
 			window:Notify({ 
 				title = "Model Changer", 
-				content = "Failed to load ID: "..assetIdText..". Make sure it's a valid 3D Model ID.", 
+				content = "Failed to load ID: "..assetIdText..". Make sure the ID is a public 3D model.", 
 				duration = 5 
 			})
+			modelEnabled = false -- Turn off to prevent spam
 		end
-	end
-
-	-- Helper to restore originals
-	local function revertModel()
-		local classicModel, charModel = getEmoteModels()
-		if not classicModel or not charModel then return end
-
-		-- Clear current models
-		for _, child in ipairs(classicModel:GetChildren()) do child:Destroy() end
-		for _, child in ipairs(charModel:GetChildren()) do child:Destroy() end
-
-		-- Restore originals
-		if savedOriginals.Classic then
-			for _, child in ipairs(savedOriginals.Classic) do child:Clone().Parent = classicModel end
-		end
-		if savedOriginals.Character then
-			for _, child in ipairs(savedOriginals.Character) do child:Clone().Parent = charModel end
-		end
-		
-		injectedChildren = {}
 	end
 
 	VisTab:CreateDivider()
@@ -1533,9 +1519,21 @@ do
 		callback = function(v)
 			modelEnabled = v
 			if v then
-				applyModel()
+				currentAppliedId = nil -- Force apply on next loop
 			else
-				revertModel()
+				-- Restore originals (game will auto-reload them if we clear the custom model)
+				local cModel, hModel = getEmoteModels()
+				if cModel then
+					for _, child in ipairs(cModel:GetChildren()) do
+						if child.Name == "CustomAsset" then child:Destroy() end
+					end
+				end
+				if hModel then
+					for _, child in ipairs(hModel:GetChildren()) do
+						if child.Name == "CustomAsset" then child:Destroy() end
+					end
+				end
+				currentAppliedId = nil
 			end
 		end,
 	})
@@ -1546,13 +1544,18 @@ do
 		removeTextAfterFocusLost = false,
 		callback = function(text)
 			if not text then return end
-			-- Clean text to only allow numbers
 			assetIdText = tostring(text):gsub("%D", "")
-			
-			-- If the toggle is already on, update the model instantly
-			if modelEnabled and assetIdText ~= "" then
-				task.spawn(applyModel) -- task.spawn prevents the UI from freezing while loading
-			end
+			currentAppliedId = nil -- Force update if they type a new ID
 		end,
 	})
+
+	-- Heartbeat Loop to constantly check and enforce the model
+	RunService.Heartbeat:Connect(function()
+		if modelEnabled and assetIdText ~= "" then
+			local cModel, hModel = getEmoteModels()
+			if cModel or hModel then
+				applyModel(cModel, hModel)
+			end
+		end
+	end)
 end
