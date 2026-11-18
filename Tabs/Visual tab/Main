@@ -1323,8 +1323,8 @@ VisTab:CreateColorPicker({
     name = "Backround Color",
     flag = "KBO_BG_PICK",
     color = KBO_BG,
-    callback = function(color)
-        KBO_BG = Color3.fromRGB(color)
+    callback = function(r, g, b)
+        KBO_BG = Color3.fromRGB(r, g, b)
         getgenv().KBO_BG_COLOR = KBO_BG
         task.wait(0.01)
         if KBON == true then
@@ -1339,8 +1339,8 @@ VisTab:CreateColorPicker({
     name = "On Press Color",
     flag = "KBO_OP_PICK",
     color = KBO_OP,
-    callback = function(color)
-        KBO_OP = Color3.fromRGB(color)
+    callback = function(r, g, b)
+        KBO_OP = Color3.fromRGB(r, g, b)
         getgenv().KBO_OP_COLOR = KBO_OP
         task.wait(0.01)
         if KBON == true then
