@@ -1389,7 +1389,7 @@ end
 
 --[[
 ===========================
-RSGASC
+RSGASC p
 ===========================
 ]]--
 
@@ -1403,7 +1403,7 @@ do
 	local Players = game:GetService("Players")
 	local LP = Players.LocalPlayer
 
-	-- The exact CFrames you found in Dex
+	-- The exact CFrames you found
 	local C0_VAL = CFrame.new(0.0410000011, -0.200000003, 0.138999999, 1, 0, 0, 0, 0, 1, 0, -1, 0)
 	local C1_VAL = CFrame.new(0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 
@@ -1411,7 +1411,6 @@ do
 	local function getEmoteModels()
 		local models = {}
 		
-		-- 1. ReplicatedStorage Models
 		local items = ReplicatedStorage:FindFirstChild("Items")
 		local itemPacks = items and items:FindFirstChild("ItemPacks")
 		local events = itemPacks and itemPacks:FindFirstChild("Events")
@@ -1421,16 +1420,13 @@ do
 		local rockinStride = emotes and emotes:FindFirstChild("RockinStride")
 		
 		if rockinStride then
-			local classicFolder = rockinStride:FindFirstChild("CharacterClassic")
-			local classicModel = classicFolder and classicFolder:FindFirstChild("EmoteModel")
+			local classicModel = rockinStride:FindFirstChild("CharacterClassic") and rockinStride.CharacterClassic:FindFirstChild("EmoteModel")
 			if classicModel then table.insert(models, classicModel) end
 			
-			local charFolder = rockinStride:FindFirstChild("Character")
-			local charModel = charFolder and charFolder:FindFirstChild("EmoteModel")
+			local charModel = rockinStride:FindFirstChild("Character") and rockinStride.Character:FindFirstChild("EmoteModel")
 			if charModel then table.insert(models, charModel) end
 		end
 
-		-- 2. Active Workspace Rig
 		local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
 		if rig then
 			for _, v in ipairs(rig:GetDescendants()) do
@@ -1443,58 +1439,62 @@ do
 		return models
 	end
 
-	-- Load the 3D Asset and setup the Handle + Motor6D
-	local function buildCustomModel()
+	-- Load the 3D Asset (Handles both Models and MeshParts safely)
+	local function createCustomModel(assetId)
 		local success, objects = pcall(function()
-			return game:GetObjects("rbxassetid://" .. tostring(assetIdText))
+			return game:GetObjects("rbxassetid://" .. tostring(assetId))
 		end)
 		
-		if not success or not objects or #objects == 0 then return nil end
+		if not success or not objects or #objects == 0 then return nil, nil end
 		
 		local newModel = Instance.new("Model")
 		newModel.Name = "CustomRockinStride"
 		
+		-- Parent everything into the new model
 		for _, obj in ipairs(objects) do
 			obj.Parent = newModel
 		end
 		
-		-- 1. Ensure Handle exists
+		-- 1. Find the Handle (or create one)
 		local handle = newModel:FindFirstChild("Handle", true)
 		if not handle then
-			local primary = newModel.PrimaryPart or newModel:FindFirstChildWhichIsA("BasePart")
-			if primary then
-				primary.Name = "Handle"
-				handle = primary
-			else
+			handle = newModel.PrimaryPart or newModel:FindFirstChildWhichIsA("BasePart")
+			if not handle then
 				handle = Instance.new("Part")
-				handle.Name = "Handle"
 				handle.Size = Vector3.new(1, 1, 1)
 				handle.Transparency = 1
 				handle.CanCollide = false
 				handle.Parent = newModel
 			end
+			handle.Name = "Handle"
 		end
 		
-		-- 2. Create the Motor6D with your exact offsets
-		local motor = Instance.new("Motor6D")
-		motor.Name = "HandleWeld"
-		motor.Part1 = handle
-		motor.C0 = C0_VAL
-		motor.C1 = C1_VAL
-		motor.Parent = handle
+		newModel.PrimaryPart = handle
 		
-		return newModel
+		-- 2. Unanchor and Weld everything to the Handle
+		for _, part in ipairs(newModel:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.Anchored = false
+				part.CanCollide = false
+				
+				if part ~= handle then
+					local weld = Instance.new("WeldConstraint")
+					weld.Part0 = handle
+					weld.Part1 = part
+					weld.Parent = part
+				end
+			end
+		end
+		
+		return newModel, handle
 	end
 
-	-- Apply the new model to everything
 	local function applyModel()
 		if not modelEnabled or assetIdText == "" then return end
 		local models = getEmoteModels()
-		
 		if #models == 0 then return end
 		
-		-- Only load the asset once
-		local customAsset = buildCustomModel()
+		local customAsset, customHandle = createCustomModel(assetIdText)
 		if not customAsset then
 			window:Notify({ title = "Model Changer", content = "Failed to load Asset ID: "..assetIdText, duration = 3 })
 			return
@@ -1521,22 +1521,28 @@ do
 			local clone = customAsset:Clone()
 			clone.Parent = model
 			
-			-- If this is the active rig, wire up the Motor6D to the LeftHand
-			if rig and model:IsDescendantOf(rig) then
-				local handle = clone:FindFirstChild("Handle", true)
-				local motor = handle and handle:FindFirstChild("HandleWeld")
-				if motor and leftHand then
-					pcall(function()
-						motor.Part0 = leftHand
-					end)
+			local cloneHandle = clone:FindFirstChild("Handle", true)
+			
+			-- 3. Wire up the Motor6D to the LeftHand
+			if rig and model:IsDescendantOf(rig) and cloneHandle and leftHand then
+				-- Remove any existing Motor6D in the Handle
+				for _, c in ipairs(cloneHandle:GetChildren()) do
+					if c:IsA("Motor6D") then c:Destroy() end
 				end
+
+				local motor = Instance.new("Motor6D")
+				motor.Name = "HandleWeld"
+				motor.Part0 = leftHand
+				motor.Part1 = cloneHandle
+				motor.C0 = C0_VAL
+				motor.C1 = C1_VAL
+				motor.Parent = leftHand -- Parent to Part0 (LeftHand)
 			end
 		end
 		
 		customAsset:Destroy()
 	end
 
-	-- Restore the original guitar
 	local function revertModel()
 		for model, children in pairs(savedOriginals) do
 			if model and model.Parent then
@@ -1589,7 +1595,6 @@ do
 			if rig then
 				for _, v in ipairs(rig:GetDescendants()) do
 					if v.Name == "EmoteModel" then
-						-- Check if it got reset
 						local hasCustom = false
 						for _, child in ipairs(v:GetChildren()) do
 							if child.Name == "CustomRockinStride" then
