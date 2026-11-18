@@ -3,7 +3,6 @@
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-do
 local TITLE = "Code Runner"
 local SUBTITLE = "Write, Save, and Run lua."
 local FLAG = "RWEXECUTOR"                           -- name of this window (DeleteGuiByFlag can remove it)
@@ -101,6 +100,7 @@ local PILL_SIZE = Vector2.new(88, 34)
 ----------------------------------------------------------------
 -- Helpers
 ----------------------------------------------------------------
+do
 local themed = {} -- things that change color with Light / Dark mode: { object, property, themeKey }
 local bind        -- defined once the themes exist
 
@@ -474,12 +474,13 @@ local function attachPress(button, scale, down)
 	end)
 	button.InputEnded:Connect(function(input)
 		if isPress(input) then tween(scale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back) end
-	end)
+    	end)
+    end
 end
-
 ----------------------------------------------------------------
 -- Remove an older copy of this window (same flag)
 ----------------------------------------------------------------
+do
 local function collectGuis()
 	local list, seen = {}, {}
 	local function add(inst)
@@ -507,10 +508,11 @@ end
 for _, old in ipairs(collectGuis()) do
 	if old:GetAttribute("Flag") == FLAG then old:Destroy() end
 end
-
+end
 ----------------------------------------------------------------
 -- Saved scripts (kept in a file, so they survive between sessions)
 ----------------------------------------------------------------
+do
 local canUseFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 local memoryStore = _G
 pcall(function()
@@ -564,10 +566,11 @@ end
 
 local data = loadData()
 local codeSize = data.settings.textSize
-
+end
 ----------------------------------------------------------------
 -- Themes (Dark is the default, Light changes every color and fades between them)
 ----------------------------------------------------------------
+do
 local THEMES = {
 	dark = {
 		bodyT = BODY_TRANSPARENCY, bodyLightT = 1,
@@ -627,10 +630,11 @@ local function scheduleSave()
 		if token == saveToken then writeData() end
 	end)
 end
-
+end
 ----------------------------------------------------------------
 -- The window
 ----------------------------------------------------------------
+do
 local screenGui = make("ScreenGui", {
 	Name = randomName(20),
 	ResetOnSpawn = false,
@@ -810,10 +814,11 @@ end)
 settingsButton.Activated:Connect(function()
 	setSettingsOpen(not settingsOpen)
 end)
-
+end
 ----------------------------------------------------------------
 -- Sidebar (the scripts)
 ----------------------------------------------------------------
+do
 local sidebar = make("Frame", {
 	Name = "Sidebar",
 	BackgroundColor3 = SIDEBAR_COLOR,
@@ -906,11 +911,12 @@ make("UIPadding", {
 	PaddingBottom = UDim.new(0, 4),
 }, listScroll)
 local listBar = makeScrollbar(listScroll, sidebar, 3, 40, 12, 8)
-
+end
 
 ----------------------------------------------------------------
 -- Editor (line numbers, colored code, Run and Clear)
 ----------------------------------------------------------------
+do
 local editorPanel = make("Frame", {
 	Name = "EditorPanel",
 	BackgroundColor3 = EDITOR_COLOR,
@@ -1121,10 +1127,11 @@ end
 local clearButton = makeActionButton("Clear", "Clear", 84, "grayBg", "grayFg", ICON_DELETE, 0)
 local clipboardButton = makeActionButton("RunClipboard", "Run Clipboard", 132, "grayBg", "grayFg", ICON_CLIPBOARD, 92)
 local runButton = makeActionButton("Run", "Run", 76, "runBg", "runFg", ICON_RUN, 232)
-
+end
 ----------------------------------------------------------------
 -- Divider (drag it to change how wide the sidebar is), resize corner, drag bar
 ----------------------------------------------------------------
+do
 local divider = make("TextButton", {
 	Name = "Divider",
 	AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1232,10 +1239,11 @@ end)
 dragHit.MouseLeave:Connect(function()
 	if drag.kind ~= "move" then tween(bar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
 end)
-
+end
 ----------------------------------------------------------------
 -- Options menu (opens when you tap a file icon), error notification, delete popup, Open pill
 ----------------------------------------------------------------
+do
 local menuCatcher = make("TextButton", {
 	Name = "MenuCatcher",
 	Size = UDim2.fromScale(1, 1),
@@ -1509,10 +1517,11 @@ end)
 pill.MouseLeave:Connect(function()
 	tween(pillStroke, 0.35, { Transparency = pillStrokeBase })
 end)
-
+end
 ----------------------------------------------------------------
 -- Layout (everything follows the window size and the sidebar width)
 ----------------------------------------------------------------
+do
 function layout()
 	layoutDirty = false
 	local w, h = sizeCur.X, sizeCur.Y
@@ -1550,10 +1559,11 @@ function layout()
 
 	if sideW < 40 and menu.Visible then closeMenu() end
 end
-
+end
 ----------------------------------------------------------------
 -- Colored code (Lua syntax highlighting)
 ----------------------------------------------------------------
+do
 local COLORS = {}
 for key, value in pairs(theme.code) do COLORS[key] = value end
 
@@ -1941,10 +1951,11 @@ editor.FocusLost:Connect(function(enterPressed)
 		editor.CursorPosition = cursor + 1
 	end)
 end)
-
+end
 ----------------------------------------------------------------
 -- Running code and reporting errors
 ----------------------------------------------------------------
+do
 local function describe(kind, line, because)
 	if line then
 		return ("%s error at line %d, this happened because %s."):format(kind, line, because)
@@ -2195,10 +2206,11 @@ clearButton.Activated:Connect(function()
 	editor.Text = ""
 	editor:ReleaseFocus()
 end)
-
+end
 ----------------------------------------------------------------
 -- The scripts list: select, add, rename, delete
 ----------------------------------------------------------------
+do
 local itemRefs = {}
 
 local function loadEditorText()
@@ -2593,10 +2605,11 @@ function openDeletePopup(index)
 		deleteEntry(entry)
 	end)
 end
-
+end
 ----------------------------------------------------------------
 -- Settings menu (everything in it is saved)
 ----------------------------------------------------------------
+do
 local TEXT_SIZES = { 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24 }
 local TOGGLE_ON = Color3.fromRGB(52, 199, 89)
 local settingRefreshers = {} -- functions that redraw a setting's current value
@@ -3043,10 +3056,11 @@ function setSettingsOpen(open)
 		end)
 	end
 end
-
+end
 ----------------------------------------------------------------
 -- Moving, resizing and the divider
 ----------------------------------------------------------------
+do
 local function begin(kind, input, extra)
 	local state = { kind = kind, input = input, start = p2(input) }
 	if extra then
@@ -3131,10 +3145,11 @@ connections[#connections + 1] = UserInputService.InputChanged:Connect(function(i
 		if drag.moved then pillCenter = drag.origin + delta end
 	end
 end)
-
+end
 ----------------------------------------------------------------
 -- Open / close, with the floating pill
 ----------------------------------------------------------------
+do
 local fadeValue = Instance.new("NumberValue")
 local fadeList = {}
 fadeValue.Changed:Connect(function(alpha)
@@ -3252,10 +3267,11 @@ pill.InputBegan:Connect(function(input)
 		end
 	end)
 end)
-
+end
 ----------------------------------------------------------------
 -- Every frame: smooth movement, off-screen protection, layout
 ----------------------------------------------------------------
+do
 local lastLayoutKey = -1
 
 connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
@@ -3303,7 +3319,7 @@ screenGui.Destroying:Connect(function()
 	table.clear(connections)
 	writeData()
 end)
-
+end
 ----------------------------------------------------------------
 -- Start up
 ----------------------------------------------------------------
@@ -3317,4 +3333,3 @@ task.defer(function()
 	codeBar.update()
 	setOpen(true) -- pops in
 end)
-end
