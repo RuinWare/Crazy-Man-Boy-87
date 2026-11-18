@@ -1389,17 +1389,16 @@ end
 
 --[[
 ===========================
-RSGASC (patch v.2.0)
+RSGASC (patch v.3.0)
 ===========================
 ]]--
 
 do
 	local modelEnabled = false
 	local assetIdText = ""
-	local currentAppliedId = nil
+	local savedOriginals = {}
 	
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local InsertService = game:GetService("InsertService")
 	local RunService = game:GetService("RunService")
 
 	-- Helper to safely traverse to the two EmoteModel folders
@@ -1423,92 +1422,68 @@ do
 		return classicModel, charModel
 	end
 
-	-- Extremely robust loader
-	local function loadAsset(id)
-		local success, objects = pcall(function()
-			return game:GetObjects("rbxassetid://" .. tostring(id))
-		end)
-		
-		if success and objects and #objects > 0 then
-			local holder = Instance.new("Model")
-			holder.Name = "CustomAsset"
-			for _, obj in ipairs(objects) do
-				-- Parent everything to preserve the model structure
-				obj.Parent = holder
+	-- Apply the new Mesh ID to the existing Handle
+	local function applyModel()
+		if not modelEnabled or assetIdText == "" then return end
+		local cModel, hModel = getEmoteModels()
+		local models = {cModel, hModel}
+		local url = "rbxassetid://" .. assetIdText
+
+		for _, model in ipairs(models) do
+			if model then
+				for _, item in ipairs(model:GetChildren()) do
+					-- Find the Handle (or anything with "Handle" in the name)
+					if item.Name == "Handle" or item.Name:find("Handle") then
+						
+						-- If it has a SpecialMesh, change it
+						local mesh = item:FindFirstChildOfClass("SpecialMesh")
+						if not mesh and item:IsA("MeshPart") then
+							-- It's a MeshPart, save and change directly
+							if not savedOriginals[item] then 
+								savedOriginals[item] = {MeshId = item.MeshId, TextureId = item.TextureId} 
+							end
+							item.MeshId = url
+							item.TextureID = ""
+						elseif mesh then
+							-- It's a Part with a SpecialMesh, save and change
+							if not savedOriginals[mesh] then 
+								savedOriginals[mesh] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId} 
+							end
+							mesh.MeshId = url
+							mesh.TextureId = ""
+						else
+							-- It's a plain Part, create a SpecialMesh
+							local newMesh = Instance.new("SpecialMesh")
+							newMesh.MeshType = Enum.MeshType.FileMesh
+							newMesh.MeshId = url
+							newMesh.Parent = item
+							savedOriginals[newMesh] = {IsNew = true}
+						end
+						
+					-- Hide the GuitarHead so it doesn't overlap with the new mesh
+					elseif item.Name == "GuitarHead" and item:IsA("BasePart") then
+						if not savedOriginals[item] then 
+							savedOriginals[item] = {Transparency = item.Transparency} 
+						end
+						item.Transparency = 1
+					end
+				end
 			end
-			return holder
 		end
-		
-		-- Fallback to InsertService (Sometimes works on client if public)
-		local s2, r2 = pcall(function()
-			return InsertService:LoadAsset(tonumber(id))
-		end)
-		
-		if s2 and r2 then
-			return r2
-		end
-		
-		return nil
 	end
 
-	-- Helper to inject the new model
-	local function applyModel(cModel, hModel)
-		if not modelEnabled or assetIdText == "" then return end
-		
-		-- Check if it's already applied
-		local function hasCustom(model)
-			if not model then return false end
-			for _, child in ipairs(model:GetChildren()) do
-				if child.Name == "CustomAsset" then return true end
+	-- Restore the original Mesh IDs and Transparency
+	local function revertModel()
+		for item, data in pairs(savedOriginals) do
+			if data.IsNew then
+				item:Destroy() -- Delete the SpecialMesh we created
+			else
+				if data.MeshId then item.MeshId = data.MeshId end
+				if data.TextureId then item.TextureId = data.TextureId end
+				if data.Transparency then item.Transparency = data.Transparency end
 			end
-			return false
 		end
-
-		if currentAppliedId == assetIdText and hasCustom(cModel) and hasCustom(hModel) then
-			return -- Already applied and still there
-		end
-
-		-- Load the new 3D Asset
-		local loadedModel = loadAsset(assetIdText)
-		
-		if loadedModel then
-			-- Check if the custom model has a "Handle", if not, create one so the game welds it to your hand
-			local hasHandle = false
-			for _, child in ipairs(loadedModel:GetChildren()) do
-				if child.Name == "Handle" then hasHandle = true break end
-			end
-			
-			if not hasHandle then
-				local fakeHandle = Instance.new("Part")
-				fakeHandle.Name = "Handle"
-				fakeHandle.Transparency = 1
-				fakeHandle.Size = Vector3.new(1, 1, 1)
-				fakeHandle.CanCollide = false
-				fakeHandle.Parent = loadedModel
-			end
-
-			-- Clear current models
-			if cModel then
-				for _, child in ipairs(cModel:GetChildren()) do child:Destroy() end
-				loadedModel:Clone().Parent = cModel
-			end
-			
-			if hModel then
-				for _, child in ipairs(hModel:GetChildren()) do child:Destroy() end
-				loadedModel:Clone().Parent = hModel
-			end
-			
-			loadedModel:Destroy()
-			currentAppliedId = assetIdText
-			print("[Model Changer] Successfully applied asset ID:", assetIdText)
-		else
-			window:Notify({ 
-				title = "Model Changer", 
-				content = "Failed to load ID: "..assetIdText..". Make sure the ID is a public 3D model.", 
-				duration = 5 
-			})
-			modelEnabled = false -- Turn off to prevent spam
-		end
+		savedOriginals = {}
 	end
 
 	VisTab:CreateDivider()
@@ -1519,21 +1494,10 @@ do
 		callback = function(v)
 			modelEnabled = v
 			if v then
-				currentAppliedId = nil -- Force apply on next loop
+				savedOriginals = {} -- Reset cache
+				applyModel()
 			else
-				-- Restore originals (game will auto-reload them if we clear the custom model)
-				local cModel, hModel = getEmoteModels()
-				if cModel then
-					for _, child in ipairs(cModel:GetChildren()) do
-						if child.Name == "CustomAsset" then child:Destroy() end
-					end
-				end
-				if hModel then
-					for _, child in ipairs(hModel:GetChildren()) do
-						if child.Name == "CustomAsset" then child:Destroy() end
-					end
-				end
-				currentAppliedId = nil
+				revertModel()
 			end
 		end,
 	})
@@ -1545,16 +1509,33 @@ do
 		callback = function(text)
 			if not text then return end
 			assetIdText = tostring(text):gsub("%D", "")
-			currentAppliedId = nil -- Force update if they type a new ID
+			
+			-- If the toggle is already on, instantly apply the new ID
+			if modelEnabled and assetIdText ~= "" then
+				revertModel() -- Restore old ones first
+				applyModel()  -- Apply new one
+			end
 		end,
 	})
 
-	-- Heartbeat Loop to constantly check and enforce the model
+	-- Heartbeat loop to force the game to keep your custom mesh
 	RunService.Heartbeat:Connect(function()
 		if modelEnabled and assetIdText ~= "" then
 			local cModel, hModel = getEmoteModels()
-			if cModel or hModel then
-				applyModel(cModel, hModel)
+			if cModel and hModel then
+				-- Check if the game reset the mesh
+				local needsReapply = false
+				for _, item in ipairs(cModel:GetChildren()) do
+					if item.Name:find("Handle") then
+						local mesh = item:FindFirstChildOfClass("SpecialMesh")
+						if item:IsA("MeshPart") and item.MeshId ~= "rbxassetid://" .. assetIdText then needsReapply = true end
+						if mesh and mesh.MeshId ~= "rbxassetid://" .. assetIdText then needsReapply = true end
+					end
+				end
+				
+				if needsReapply then
+					applyModel()
+				end
 			end
 		end
 	end)
