@@ -1389,7 +1389,7 @@ end
 
 --[[
 ===========================
-RSGASC (patch v.5.0)
+RSGASC
 ===========================
 ]]--
 
@@ -1400,9 +1400,14 @@ do
 	
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local RunService = game:GetService("RunService")
-	local LP = game:GetService("Players").LocalPlayer
+	local Players = game:GetService("Players")
+	local LP = Players.LocalPlayer
 
-	-- Helper to safely traverse to the two EmoteModel folders AND the active rig
+	-- The exact CFrames you found in Dex
+	local C0_VAL = CFrame.new(0.0410000011, -0.200000003, 0.138999999, 1, 0, 0, 0, 0, 1, 0, -1, 0)
+	local C1_VAL = CFrame.new(0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+
+	-- Helper to find the EmoteModels in ReplicatedStorage and the active rig
 	local function getEmoteModels()
 		local models = {}
 		
@@ -1425,7 +1430,7 @@ do
 			if charModel then table.insert(models, charModel) end
 		end
 
-		-- 2. Active Workspace Rig (If you are currently doing the emote)
+		-- 2. Active Workspace Rig
 		local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
 		if rig then
 			for _, v in ipairs(rig:GetDescendants()) do
@@ -1438,78 +1443,110 @@ do
 		return models
 	end
 
-	-- Apply the new Mesh ID safely
+	-- Load the 3D Asset and setup the Handle + Motor6D
+	local function buildCustomModel()
+		local success, objects = pcall(function()
+			return game:GetObjects("rbxassetid://" .. tostring(assetIdText))
+		end)
+		
+		if not success or not objects or #objects == 0 then return nil end
+		
+		local newModel = Instance.new("Model")
+		newModel.Name = "CustomRockinStride"
+		
+		for _, obj in ipairs(objects) do
+			obj.Parent = newModel
+		end
+		
+		-- 1. Ensure Handle exists
+		local handle = newModel:FindFirstChild("Handle", true)
+		if not handle then
+			local primary = newModel.PrimaryPart or newModel:FindFirstChildWhichIsA("BasePart")
+			if primary then
+				primary.Name = "Handle"
+				handle = primary
+			else
+				handle = Instance.new("Part")
+				handle.Name = "Handle"
+				handle.Size = Vector3.new(1, 1, 1)
+				handle.Transparency = 1
+				handle.CanCollide = false
+				handle.Parent = newModel
+			end
+		end
+		
+		-- 2. Create the Motor6D with your exact offsets
+		local motor = Instance.new("Motor6D")
+		motor.Name = "HandleWeld"
+		motor.Part1 = handle
+		motor.C0 = C0_VAL
+		motor.C1 = C1_VAL
+		motor.Parent = handle
+		
+		return newModel
+	end
+
+	-- Apply the new model to everything
 	local function applyModel()
 		if not modelEnabled or assetIdText == "" then return end
 		local models = getEmoteModels()
-		local url = "rbxassetid://" .. assetIdText
+		
+		if #models == 0 then return end
+		
+		-- Only load the asset once
+		local customAsset = buildCustomModel()
+		if not customAsset then
+			window:Notify({ title = "Model Changer", content = "Failed to load Asset ID: "..assetIdText, duration = 3 })
+			return
+		end
+
+		local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
+		local leftHand = rig and (rig:FindFirstChild("LeftHand") or rig:FindFirstChild("Left Hand") or rig:FindFirstChild("Left Arm"))
 
 		for _, model in ipairs(models) do
-			if model then
-				-- 1. Hide the GuitarHead
+			-- Save originals only once
+			if not savedOriginals[model] then
+				savedOriginals[model] = {}
 				for _, child in ipairs(model:GetChildren()) do
-					if child.Name:find("GuitarHead") and child:IsA("BasePart") then
-						if not savedOriginals[child] then savedOriginals[child] = child.Transparency end
-						child.Transparency = 1
-					end
+					table.insert(savedOriginals[model], child:Clone())
 				end
+			end
 
-				-- 2. Find the Handle
-				local handle = model:FindFirstChild("Handle") or model:FindFirstChild("Handle 🡪 GuitarHead")
-				if handle then
-					-- Hide the original handle (Do NOT destroy it, or the game throws an error)
-					if handle:IsA("BasePart") then
-						if not savedOriginals[handle] then savedOriginals[handle] = handle.Transparency end
-						handle.Transparency = 1
-					end
+			-- Nuke the old children
+			for _, child in ipairs(model:GetChildren()) do
+				child:Destroy()
+			end
 
-					-- 3. Create our custom part
-					local custom = model:FindFirstChild("CustomGuitar")
-					if not custom then
-						custom = Instance.new("Part")
-						custom.Name = "CustomGuitar"
-						custom.Size = handle.Size
-						custom.CFrame = handle.CFrame
-						custom.CanCollide = false
-						custom.Massless = true
-						custom.Transparency = 0
-						custom.Anchored = false
-
-						local mesh = Instance.new("SpecialMesh")
-						mesh.MeshType = Enum.MeshType.FileMesh
-						mesh.MeshId = url
-						mesh.Parent = custom
-
-						-- Weld our custom part to the invisible handle so it moves perfectly
-						local weld = Instance.new("WeldConstraint")
-						weld.Part0 = handle
-						weld.Part1 = custom
-						weld.Parent = handle
-
-						custom.Parent = model
-					else
-						-- Update the mesh ID if the user typed a new one
-						local mesh = custom:FindFirstChildOfClass("SpecialMesh")
-						if mesh and mesh.MeshId ~= url then
-							mesh.MeshId = url
-						end
-					end
+			-- Put in the new model
+			local clone = customAsset:Clone()
+			clone.Parent = model
+			
+			-- If this is the active rig, wire up the Motor6D to the LeftHand
+			if rig and model:IsDescendantOf(rig) then
+				local handle = clone:FindFirstChild("Handle", true)
+				local motor = handle and handle:FindFirstChild("HandleWeld")
+				if motor and leftHand then
+					pcall(function()
+						motor.Part0 = leftHand
+					end)
 				end
 			end
 		end
+		
+		customAsset:Destroy()
 	end
 
-	-- Restore everything to normal
+	-- Restore the original guitar
 	local function revertModel()
-		for item, data in pairs(savedOriginals) do
-			pcall(function()
-				item.Transparency = data
-			end)
-		end
-
-		for _, model in ipairs(getEmoteModels()) do
-			local custom = model:FindFirstChild("CustomGuitar")
-			if custom then custom:Destroy() end
+		for model, children in pairs(savedOriginals) do
+			if model and model.Parent then
+				for _, child in ipairs(model:GetChildren()) do
+					child:Destroy()
+				end
+				for _, child in ipairs(children) do
+					child:Clone().Parent = model
+				end
+			end
 		end
 		savedOriginals = {}
 	end
@@ -1545,10 +1582,28 @@ do
 		end,
 	})
 
-	-- Heartbeat loop to force the game to keep your custom mesh and keep it invisible
+	-- Loop to enforce it in case the game resets the EmoteModel
 	RunService.Heartbeat:Connect(function()
 		if modelEnabled and assetIdText ~= "" then
-			applyModel()
+			local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
+			if rig then
+				for _, v in ipairs(rig:GetDescendants()) do
+					if v.Name == "EmoteModel" then
+						-- Check if it got reset
+						local hasCustom = false
+						for _, child in ipairs(v:GetChildren()) do
+							if child.Name == "CustomRockinStride" then
+								hasCustom = true
+								break
+							end
+						end
+						if not hasCustom then
+							applyModel()
+							break
+						end
+					end
+				end
+			end
 		end
 	end)
 end
