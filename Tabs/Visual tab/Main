@@ -930,6 +930,342 @@ do
 	end)
 end
 
+do
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	-- State Variables
+	local levelEnabled, xpEnabled = false, false
+	local tokenEnabled, pointEnabled, voucherEnabled = false, false, false
+	local ticketEnabled, survivalEnabled, streakEnabled = false, false, false
+
+	local levelText, xpText, xpOutOfText = "", "", ""
+	local tokenText, pointText, voucherText = "", "", ""
+	local ticketText, survivalText, streakText = "", "", ""
+
+	-- Original Value Storage
+	local originals = {}
+
+	VisTab:CreateDivider()
+
+	-- Helper to format numbers with commas
+	local function formatCommas(input)
+		local num = tonumber(tostring(input):gsub("%D", ""))
+		if not num then return tostring(input) end
+		local formatted = tostring(num)
+		while true do
+			formatted, k = formatted:gsub("^(%d+)(%d%d%d)", "%1,%2")
+			if k == 0 then break end
+		end
+		return formatted
+	end
+
+	-- Helper to safely traverse the UI path
+	local function getUI(...)
+		local current = LP:FindFirstChild("PlayerGui")
+		if not current then return nil end
+		for _, v in ipairs({...}) do
+			if not current then return nil end
+			current = current:FindFirstChild(v)
+		end
+		return current
+	end
+
+	-- Helper to save original values
+	local function saveOriginal(key, element, isVisible)
+		if not originals[key] then
+			if element then
+				if isVisible then
+					originals[key] = { Visible = element.Visible }
+				else
+					originals[key] = { Text = element.Text }
+				end
+			end
+		end
+	end
+
+	-- Helper to restore original values
+	local function restoreOriginal(key, element, isVisible)
+		local data = originals[key]
+		if data and element then
+			if isVisible then
+				element.Visible = data.Visible
+			else
+				element.Text = data.Text
+			end
+		end
+	end
+
+	-- ==========================================
+	-- 1. Level Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "Level Spoofer",
+		value = false,
+		callback = function(v)
+			levelEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Level", "Level")
+				restoreOriginal("Level", el, false)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "Level:",
+		placeholder = "100",
+		removeTextAfterFocusLost = false,
+		callback = function(text) levelText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- 2. XP Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "XP Spoofer",
+		value = false,
+		callback = function(v)
+			xpEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Level", "Experience")
+				restoreOriginal("XP", el, false)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "XP:",
+		placeholder = "500",
+		removeTextAfterFocusLost = false,
+		callback = function(text) xpText = formatCommas(text) end,
+	})
+	VisTab:CreateInput({
+		name = "Out Of:",
+		placeholder = "1000",
+		removeTextAfterFocusLost = false,
+		callback = function(text) xpOutOfText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- 3. Token Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "Token Spoofer",
+		value = false,
+		callback = function(v)
+			tokenEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Left", "Tokens", "Pill", "Body", "Amount")
+				restoreOriginal("Tokens", el, false)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "Tokens:",
+		placeholder = "1000000",
+		removeTextAfterFocusLost = false,
+		callback = function(text) tokenText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- 4. Points Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "Points Spoofer",
+		value = false,
+		callback = function(v)
+			pointEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Left", "Points", "Pill", "Body", "Amount")
+				restoreOriginal("Points", el, false)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "Points:",
+		placeholder = "1000000",
+		removeTextAfterFocusLost = false,
+		callback = function(text) pointText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- 5. Voucher Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "Voucher Spoofer",
+		value = false,
+		callback = function(v)
+			voucherEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Left", "Vouchers", "Pill", "Body", "Amount")
+				restoreOriginal("Vouchers", el, false)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "Vouchers:",
+		placeholder = "1000000",
+		removeTextAfterFocusLost = false,
+		callback = function(text) voucherText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- 6. Tickets Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "Tickets Spoofer",
+		value = false,
+		callback = function(v)
+			ticketEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Left", "Tickets", "Pill", "Body", "Amount")
+				restoreOriginal("Tickets", el, false)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "Tickets:",
+		placeholder = "1000000",
+		removeTextAfterFocusLost = false,
+		callback = function(text) ticketText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- 7. Survival Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "Survival Spoofer",
+		value = false,
+		callback = function(v)
+			survivalEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Left", "Survivals", "Pill", "Body", "Amount")
+				restoreOriginal("Survivals", el, false)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "Survivals:",
+		placeholder = "1000000",
+		removeTextAfterFocusLost = false,
+		callback = function(text) survivalText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- 8. Winstreak Spoofer
+	-- ==========================================
+	VisTab:CreateToggle({
+		name = "Winstreak Spoofer",
+		value = false,
+		callback = function(v)
+			streakEnabled = v
+			if not v then
+				local el = getUI("HomePage", "Root", "Bottom", "Left", "StreakRow", "Streak", "Pill", "Body", "Amount")
+				local row = getUI("HomePage", "Root", "Bottom", "Left", "StreakRow")
+				restoreOriginal("Winstreak", el, false)
+				restoreOriginal("WinstreakVisible", row, true)
+			end
+		end,
+	})
+	VisTab:CreateInput({
+		name = "Winstreak:",
+		placeholder = "1000000",
+		removeTextAfterFocusLost = false,
+		callback = function(text) streakText = formatCommas(text) end,
+	})
+
+	-- ==========================================
+	-- Heartbeat Loop (Enforce Spoofs)
+	-- ==========================================
+	RunService.Heartbeat:Connect(function()
+		-- 1. Level
+		if levelEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Level", "Level")
+			if el then
+				saveOriginal("Level", el, false)
+				el.Text = "LEVEL " .. (levelText ~= "" and levelText or "1")
+			end
+		end
+
+		-- 2. XP
+		if xpEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Level", "Experience")
+			if el then
+				saveOriginal("XP", el, false)
+				local xp = xpText ~= "" and xpText or "0"
+				local out = xpOutOfText ~= "" and xpOutOfText or "0"
+				el.Text = xp .. "/" .. out
+			end
+		end
+
+		-- 3. Tokens
+		if tokenEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Left", "Tokens", "Pill", "Body", "Amount")
+			if el then
+				saveOriginal("Tokens", el, false)
+				el.Text = tokenText ~= "" and tokenText or "0"
+			end
+		end
+
+		-- 4. Points
+		if pointEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Left", "Points", "Pill", "Body", "Amount")
+			if el then
+				saveOriginal("Points", el, false)
+				el.Text = pointText ~= "" and pointText or "0"
+			end
+		end
+
+		-- 5. Vouchers
+		if voucherEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Left", "Vouchers", "Pill", "Body", "Amount")
+			if el then
+				saveOriginal("Vouchers", el, false)
+				el.Text = voucherText ~= "" and voucherText or "0"
+			end
+		end
+
+		-- 6. Tickets
+		if ticketEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Left", "Tickets", "Pill", "Body", "Amount")
+			if el then
+				saveOriginal("Tickets", el, false)
+				el.Text = ticketText ~= "" and ticketText or "0"
+			end
+		end
+
+		-- 7. Survivals
+		if survivalEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Left", "Survivals", "Pill", "Body", "Amount")
+			if el then
+				saveOriginal("Survivals", el, false)
+				el.Text = survivalText ~= "" and survivalText or "0"
+			end
+		end
+
+		-- 8. Winstreak + Visibility
+		if streakEnabled then
+			local el = getUI("HomePage", "Root", "Bottom", "Left", "StreakRow", "Streak", "Pill", "Body", "Amount")
+			local row = getUI("HomePage", "Root", "Bottom", "Left", "StreakRow")
+			
+			if el then
+				saveOriginal("Winstreak", el, false)
+				el.Text = streakText ~= "" and streakText or "0"
+			end
+			
+			if row then
+				saveOriginal("WinstreakVisible", row, true)
+				-- If text is "0" or empty, hide the row. Otherwise show it.
+				local val = streakText:gsub("%D", "")
+				if val == "" or tonumber(val) == 0 then
+					row.Visible = false
+				else
+					row.Visible = true
+				end
+			end
+		end
+	end)
+end
+
 --[[
 ===========================
 FULLBRIGHT
