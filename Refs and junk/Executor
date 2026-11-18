@@ -604,6 +604,8 @@ local THEMES = {
 		},
 	},
 }
+end
+do
 local theme = THEMES[data.settings.mode] or THEMES.dark
 
 -- Colors an object from the current theme now, and remembers it so a theme change can fade it later
