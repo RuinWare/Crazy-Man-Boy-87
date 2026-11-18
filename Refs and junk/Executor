@@ -44,7 +44,7 @@ local PILL_TITLE = "Run Code"
 local PILL_SUBTITLE = "Tap to show"
 local PILL_ICON = 98691154054966
 local TOAST_TOP = 16                                -- how far from the top of the screen the error notification sits
-
+local THEMES[data.settings.mode] = light
 -- ============================================================
 -- DO NOT EDIT BELOW THIS LINE
 -- ============================================================
