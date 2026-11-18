@@ -8,91 +8,10 @@ local window = Rayfield:CreateWindow({
 -- tabb
 local tab = window:CreateTab({ name = "Test", icon = 0 })
 
-do
-	local noclipEnabled = false
-	local Players = game:GetService("Players")
-	local RunService = game:GetService("RunService")
-	local LP = Players.LocalPlayer
-
-	-- Create an invisible "dummy" part to act as the camera subject
-	-- This prevents the camera from bugging out when we disable CanQuery
-	local camFixPart = Instance.new("Part")
-	camFixPart.Name = "NoclipCameraFix"
-	camFixPart.Size = Vector3.new(1, 1, 1)
-	camFixPart.Transparency = 1
-	camFixPart.CanCollide = false
-	camFixPart.CanTouch = false
-	camFixPart.CanQuery = true -- Camera can raycast to this perfectly
-	camFixPart.Parent = workspace.CurrentCamera
-	camFixPart.Position = Vector3.new(0, -1000, 0) -- Hide it underground initially
-
-	tab:CreateDivider()
-
-	tab:CreateToggle({
-		name = "Noclip",
-		value = false,
-		callback = function(v)
-			noclipEnabled = v
-			
-			local rig = workspace.Rigs:FindFirstChild(LP.Name)
-			if not v and rig then
-				-- RESTORE EVERYTHING WHEN TURNED OFF
-				for _, part in ipairs(rig:GetDescendants()) do
-					if part:IsA("BasePart") then
-						part.CanCollide = true
-						part.CanTouch = true
-						part.CanQuery = true
-					end
-				end
-				
-				-- Restore the original camera subject
-				local head = rig:FindFirstChild("Head")
-				local hum = rig:FindFirstChild("Humanoid")
-				workspace.CurrentCamera.CameraSubject = hum or head
-				
-				-- Hide the dummy part
-				camFixPart.Position = Vector3.new(0, -1000, 0)
-			end
-		end,
-	})
-
-	-- Apply every physics step so the game can't fight it
-	RunService.Stepped:Connect(function()
-		if not noclipEnabled then return end
-		
-		local rig = workspace.Rigs:FindFirstChild(LP.Name)
-		if rig then
-			local head = rig:FindFirstChild("Head")
-			
-			-- If the camera is currently looking at the rig, swap it to the dummy part
-			if head and workspace.CurrentCamera.CameraSubject ~= camFixPart then
-				workspace.CurrentCamera.CameraSubject = camFixPart
-			end
-			
-			-- Keep the dummy part exactly where the head is
-			if head then
-				camFixPart.CFrame = head.CFrame
-			end
-
-			-- Disable EVERYTHING on the entire rig
-			for _, part in ipairs(rig:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.CanCollide = false
-					part.CanTouch = false
-					part.CanQuery = false -- This is what bypasses their raycasts
-					
-					-- Clear velocity so the game can't push you out of the wall
-					part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-				end
-			end
-		end
-	end)
-end
-
--- new new
-
-window:Notify({
-    title = "All Loaded",
-    content = "All tests were successful at loading.",
-    duration = 10,
+tab:CreateColorPicker({
+    name = "Highlight",
+    color = Color3.fromRGB(96, 205, 255),
+    callback = function(color)
+        print(color)
+    end,
 })
