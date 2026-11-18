@@ -1,0 +1,34 @@
+-- Delete Keyboard Overlay
+-- Removes the keyboard overlay made by KeyboardOverlay. Its saved position stays,
+-- so it comes back in the same place next time you run KeyboardOverlay.
+
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+
+local TAG = "KeyboardOverlayGui" -- must match KeyboardOverlay
+local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+
+local found = {}
+
+for _, inst in ipairs(CollectionService:GetTagged(TAG)) do
+	found[inst] = true
+end
+
+local function scan(container)
+	if not container then return end
+	local ok, children = pcall(function() return container:GetChildren() end)
+	if not ok then return end
+	for _, child in ipairs(children) do
+		if child:IsA("ScreenGui") and child:GetAttribute(TAG) then
+			found[child] = true
+		end
+	end
+end
+
+scan(playerGui)
+pcall(function() scan(game:GetService("CoreGui")) end)
+if gethui then pcall(function() scan(gethui()) end) end
+
+for gui in pairs(found) do
+	gui:Destroy()
+end
