@@ -1327,11 +1327,6 @@ VisTab:CreateColorPicker({
         KBO_BG = Color3.fromRGB(r, g, b)
         getgenv().KBO_BG_COLOR = KBO_BG
         task.wait(0.01)
-        if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-         else
-     -- nothing
-        end
     end,
 })
 
@@ -1343,11 +1338,6 @@ VisTab:CreateColorPicker({
         KBO_OP = Color3.fromRGB(r, g, b)
         getgenv().KBO_OP_COLOR = KBO_OP
         task.wait(0.01)
-        if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-         else
-     -- nothing
-        end
     end,
 })
 
@@ -1362,11 +1352,6 @@ VisTab:CreateSlider({
         KBO_TR = v
         getgenv().KBO_BG_TRANS = KBO_TR
         task.wait(0.01)
-        if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-         else
-     -- nothing
-        end
     end,
 })
 
