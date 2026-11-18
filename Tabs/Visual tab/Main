@@ -1389,7 +1389,7 @@ end
 
 --[[
 ===========================
-RSGASC (patch v.3.0)
+RSGASC (patch v.4.0)
 ===========================
 ]]--
 
@@ -1422,7 +1422,7 @@ do
 		return classicModel, charModel
 	end
 
-	-- Apply the new Mesh ID to the existing Handle
+	-- Apply the new Mesh ID safely without crashing on MeshParts
 	local function applyModel()
 		if not modelEnabled or assetIdText == "" then return end
 		local cModel, hModel = getEmoteModels()
@@ -1432,56 +1432,92 @@ do
 		for _, model in ipairs(models) do
 			if model then
 				for _, item in ipairs(model:GetChildren()) do
-					-- Find the Handle (or anything with "Handle" in the name)
+					-- Find the Handle
 					if item.Name == "Handle" or item.Name:find("Handle") then
+						pcall(function()
+							if item:IsA("MeshPart") then
+								-- CANNOT CHANGE MESHPART.MESHID
+								-- Hide original and weld a new Part with a SpecialMesh
+								if not savedOriginals[item] then
+									savedOriginals[item] = { Transparency = item.Transparency, CustomPart = nil }
+								end
+								item.Transparency = 1
+								
+								local custom = item:FindFirstChild("CustomMeshPart")
+								if not custom then
+									custom = Instance.new("Part")
+									custom.Name = "CustomMeshPart"
+									custom.Size = item.Size
+									custom.CFrame = item.CFrame
+									custom.CanCollide = false
+									custom.Massless = true
+									custom.Transparency = 0
+									
+									local mesh = Instance.new("SpecialMesh")
+									mesh.MeshType = Enum.MeshType.FileMesh
+									mesh.MeshId = url
+									mesh.Scale = item.Size
+									mesh.Parent = custom
+									
+									local weld = Instance.new("WeldConstraint")
+									weld.Part0 = item
+									weld.Part1 = custom
+									weld.Parent = custom
+									
+									custom.Parent = item
+									savedOriginals[item].CustomPart = custom
+								else
+									local mesh = custom:FindFirstChildOfClass("SpecialMesh")
+									if mesh then mesh.MeshId = url end
+								end
+							else
+								-- Standard Part (Safe to change)
+								local mesh = item:FindFirstChildOfClass("SpecialMesh")
+								if not mesh then
+									mesh = Instance.new("SpecialMesh")
+									mesh.MeshType = Enum.MeshType.FileMesh
+									mesh.Parent = item
+									savedOriginals[mesh] = { IsNew = true }
+								end
+								
+								if not savedOriginals[mesh] then
+									savedOriginals[mesh] = { MeshId = mesh.MeshId, TextureId = mesh.TextureId }
+								end
+								
+								mesh.MeshId = url
+								mesh.TextureId = ""
+							end
+						end)
 						
-						-- If it has a SpecialMesh, change it
-						local mesh = item:FindFirstChildOfClass("SpecialMesh")
-						if not mesh and item:IsA("MeshPart") then
-							-- It's a MeshPart, save and change directly
+					-- Hide the GuitarHead so it doesn't overlap
+					elseif item.Name == "GuitarHead" or item.Name:find("GuitarHead") then
+						pcall(function()
 							if not savedOriginals[item] then 
-								savedOriginals[item] = {MeshId = item.MeshId, TextureId = item.TextureId} 
+								savedOriginals[item] = { Transparency = item.Transparency } 
 							end
-							item.MeshId = url
-							item.TextureID = ""
-						elseif mesh then
-							-- It's a Part with a SpecialMesh, save and change
-							if not savedOriginals[mesh] then 
-								savedOriginals[mesh] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId} 
-							end
-							mesh.MeshId = url
-							mesh.TextureId = ""
-						else
-							-- It's a plain Part, create a SpecialMesh
-							local newMesh = Instance.new("SpecialMesh")
-							newMesh.MeshType = Enum.MeshType.FileMesh
-							newMesh.MeshId = url
-							newMesh.Parent = item
-							savedOriginals[newMesh] = {IsNew = true}
-						end
-						
-					-- Hide the GuitarHead so it doesn't overlap with the new mesh
-					elseif item.Name == "GuitarHead" and item:IsA("BasePart") then
-						if not savedOriginals[item] then 
-							savedOriginals[item] = {Transparency = item.Transparency} 
-						end
-						item.Transparency = 1
+							item.Transparency = 1
+						end)
 					end
 				end
 			end
 		end
 	end
 
-	-- Restore the original Mesh IDs and Transparency
+	-- Restore everything to normal
 	local function revertModel()
 		for item, data in pairs(savedOriginals) do
-			if data.IsNew then
-				item:Destroy() -- Delete the SpecialMesh we created
-			else
-				if data.MeshId then item.MeshId = data.MeshId end
-				if data.TextureId then item.TextureId = data.TextureId end
-				if data.Transparency then item.Transparency = data.Transparency end
-			end
+			pcall(function()
+				if data.IsNew then
+					item:Destroy()
+				else
+					if data.MeshId then item.MeshId = data.MeshId end
+					if data.TextureId then item.TextureId = data.TextureId end
+					if data.Transparency ~= nil then item.Transparency = data.Transparency end
+					if data.CustomPart and data.CustomPart.Parent then
+						data.CustomPart:Destroy()
+					end
+				end
+			end)
 		end
 		savedOriginals = {}
 	end
@@ -1512,8 +1548,8 @@ do
 			
 			-- If the toggle is already on, instantly apply the new ID
 			if modelEnabled and assetIdText ~= "" then
-				revertModel() -- Restore old ones first
-				applyModel()  -- Apply new one
+				revertModel()
+				applyModel()
 			end
 		end,
 	})
@@ -1523,13 +1559,19 @@ do
 		if modelEnabled and assetIdText ~= "" then
 			local cModel, hModel = getEmoteModels()
 			if cModel and hModel then
-				-- Check if the game reset the mesh
 				local needsReapply = false
-				for _, item in ipairs(cModel:GetChildren()) do
-					if item.Name:find("Handle") then
-						local mesh = item:FindFirstChildOfClass("SpecialMesh")
-						if item:IsA("MeshPart") and item.MeshId ~= "rbxassetid://" .. assetIdText then needsReapply = true end
-						if mesh and mesh.MeshId ~= "rbxassetid://" .. assetIdText then needsReapply = true end
+				for _, model in ipairs({cModel, hModel}) do
+					for _, item in ipairs(model:GetChildren()) do
+						if item.Name == "Handle" or item.Name:find("Handle") then
+							if item:IsA("MeshPart") and not item:FindFirstChild("CustomMeshPart") then
+								needsReapply = true
+							elseif not item:IsA("MeshPart") then
+								local mesh = item:FindFirstChildOfClass("SpecialMesh")
+								if mesh and mesh.MeshId ~= "rbxassetid://" .. assetIdText then
+									needsReapply = true
+								end
+							end
+						end
 					end
 				end
 				
