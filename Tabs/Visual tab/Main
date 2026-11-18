@@ -1389,7 +1389,7 @@ end
 
 --[[
 ===========================
-RSGASC (patch v.4.0)
+RSGASC (patch v.5.0)
 ===========================
 ]]--
 
@@ -1400,9 +1400,13 @@ do
 	
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local RunService = game:GetService("RunService")
+	local LP = game:GetService("Players").LocalPlayer
 
-	-- Helper to safely traverse to the two EmoteModel folders
+	-- Helper to safely traverse to the two EmoteModel folders AND the active rig
 	local function getEmoteModels()
+		local models = {}
+		
+		-- 1. ReplicatedStorage Models
 		local items = ReplicatedStorage:FindFirstChild("Items")
 		local itemPacks = items and items:FindFirstChild("ItemPacks")
 		local events = itemPacks and itemPacks:FindFirstChild("Events")
@@ -1411,92 +1415,84 @@ do
 		local emotes = halloween and halloween:FindFirstChild("Emotes")
 		local rockinStride = emotes and emotes:FindFirstChild("RockinStride")
 		
-		if not rockinStride then return nil, nil end
-		
-		local classicFolder = rockinStride:FindFirstChild("CharacterClassic")
-		local classicModel = classicFolder and classicFolder:FindFirstChild("EmoteModel")
-		
-		local charFolder = rockinStride:FindFirstChild("Character")
-		local charModel = charFolder and charFolder:FindFirstChild("EmoteModel")
-		
-		return classicModel, charModel
+		if rockinStride then
+			local classicFolder = rockinStride:FindFirstChild("CharacterClassic")
+			local classicModel = classicFolder and classicFolder:FindFirstChild("EmoteModel")
+			if classicModel then table.insert(models, classicModel) end
+			
+			local charFolder = rockinStride:FindFirstChild("Character")
+			local charModel = charFolder and charFolder:FindFirstChild("EmoteModel")
+			if charModel then table.insert(models, charModel) end
+		end
+
+		-- 2. Active Workspace Rig (If you are currently doing the emote)
+		local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
+		if rig then
+			for _, v in ipairs(rig:GetDescendants()) do
+				if v.Name == "EmoteModel" then
+					table.insert(models, v)
+				end
+			end
+		end
+
+		return models
 	end
 
-	-- Apply the new Mesh ID safely without crashing on MeshParts
+	-- Apply the new Mesh ID safely
 	local function applyModel()
 		if not modelEnabled or assetIdText == "" then return end
-		local cModel, hModel = getEmoteModels()
-		local models = {cModel, hModel}
+		local models = getEmoteModels()
 		local url = "rbxassetid://" .. assetIdText
 
 		for _, model in ipairs(models) do
 			if model then
-				for _, item in ipairs(model:GetChildren()) do
-					-- Find the Handle
-					if item.Name == "Handle" or item.Name:find("Handle") then
-						pcall(function()
-							if item:IsA("MeshPart") then
-								-- CANNOT CHANGE MESHPART.MESHID
-								-- Hide original and weld a new Part with a SpecialMesh
-								if not savedOriginals[item] then
-									savedOriginals[item] = { Transparency = item.Transparency, CustomPart = nil }
-								end
-								item.Transparency = 1
-								
-								local custom = item:FindFirstChild("CustomMeshPart")
-								if not custom then
-									custom = Instance.new("Part")
-									custom.Name = "CustomMeshPart"
-									custom.Size = item.Size
-									custom.CFrame = item.CFrame
-									custom.CanCollide = false
-									custom.Massless = true
-									custom.Transparency = 0
-									
-									local mesh = Instance.new("SpecialMesh")
-									mesh.MeshType = Enum.MeshType.FileMesh
-									mesh.MeshId = url
-									mesh.Scale = item.Size
-									mesh.Parent = custom
-									
-									local weld = Instance.new("WeldConstraint")
-									weld.Part0 = item
-									weld.Part1 = custom
-									weld.Parent = custom
-									
-									custom.Parent = item
-									savedOriginals[item].CustomPart = custom
-								else
-									local mesh = custom:FindFirstChildOfClass("SpecialMesh")
-									if mesh then mesh.MeshId = url end
-								end
-							else
-								-- Standard Part (Safe to change)
-								local mesh = item:FindFirstChildOfClass("SpecialMesh")
-								if not mesh then
-									mesh = Instance.new("SpecialMesh")
-									mesh.MeshType = Enum.MeshType.FileMesh
-									mesh.Parent = item
-									savedOriginals[mesh] = { IsNew = true }
-								end
-								
-								if not savedOriginals[mesh] then
-									savedOriginals[mesh] = { MeshId = mesh.MeshId, TextureId = mesh.TextureId }
-								end
-								
-								mesh.MeshId = url
-								mesh.TextureId = ""
-							end
-						end)
-						
-					-- Hide the GuitarHead so it doesn't overlap
-					elseif item.Name == "GuitarHead" or item.Name:find("GuitarHead") then
-						pcall(function()
-							if not savedOriginals[item] then 
-								savedOriginals[item] = { Transparency = item.Transparency } 
-							end
-							item.Transparency = 1
-						end)
+				-- 1. Hide the GuitarHead
+				for _, child in ipairs(model:GetChildren()) do
+					if child.Name:find("GuitarHead") and child:IsA("BasePart") then
+						if not savedOriginals[child] then savedOriginals[child] = child.Transparency end
+						child.Transparency = 1
+					end
+				end
+
+				-- 2. Find the Handle
+				local handle = model:FindFirstChild("Handle") or model:FindFirstChild("Handle 🡪 GuitarHead")
+				if handle then
+					-- Hide the original handle (Do NOT destroy it, or the game throws an error)
+					if handle:IsA("BasePart") then
+						if not savedOriginals[handle] then savedOriginals[handle] = handle.Transparency end
+						handle.Transparency = 1
+					end
+
+					-- 3. Create our custom part
+					local custom = model:FindFirstChild("CustomGuitar")
+					if not custom then
+						custom = Instance.new("Part")
+						custom.Name = "CustomGuitar"
+						custom.Size = handle.Size
+						custom.CFrame = handle.CFrame
+						custom.CanCollide = false
+						custom.Massless = true
+						custom.Transparency = 0
+						custom.Anchored = false
+
+						local mesh = Instance.new("SpecialMesh")
+						mesh.MeshType = Enum.MeshType.FileMesh
+						mesh.MeshId = url
+						mesh.Parent = custom
+
+						-- Weld our custom part to the invisible handle so it moves perfectly
+						local weld = Instance.new("WeldConstraint")
+						weld.Part0 = handle
+						weld.Part1 = custom
+						weld.Parent = handle
+
+						custom.Parent = model
+					else
+						-- Update the mesh ID if the user typed a new one
+						local mesh = custom:FindFirstChildOfClass("SpecialMesh")
+						if mesh and mesh.MeshId ~= url then
+							mesh.MeshId = url
+						end
 					end
 				end
 			end
@@ -1507,17 +1503,13 @@ do
 	local function revertModel()
 		for item, data in pairs(savedOriginals) do
 			pcall(function()
-				if data.IsNew then
-					item:Destroy()
-				else
-					if data.MeshId then item.MeshId = data.MeshId end
-					if data.TextureId then item.TextureId = data.TextureId end
-					if data.Transparency ~= nil then item.Transparency = data.Transparency end
-					if data.CustomPart and data.CustomPart.Parent then
-						data.CustomPart:Destroy()
-					end
-				end
+				item.Transparency = data
 			end)
+		end
+
+		for _, model in ipairs(getEmoteModels()) do
+			local custom = model:FindFirstChild("CustomGuitar")
+			if custom then custom:Destroy() end
 		end
 		savedOriginals = {}
 	end
@@ -1530,7 +1522,7 @@ do
 		callback = function(v)
 			modelEnabled = v
 			if v then
-				savedOriginals = {} -- Reset cache
+				savedOriginals = {}
 				applyModel()
 			else
 				revertModel()
@@ -1546,7 +1538,6 @@ do
 			if not text then return end
 			assetIdText = tostring(text):gsub("%D", "")
 			
-			-- If the toggle is already on, instantly apply the new ID
 			if modelEnabled and assetIdText ~= "" then
 				revertModel()
 				applyModel()
@@ -1554,31 +1545,10 @@ do
 		end,
 	})
 
-	-- Heartbeat loop to force the game to keep your custom mesh
+	-- Heartbeat loop to force the game to keep your custom mesh and keep it invisible
 	RunService.Heartbeat:Connect(function()
 		if modelEnabled and assetIdText ~= "" then
-			local cModel, hModel = getEmoteModels()
-			if cModel and hModel then
-				local needsReapply = false
-				for _, model in ipairs({cModel, hModel}) do
-					for _, item in ipairs(model:GetChildren()) do
-						if item.Name == "Handle" or item.Name:find("Handle") then
-							if item:IsA("MeshPart") and not item:FindFirstChild("CustomMeshPart") then
-								needsReapply = true
-							elseif not item:IsA("MeshPart") then
-								local mesh = item:FindFirstChildOfClass("SpecialMesh")
-								if mesh and mesh.MeshId ~= "rbxassetid://" .. assetIdText then
-									needsReapply = true
-								end
-							end
-						end
-					end
-				end
-				
-				if needsReapply then
-					applyModel()
-				end
-			end
+			applyModel()
 		end
 	end)
 end
