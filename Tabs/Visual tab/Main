@@ -1070,7 +1070,7 @@ end
 
 --[[
 ===========================
-HUD COLORS
+HUD COLORS (v.2.0)
 ===========================
 ]]--
 
@@ -1083,87 +1083,98 @@ do
 	local RunService = game:GetService("RunService")
 	local LP = Players.LocalPlayer
 	
-	local originalColors = {} -- Stores original UI colors
-	local lastFoundElements = {} -- Caches elements so we don't lookup 60 times a second
+	-- Store originals per instance
+	local savedColors = {}
 
-	-- Helper to find all UI elements safely
+	-- Helper to find the new UI elements safely
 	local function getHUDElements()
 		local playerGui = LP:FindFirstChild("PlayerGui")
 		if not playerGui then return nil end
 		
-		local gameGui = playerGui:FindFirstChild("Game")
-		if not gameGui then return nil end
+		local gameHud = playerGui:FindFirstChild("GameHud")
+		if not gameHud then return nil end
 		
-		local hud = gameGui:FindFirstChild("HUD")
-		if not hud then return nil end
+		local root = gameHud:FindFirstChild("Root")
+		if not root then return nil end
 		
-		local overlay = hud:FindFirstChild("Overlay")
-		if not overlay then return nil end
-		
-		local charStatus = overlay:FindFirstChild("CharacterStatus")
-		if not charStatus then return nil end
-		
-		local bottomLeft = charStatus:FindFirstChild("BottomLeft")
+		local bottomLeft = root:FindFirstChild("BottomLeft")
 		if not bottomLeft then return nil end
 		
-		-- Health Elements
-		local healthFolder = bottomLeft:FindFirstChild("Health")
-		local healthIcon = healthFolder and healthFolder:FindFirstChild("HealthIcon")
-		local healthText = healthFolder and healthFolder:FindFirstChild("Health")
+		-- 1. Speedometer Path
+		local plate = bottomLeft:FindFirstChild("Plate")
+		local content = plate and plate:FindFirstChild("Content")
+		local speedText = content and content:FindFirstChild("Value")
+		local speedIcon = content and content:FindFirstChild("Icon")
 		
-		-- Speedometer Elements
-		local speedFolder = bottomLeft:FindFirstChild("Speedometer")
-		local speedImage = speedFolder and speedFolder:FindFirstChild("ImageLabel")
-		local speedText = speedFolder and speedFolder:FindFirstChild("Speed")
+		-- 2. Health Path
+		local row = bottomLeft:FindFirstChild("Row")
+		local rowPlate = row and row:FindFirstChild("Plate")
+		local rowContent = rowPlate and rowPlate:FindFirstChild("Content")
+		local healthText = rowContent and rowContent:FindFirstChild("Value")
+		local healthIcon = rowContent and rowContent:FindFirstChild("Icon")
 		
 		return {
 			HealthIcon = healthIcon,
 			HealthText = healthText,
-			SpeedImage = speedImage,
+			SpeedImage = speedIcon,  -- Keeping variable name consistent with old script
 			SpeedText = speedText
 		}
 	end
 
-	-- Save original colors for clean reversion
-	local function saveOriginalColors(elements)
-		if not elements.HealthIcon or not originalColors.Saved then
-			originalColors.Saved = true
-			originalColors.HealthIcon = elements.HealthIcon and elements.HealthIcon.ImageColor3
-			originalColors.HealthText = elements.HealthText and elements.HealthText.TextColor3
-			originalColors.SpeedImage = elements.SpeedImage and elements.SpeedImage.ImageColor3
-			originalColors.SpeedText = elements.SpeedText and elements.SpeedText.TextColor3
+	-- Save original colors based on the specific UI instance
+	local function saveOriginalColor(inst, prop)
+		if inst and not savedColors[inst] then
+			savedColors[inst] = inst[prop]
 		end
 	end
 
 	-- Apply the chosen colors
 	local function applyColors()
 		local elements = getHUDElements()
-		if not elements or not elements.HealthIcon then return end
+		if not elements then return end
 		
-		-- If this is the first time finding them, save the originals
-		saveOriginalColors(elements)
+		-- Health
+		if elements.HealthIcon then 
+			saveOriginalColor(elements.HealthIcon, "ImageColor3")
+			elements.HealthIcon.ImageColor3 = healthColor 
+		end
+		if elements.HealthText then 
+			saveOriginalColor(elements.HealthText, "TextColor3")
+			elements.HealthText.TextColor3 = healthColor 
+		end
 		
-		if elements.HealthIcon then elements.HealthIcon.ImageColor3 = healthColor end
-		if elements.HealthText then elements.HealthText.TextColor3 = healthColor end
-		
-		if elements.SpeedImage then elements.SpeedImage.ImageColor3 = speedColor end
-		if elements.SpeedText then elements.SpeedText.TextColor3 = speedColor end
+		-- Speedometer
+		if elements.SpeedImage then 
+			saveOriginalColor(elements.SpeedImage, "ImageColor3")
+			elements.SpeedImage.ImageColor3 = speedColor 
+		end
+		if elements.SpeedText then 
+			saveOriginalColor(elements.SpeedText, "TextColor3")
+			elements.SpeedText.TextColor3 = speedColor 
+		end
 	end
 
 	-- Revert to original colors
 	local function revertColors()
-		if not originalColors.Saved then return end
 		local elements = getHUDElements()
 		if not elements then return end
 		
-		if elements.HealthIcon and originalColors.HealthIcon then elements.HealthIcon.ImageColor3 = originalColors.HealthIcon end
-		if elements.HealthText and originalColors.HealthText then elements.HealthText.TextColor3 = originalColors.HealthText end
+		if elements.HealthIcon and savedColors[elements.HealthIcon] then 
+			elements.HealthIcon.ImageColor3 = savedColors[elements.HealthIcon] 
+		end
+		if elements.HealthText and savedColors[elements.HealthText] then 
+			elements.HealthText.TextColor3 = savedColors[elements.HealthText] 
+		end
 		
-		if elements.SpeedImage and originalColors.SpeedImage then elements.SpeedImage.ImageColor3 = originalColors.SpeedImage end
-		if elements.SpeedText and originalColors.SpeedText then elements.SpeedText.TextColor3 = originalColors.SpeedText end
+		if elements.SpeedImage and savedColors[elements.SpeedImage] then 
+			elements.SpeedImage.ImageColor3 = savedColors[elements.SpeedImage] 
+		end
+		if elements.SpeedText and savedColors[elements.SpeedText] then 
+			elements.SpeedText.TextColor3 = savedColors[elements.SpeedText] 
+		end
 	end
 
-	VisTab:CreateDivider({ text = "HUD" })
+	VisTab:CreateDivider()
 
 	VisTab:CreateToggle({
 		name = "Change HUD Colors",
@@ -1178,7 +1189,7 @@ do
 
 	VisTab:CreateColorPicker({
 		name = "Health",
-		color = Color3.fromRGB(255,255, 255), -- Default red
+		color = Color3.fromRGB(255, 50, 50), -- Default red
 		callback = function(color)
 			healthColor = color
 			if hudEnabled then applyColors() end
@@ -1194,10 +1205,10 @@ do
 		end,
 	})
 
-	-- Enforce colors every frame (The game frequently overrides UI colors)
+	-- Enforce colors every frame, wrapped in pcall just in case the UI disappears mid-frame
 	RunService.Heartbeat:Connect(function()
 		if hudEnabled then
-			applyColors()
+			pcall(applyColors)
 		end
 	end)
 end
