@@ -1887,10 +1887,10 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-tab:CreateDivider()
+local InfSlideDivider = tab:CreateDivider({ text = "Infinite Slide" })
 
 tab:CreateToggle({
-    name = "Inf Slide",
+    name = "Infinite Slide",
     icon = 84806424467602,
     currentValue = false,
     flag = "InfSlide_Toggle",
@@ -1900,6 +1900,15 @@ tab:CreateToggle({
             sliding = false
             fireFriction(5)
         end
+       if v then
+        InfSlideDivider:Set("Infinite Slide Enabled")
+         task.wait(3)
+         InfSlideDivider:Set("Infinite Slide")
+       else
+        InfSlideDivider:Set("Infinite Slide Disabled")
+         task.wait(3)
+         InfSlideDivider:Set("Infinite Slide")
+      end
     end,
 })
 
@@ -1985,7 +1994,7 @@ end)
 tab:CreateDivider()
 
 tab:CreateToggle({
-    name = "Y Lock",
+    name = "Y Surf",
     icon = 139863028132428,
     currentValue = false,
     flag = "YLock_Toggle",
@@ -2226,9 +2235,11 @@ do
         anchorPart.CFrame = anchorPart.CFrame + dir * speed * dt
     end)
 
+local DownedDashDivider = tab:CreateDivider({ text = "Downed Dash" })
+
     tab:CreateToggle({
-        name = "Downed Dash",
-        currentValue = false,
+        name = "Overhaul Auto Downed Dash",
+        value = false,
         flag = "DownedDash_Toggle",
         callback = function(v)
             downedDashEnabled = v
@@ -2236,6 +2247,15 @@ do
                 downedDashActive = false
                 cleanup()
             end
+       if v then
+        DownedDashDivider:Set("Overhaul Auto Downed Dash Enabled")
+         task.wait(3)
+         DownedDashDivider:Set("Overhaul Auto Downed Dash")
+       else
+        DownedDashDivider:Set("Overhaul Auto Downed Dash Disabled")
+         task.wait(3)
+         DownedDashDivider:Set("Overhaul Auto Downed Dash")
+      end
         end,
     })
 
@@ -2349,13 +2369,24 @@ do
 
     RunService.Heartbeat:Connect(checkEdgeTrimp)
 
-    tab:CreateDivider()
+local EasyEdgeDivider = tab:CreateDivider({ text = "Easy Edge Trimp" })
 
     tab:CreateToggle({
         name = "Easy Edge Trimp",
         currentValue = false,
         flag = "EdgeTrimp_Toggle",
-        callback = function(v) edgeTrimpEnabled = v end,
+        callback = function(value) 
+           edgeTrimpEnabled = value
+       if value then
+        EasyEdgeDivider:Set("Easy Edge Trimp Enabled")
+         task.wait(3)
+         EasyEdgeDivider:Set("Easy Edge Trimp")
+       else
+        EasyEdgeDivider:Set("Easy Edge Trimp Disabled")
+         task.wait(3)
+         EasyEdgeDivider:Set("Easy Edge Trimp")
+           end
+       end,
     })
 
     tab:CreateSlider({
@@ -2515,13 +2546,16 @@ end
     _G.RWCallbacks["SuperJumpTrigger"] = triggerSuperJump
     _G.RWCallbacks["SuperJump"] = function(v) superJumpEnabled = v end
 
-    tab:CreateDivider()
+local SJDivider = tab:CreateDivider({ text = "Super Jump" })
 
     tab:CreateToggle({
         name = "Super Jump",
         currentValue = false,
         flag = "SuperJump_Toggle",
-        callback = function(v) superJumpEnabled = v end,
+        callback = function(v)
+           superJumpEnabled = v
+
+       end,
     })
 
     tab:CreateKeybind({
