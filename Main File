@@ -287,7 +287,11 @@ local function buildEmoteChanger(tab, window)
 E     D     I     T     S
 ============================================================================
 ]]--
+tab:CreateSection({ name = "Emotes", icon = 121586615710226 })
+tab:CreateDivider({ line = false, spacing = 13 })
+
         tab:CreateDivider({ text = "Emote Changer" })
+
 	tab:CreateToggle({
 		name = "Use Textbox",
                 icon = 131412776187171,
@@ -683,6 +687,8 @@ local function buildCosmeticChanger(tab, window)
 E     D     I     T     S
 ============================================================================
 ]]--
+tab:CreateSection({ name = "Cosmetics", icon = 85228918424110 })
+tab:CreateDivider({ line = false, spacing = 13 })
 
         tab:CreateDivider({ text = "Cosmetic Changer" })
 	tab:CreateToggle({
@@ -1320,16 +1326,24 @@ do
         b.MouseLeave:Connect(function() hjHeld = false end)
     end)
 
-local HoldJumpDivider = tab:CreateDivider({ text = "Hold Jump" })
+local HJumpDivider = tab:CreateDivider({ text = "Hold Jump" })
 
     tab:CreateToggle({
-        name = "Hold Jump",
+        name = "Enabled",
         icon = 97668677854395,
         currentValue = false,
         flag = "HoldJump_Toggle",
         callback = function(v)
             hjEnabled = v
-
+       if value then
+        HJumpDivider:Set("Hold Jump Enabled")
+         task.wait(3)
+         HJumpDivider:Set("Hold Jump")
+       else
+        HJumpDivider:Set("Hold Jump Disabled")
+         task.wait(3)
+         HJumpDivider:Set("Hold Jump")
+      end
        end,
     })
 
@@ -1434,15 +1448,24 @@ RunService.Heartbeat:Connect(function()
     lastYVelocity = root.AssemblyLinearVelocity.Y
 end)
 
-tab:CreateDivider()
+local EBDivider = tab:CreateDivider({ text = "Easy Bounce" })
 
 tab:CreateToggle({
-    name = "Easy Bounce",
+    name = "Enabled",
     icon = 116414714090955,
     currentValue = false,
     flag = "EasyBounce_Toggle",
     callback = function(value)
         easyBounceEnabled = value
+       if value then
+        EBJumpDivider:Set("Auto Jump Enabled")
+         task.wait(3)
+         EBJumpDivider:Set("Auto Jump")
+       else
+        EBJumpDivider:Set("Auto Jump Disabled")
+         task.wait(3)
+         EBDivider:Set("Auto Jump")
+      end
     end,
 })
 
@@ -6134,82 +6157,6 @@ do
             local pick = type(selected) == "table" and selected[1] or selected
             if pick then
                 window:ChangeTheme(pick)
-            end
-        end,
-    })
-end
-
-do
-    ScriptTab:CreateDivider({ text = "Configuration Saving" })
-
-    local function notify(title, content)
-        pcall(function()
-            window:Notify({ title = title, content = content, duration = 3 })
-        end)
-    end
-
-    ScriptTab:CreateInput({
-        name = "Name:",
-        placeholder = "config name",
-        callback = function(text)
-            if text and text ~= "" then selectedName = text end
-        end,
-    })
-
-    ScriptTab:CreateButton({
-        name = "Save",
-        callback = function()
-            if selectedName == "" then
-                notify("Config", "Enter a name first.")
-                return
-            end
-            local ok, err = pcall(function() window:Save(selectedName) end)
-            if ok then
-                addUnique(trackedNames, selectedName)
-                notify("Config", "Saved: " .. selectedName)
-                refreshDropdown()
-            else
-                notify("Config Save Error", tostring(err))
-            end
-        end,
-    })
-
-    ScriptTab:CreateButton({
-        name = "Load",
-        callback = function()
-            if selectedName == "" then
-                notify("Config", "Select or type a config name.")
-                return
-            end
-            local ok, err = pcall(function() window:Load(selectedName) end)
-            if ok then
-                notify("Config", "Loaded: " .. selectedName)
-            else
-                notify("Config Load Error", tostring(err))
-            end
-        end,
-    })
-
-    ScriptTab:CreateButton({
-        name = "Delete",
-        description = "If you want a list or proper Configuration Settings, click on the gear icon in the top right and scroll down.",
-        callback = function()
-            if selectedName == "" then
-                notify("Config", "Select a config to delete.")
-                return
-            end
-            local ok, err = pcall(function() window:DeleteConfig(selectedName) end)
-            if ok then
-                -- Remove from session tracking
-                for i = #trackedNames, 1, -1 do
-                    if trackedNames[i] == selectedName then
-                        table.remove(trackedNames, i)
-                    end
-                end
-                notify("Config", "Deleted: " .. selectedName)
-                refreshDropdown()
-            else
-                notify("Config Delete Error", tostring(err))
             end
         end,
     })
