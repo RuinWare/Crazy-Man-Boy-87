@@ -990,6 +990,8 @@ RunService.PreSimulation:Connect(function()
     tryJump(hum, root)
 end)
 
+local AutoJumpDivider = tab:CreateDivider({ text = "Auto Jump" })
+
 tab:CreateToggle({
     name = "Auto Jump",
     icon = 109475752270721,
@@ -997,6 +999,13 @@ tab:CreateToggle({
     flag = "AutoJump_Toggle",
     callback = function(value)
         autoJumpEnabled = value
+       if value then
+        AutoJumpDivider:Set("V Enabled")
+       else
+        AutoJumpDivider:Set("V Disabled")
+         task.wait(3)
+         AutoJumpDivider:Set("V Jump")
+      end
     end,
 })
 
@@ -1005,7 +1014,7 @@ _G.RWCallbacks["AutoJump"] = function(v) autoJumpEnabled = v end
 tab:CreateToggle({
     name = "Ramp Protection",
     icon = 111308594268728,
-    currentValue = false,
+    value = false,
     flag = "AutoJump_RampProtection_Toggle",
     callback = function(value)
         rampProtection = value
@@ -1015,7 +1024,7 @@ tab:CreateToggle({
 tab:CreateToggle({
     name = "Only Trigger On Look Down",
     icon = 128804949999663,
-    currentValue = false,
+    value = false,
     flag = "AutoJump_LookDown_Toggle",
     callback = function(value)
         lookDownOnly = value
@@ -1025,7 +1034,7 @@ tab:CreateToggle({
 tab:CreateToggle({
     name = "Only Trigger On Move",
     icon = 135743813499745,
-    currentValue = false,
+    value = false,
     flag = "AutoJump_MoveOnly_Toggle",
     callback = function(value)
         moveOnly = value
@@ -1038,7 +1047,7 @@ tab:CreateSlider({
     range = {0, 5},
     increment = 0.05,
     suffix = "s",
-    currentValue = 0,
+    value = 0,
     flag = "AutoJump_MoveHold",
     callback = function(value)
         moveHoldThreshold = value
