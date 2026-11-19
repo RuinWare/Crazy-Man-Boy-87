@@ -8,10 +8,14 @@ local window = Rayfield:CreateWindow({
 -- tabb
 local tab = window:CreateTab({ name = "Test", icon = 0 })
 
-tab:CreateColorPicker({
-    name = "Highlight",
-    color = Color3.fromRGB(96, 205, 255),
-    callback = function(color)
-        print(color)
+local TEST = tab:CreateToggle({
+    name = "Test Disabled",
+    value = false,
+    callback = function(v)
+     if v then
+     TEST:name("Test Enabled")
+    else
+     TEST:name("Test Disabled")
+        end
     end,
 })
