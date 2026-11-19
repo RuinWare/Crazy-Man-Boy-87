@@ -1167,7 +1167,7 @@ local LegitJumpDivider = tab:CreateDivider({ text = "Legit Jump" })
         flag = "DelayJump_Toggle",
         callback = function(v) 
          djEnabled = v 
-       if value then
+       if v then
         LegitJumpDivider:Set("Legit Jump Enabled")
          task.wait(3)
          LegitJumpDivider:Set("Legit Jump")
@@ -1335,7 +1335,7 @@ local HJumpDivider = tab:CreateDivider({ text = "Hold Jump" })
         flag = "HoldJump_Toggle",
         callback = function(v)
             hjEnabled = v
-       if value then
+       if v then
         HJumpDivider:Set("Hold Jump Enabled")
          task.wait(3)
          HJumpDivider:Set("Hold Jump")
@@ -1458,13 +1458,13 @@ tab:CreateToggle({
     callback = function(value)
         easyBounceEnabled = value
        if value then
-        EBJumpDivider:Set("Auto Jump Enabled")
+        EBJumpDivider:Set("Easy Bounce Enabled")
          task.wait(3)
-         EBJumpDivider:Set("Auto Jump")
+         EBJumpDivider:Set("Easy Bounce")
        else
-        EBJumpDivider:Set("Auto Jump Disabled")
+        EBJumpDivider:Set("Easy Bounce Disabled")
          task.wait(3)
-         EBDivider:Set("Auto Jump")
+         EBDivider:Set("Easy Bounce")
       end
     end,
 })
@@ -1554,7 +1554,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-tab:CreateDivider()
+HBDivider = tab:CreateDivider({ text = "Hard Bounce" })
 
 tab:CreateToggle({
     name = "Hard Bounce",
@@ -1563,6 +1563,15 @@ tab:CreateToggle({
     flag = "HardBounce_Toggle",
     callback = function(value)
         hardBounceEnabled = value
+       if value then
+        HBDivider:Set("Hard Bounce Enabled")
+         task.wait(3)
+         HBDivider:Set("Hard Bounce")
+       else
+        HBDivider:Set("Hard Bounce Disabled")
+         task.wait(3)
+         HBDivider:Set("Hard Bounce")
+      end
     end,
 })
 
@@ -1735,8 +1744,6 @@ do
             emoteFlingWasInAir = false
         end
     end)
-
-    tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Emote Fling",
