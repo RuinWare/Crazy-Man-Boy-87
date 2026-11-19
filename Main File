@@ -1448,7 +1448,7 @@ RunService.Heartbeat:Connect(function()
     lastYVelocity = root.AssemblyLinearVelocity.Y
 end)
 
-local EBDivider = tab:CreateDivider({ text = "Easy Bounce" })
+local EBJumpDivider = tab:CreateDivider({ text = "Easy Bounce" })
 
 tab:CreateToggle({
     name = "Enabled",
@@ -1464,7 +1464,7 @@ tab:CreateToggle({
        else
         EBJumpDivider:Set("Easy Bounce Disabled")
          task.wait(3)
-         EBDivider:Set("Easy Bounce")
+         EBJumpDivider:Set("Easy Bounce")
       end
     end,
 })
