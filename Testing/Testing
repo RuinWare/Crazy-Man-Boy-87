@@ -9,13 +9,13 @@ local window = Rayfield:CreateWindow({
 local tab = window:CreateTab({ name = "Test", icon = 0 })
 
 local TEST = tab:CreateToggle({
-    name = "Test Disabled",
+    name = OHIO,
     value = false,
     callback = function(v)
      if v then
-     TEST:name("Test Enabled")
+     OHIO = "Test Enabled"
     else
-     TEST:name("Test Disabled")
+     OHIO = "Test Disabled"
         end
     end,
 })
