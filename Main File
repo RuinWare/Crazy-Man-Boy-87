@@ -990,21 +990,25 @@ RunService.PreSimulation:Connect(function()
     tryJump(hum, root)
 end)
 
+tab:CreateDivider({ line = false, spacing = 25 })
+
 local AutoJumpDivider = tab:CreateDivider({ text = "Auto Jump" })
 
 tab:CreateToggle({
-    name = "Auto Jump",
+    name = "Enabled",
     icon = 109475752270721,
-    currentValue = false,
+    value = false,
     flag = "AutoJump_Toggle",
     callback = function(value)
         autoJumpEnabled = value
        if value then
-        AutoJumpDivider:Set("V Enabled")
-       else
-        AutoJumpDivider:Set("V Disabled")
+        AutoJumpDivider:Set("Auto Jump Enabled")
          task.wait(3)
-         AutoJumpDivider:Set("V Jump")
+         AutoJumpDivider:Set("Auto Jump")
+       else
+        AutoJumpDivider:Set("Auto Jump Disabled")
+         task.wait(3)
+         AutoJumpDivider:Set("Auto Jump")
       end
     end,
 })
@@ -1148,14 +1152,25 @@ do
         end
     end)
 
-    tab:CreateDivider()
+local LegitJumpDivider = tab:CreateDivider({ text = "Legit Jump" })
 
     tab:CreateToggle({
-        name = "Legit Jump",
+        name = "Enabled",
         icon = 109475752270721,
         currentValue = false,
         flag = "DelayJump_Toggle",
-        callback = function(v) djEnabled = v end,
+        callback = function(v) 
+         djEnabled = v 
+       if value then
+        LegitJumpDivider:Set("Legit Jump Enabled")
+         task.wait(3)
+         LegitJumpDivider:Set("Legit Jump")
+       else
+        LegitJumpDivider:Set("Legit Jump Disabled")
+         task.wait(3)
+         LegitJumpDivider:Set("Legit Jump")
+              end
+          end,
     })
 	
 _G.RWCallbacks["LegitJump"] = function(v) djEnabled = v end
@@ -1305,14 +1320,17 @@ do
         b.MouseLeave:Connect(function() hjHeld = false end)
     end)
 
-    tab:CreateDivider()
+local HoldJumpDivider = tab:CreateDivider({ text = "Hold Jump" })
 
     tab:CreateToggle({
         name = "Hold Jump",
         icon = 97668677854395,
         currentValue = false,
         flag = "HoldJump_Toggle",
-        callback = function(v) hjEnabled = v end,
+        callback = function(v)
+            hjEnabled = v
+
+       end,
     })
 
 _G.RWCallbacks["HoldJump"] = function(v) hjEnabled = v end
