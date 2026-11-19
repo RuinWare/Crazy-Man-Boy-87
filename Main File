@@ -81,18 +81,18 @@ local THEMEE = {
         Color3.fromRGB(22, 21, 26),
         Color3.fromRGB(22, 21, 26)
     ),
-    ElementStroke = Color3.fromRGB(60, 60, 60),
+    ElementStroke = Color3.fromRGB(30, 30, 30),
     ElementStrokeGradient = ColorSequence.new(
-        Color3.fromRGB(60, 60, 60),
-        Color3.fromRGB(60, 60, 60)
+        Color3.fromRGB(30, 30, 30),
+        Color3.fromRGB(30, 30, 30)
     ),
     ElementTransparency = 0,
-    ElementStrokeTransparency = 0,
+    ElementStrokeTransparency = 0.15,
     ElementStrokeHover = Color3.fromRGB(90, 90, 90),
     ElementStrokeHoverTransparency = 0,
     StatBackground = Color3.fromRGB(22, 21, 26),
 
-    AccentColor = Color3.fromRGB(40, 55, 90),
+    AccentColor = Color3.fromRGB(19, 18, 24),
     AccentStroke = Color3.fromRGB(40, 55, 90),
     AccentGlow = 0.7,
 
@@ -107,7 +107,7 @@ local THEMEE = {
 
     ToggleTrack = Color3.fromRGB(245, 245, 245),
     ToggleTrackTransparency = 0,
-    ToggleKnobOff = Color3.fromRGB(160, 160, 160),
+    ToggleKnobOff = Color3.fromRGB(50, 50, 50),
     ToggleKnobOffTransparency = 0,
     DarkToggleOverlay = false,
 
