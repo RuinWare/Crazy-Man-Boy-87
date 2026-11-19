@@ -59,33 +59,71 @@ local THEMEE = {
         Color3.fromRGB(14, 14, 16),
         Color3.fromRGB(17, 17, 19)
     ),
+    ShadowColor = Color3.fromRGB(0, 0, 0),
+    SurfaceStroke = Color3.fromRGB(60, 60, 60),
 
+    ContentColor = Color3.fromRGB(230, 230, 230),
+    TitlingColor = Color3.fromRGB(240, 240, 240),
+    ElementTextHoverColor = Color3.fromRGB(255, 255, 255),
+    ActionColor = Color3.fromRGB(255, 255, 255),
+
+    TabColor = Color3.fromRGB(220, 220, 220),
     TabBackground = ColorSequence.new(
-        Color3.fromRGB(15, 25, 50),
-        Color3.fromRGB(25, 40, 80)
+        Color3.fromRGB(18, 20, 35),
+        Color3.fromRGB(24, 28, 50)
     ),
-
-    TabColor = Color3.fromRGB(220, 230, 255),
-
     TabStroke = ColorSequence.new(
-        Color3.fromRGB(60, 90, 150),
-        Color3.fromRGB(30, 50, 100)
+        Color3.fromRGB(60, 60, 60),
+        Color3.fromRGB(60, 60, 60)
     ),
 
     ElementGradient = ColorSequence.new(
         Color3.fromRGB(22, 21, 26),
         Color3.fromRGB(22, 21, 26)
     ),
-    ElementStroke = Color3.fromRGB(23, 22, 27),
-    SliderBackgroundHover = Color3.fromRGB(245, 245, 245),
-    SliderBackground = Color3.fromRGB(20, 20, 23),
+    ElementStroke = Color3.fromRGB(60, 60, 60),
+    ElementStrokeGradient = ColorSequence.new(
+        Color3.fromRGB(60, 60, 60),
+        Color3.fromRGB(60, 60, 60)
+    ),
+    ElementTransparency = 0,
+    ElementStrokeTransparency = 0,
+    ElementStrokeHover = Color3.fromRGB(90, 90, 90),
+    ElementStrokeHoverTransparency = 0,
+    StatBackground = Color3.fromRGB(22, 21, 26),
 
+    AccentColor = Color3.fromRGB(40, 55, 90),
+    AccentStroke = Color3.fromRGB(40, 55, 90),
+    AccentGlow = 0.7,
+
+    SliderBackground = Color3.fromRGB(245, 245, 245),
+    SliderBackgroundHover = Color3.fromRGB(235, 235, 235),
     SliderProgress = ColorSequence.new(
-        Color3.fromRGB(200, 200, 200),
-        Color3.fromRGB(245, 245, 245)
-),
+        Color3.fromRGB(40, 55, 90),
+        Color3.fromRGB(50, 70, 120)
+    ),
+    SliderStroke = Color3.fromRGB(60, 60, 60),
+    SliderHandle = Color3.fromRGB(200, 200, 200),
 
     ToggleTrack = Color3.fromRGB(245, 245, 245),
+    ToggleTrackTransparency = 0,
+    ToggleKnobOff = Color3.fromRGB(160, 160, 160),
+    ToggleKnobOffTransparency = 0,
+    DarkToggleOverlay = false,
+
+    DropdownHighlight = Color3.fromRGB(40, 55, 90),
+
+    FieldBackground = Color3.fromRGB(22, 21, 26),
+    FieldTransparency = 0,
+    FieldGlow = Color3.fromRGB(40, 55, 90),
+    PlaceholderColor = Color3.fromRGB(130, 130, 130),
+
+    NeutralButton = Color3.fromRGB(18, 20, 35),
+    NeutralButtonHover = Color3.fromRGB(28, 32, 50),
+    NeutralButtonStroke = Color3.fromRGB(60, 60, 60),
+
+    ErrorColor = Color3.fromRGB(180, 60, 60),
+    ErrorStrokeColor = Color3.fromRGB(120, 40, 40),
 }
 
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
