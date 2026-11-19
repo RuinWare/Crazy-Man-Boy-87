@@ -76,8 +76,15 @@ local THEMEE = {
         Color3.fromRGB(22, 21, 26),
         Color3.fromRGB(22, 21, 26)
     ),
+    ElementStroke = Color3.fromRGB(23, 22, 27),
+    SliderBackgroundHover = Color3.fromRGB(245, 245, 245),
+    SliderBackground = Color3.fromRGB(20, 20, 23),
 
-    SliderBackground = Color3.fromRGB(245, 245, 245),
+    SliderProgress = ColorSequence.new(
+        Color3.fromRGB(200, 200, 200),
+        Color3.fromRGB(245, 245, 245)
+),
+
     ToggleTrack = Color3.fromRGB(245, 245, 245),
 }
 
