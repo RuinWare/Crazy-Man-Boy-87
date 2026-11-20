@@ -52,36 +52,6 @@ local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
 }
 
-local THEMEE = {
-    WindowColor = ColorSequence.new(
-        Color3.fromRGB(14, 14, 16),
-        Color3.fromRGB(17, 17, 19)
-    ),
-    ShadowColor = Color3.fromRGB(1, 1, 2),
-    TabColor = Color3.fromRGB(254, 254, 255),
-    TabBackground = ColorSequence.new(
-        Color3.fromRGB(18, 20, 35),
-        Color3.fromRGB(34, 30, 44)
-    ),
-    ElementStrokeTransparency = 0.50,
-    ElementStroke = Color3.fromRGB(30, 30, 30),
-    ElementTransparency = 0.15,
-    ElementStrokeHoverTransparency = 0,
-    AccentColor = Color3.fromRGB(19, 18, 24),
-    SliderBackground = Color3.fromRGB(245, 245, 245),
-    SliderBackgroundHover = Color3.fromRGB(235, 235, 235),
-    SliderProgress = ColorSequence.new(
-        Color3.fromRGB(40, 55, 90),
-        Color3.fromRGB(50, 70, 120)
-    ),
-    ToggleKnobOff = Color3.fromRGB(50, 50, 50),
-    ElementGradient = (
-        Color3.fromRGB(22, 21, 26),
-        Color3.fromRGB(23, 22, 27)
-
-	),
-}
-
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
 
 _G.RWCallbacks = _G.RWCallbacks or {}
@@ -864,7 +834,7 @@ local window = Rayfield:CreateWindow({
     icon = 98691154054966,
     subtitle = "Evade",
     sidebarLayout = true,
-    theme = THEMEE,
+    theme = "default",
     showIcon = 98691154054966,
     showName = "RuinWare",
 
