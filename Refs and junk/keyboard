@@ -5,20 +5,21 @@
 -- ============================================================
 -- SETTINGS
 -- ============================================================
-local PRESSED_COLOR = getgenv().KBO_OP_COLOR       -- the color a key turns while it is pressed
-local PRESSED_TEXT_COLOR = Color3.fromRGB(255, 255, 255) -- the color of the letter while it is pressed
-local KEY_COLOR = Color3.fromRGB(45, 45, 48)            -- a key when it is not pressed
-local KEY_TEXT_COLOR = Color3.fromRGB(255, 255, 255)    -- the letter on a key when it is not pressed
+-- Colors are plain numbers: { red, green, blue }, each from 0 to 255
+local PRESSED_COLOR = { KBOPC }               -- the color a key turns while it is pressed
+local PRESSED_TEXT_COLOR = { 255, 255, 255 }         -- the color of the letter while it is pressed
+local KEY_COLOR = { KBOKC }                     -- a key when it is not pressed
+local KEY_TEXT_COLOR = { 254, 254, 254 }             -- the letter on a key when it is not pressed
 local KEY_TRANSPARENCY = 0                              -- 0 = solid keys, 1 = invisible keys
 
-local BACKGROUND_COLOR = getgenv().KBO_BG_COLOR     -- the gray box behind the keys
-local BACKGROUND_TRANSPARENCY = getgenv().KBO_BG_TRANS                    -- 0 = solid, 1 = invisible
+local BACKGROUND_COLOR = { KBOBGC }              -- the gray box behind the keys
+local BACKGROUND_TRANSPARENCY = KBOT                    -- 0 = solid, 1 = invisible
 
 local KEY_SIZE = 44                                     -- size of a normal key, in pixels
 local KEY_GAP = 4                                       -- space between keys, in pixels
 local PADDING = 10                                      -- space between the keys and the edge of the gray box
 local TEXT_SIZE = 14
-local TILT = 0                                          -- tilts the whole keyboard (degrees), 0 = flat
+local TILT = KBOTT                                         -- leans every key (degrees): 0 = |=|, 10 = /=/, -10 = \=\   (the letters stay straight)
 local PRESS_FADE = 0.05                                 -- how fast a key changes color (seconds)
 
 local SPAWN = Vector2.new(0.15, 0.78)                   -- where it first appears (0-1 of the screen)
@@ -90,6 +91,19 @@ local function isPress(input)
 	return input.UserInputType == Enum.UserInputType.MouseButton1
 		or input.UserInputType == Enum.UserInputType.Touch
 end
+
+local function rgb(color)
+	return Color3.fromRGB(
+		math.clamp(color[1] or 0, 0, 255),
+		math.clamp(color[2] or 0, 0, 255),
+		math.clamp(color[3] or 0, 0, 255)
+	)
+end
+local pressedColor = rgb(PRESSED_COLOR)
+local pressedTextColor = rgb(PRESSED_TEXT_COLOR)
+local keyColor = rgb(KEY_COLOR)
+local keyTextColor = rgb(KEY_TEXT_COLOR)
+local backgroundColor = rgb(BACKGROUND_COLOR)
 
 local function p2(input)
 	return Vector2.new(input.Position.X, input.Position.Y)
@@ -194,13 +208,16 @@ for index, row in ipairs(ROWS) do
 	widest = math.max(widest, total)
 end
 
-local boardWidth = widest * PITCH - KEY_GAP + PADDING * 2
-local boardHeight = #ROWS * PITCH - KEY_GAP + PADDING * 2
+-- Leaning keys: each key is a parallelogram. At the top it is shifted right (or left) by `shear`
+-- compared to the bottom, so the board needs that much extra room at the sides.
+local tiltRadians = math.rad(math.clamp(TILT, -45, 45))
+local shear = KEY_SIZE * math.abs(math.tan(tiltRadians))
+local sideInset = PADDING + shear / 2
 
--- the space the (possibly tilted) board takes up on the screen
-local tiltRadians = math.rad(TILT)
-local halfWidth = (math.abs(boardWidth * math.cos(tiltRadians)) + math.abs(boardHeight * math.sin(tiltRadians))) / 2
-local halfHeight = (math.abs(boardWidth * math.sin(tiltRadians)) + math.abs(boardHeight * math.cos(tiltRadians))) / 2
+local boardWidth = widest * PITCH - KEY_GAP + sideInset * 2
+local boardHeight = #ROWS * PITCH - KEY_GAP + PADDING * 2
+local halfWidth = boardWidth / 2
+local halfHeight = boardHeight / 2
 
 ----------------------------------------------------------------
 -- Build the overlay
@@ -251,40 +268,53 @@ local board = make("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromOffset(math.floor(center.X), math.floor(center.Y)),
 	Size = UDim2.fromOffset(boardWidth, boardHeight),
-	Rotation = TILT,
-	BackgroundColor3 = BACKGROUND_COLOR,
+	BackgroundColor3 = backgroundColor,
 	BackgroundTransparency = BACKGROUND_TRANSPARENCY,
 	BorderSizePixel = 0,
 	ZIndex = 1,
 }, screenGui)
 make("UICorner", { CornerRadius = UDim.new(0, 10) }, board)
 
--- the keys: every row starts at the left, so the wider keys (Tab, Caps, Shift) push the letters over
--- a little more on each row, just like on a real keyboard
+-- The keys: every row starts at the left, so the wider keys (Tab, Caps, Shift) push the letters over
+-- a little more on each row, just like on a real keyboard.
+-- A leaning key is made from a tall, rotated bar that is cut off at the top and bottom by a box the
+-- height of the key (that leaves a parallelogram). The letter sits on top and is never rotated.
 local keyEntries = {}
 for rowIndex, row in ipairs(ROWS) do
 	local x = 0
 	for _, key in ipairs(row) do
-		local frame = make("Frame", {
+		local keyWidth = key.width * PITCH - KEY_GAP
+
+		local clip = make("Frame", {
 			Name = key.label,
-			Position = UDim2.fromOffset(PADDING + x * PITCH, PADDING + (rowIndex - 1) * PITCH),
-			Size = UDim2.fromOffset(key.width * PITCH - KEY_GAP, KEY_SIZE),
-			BackgroundColor3 = KEY_COLOR,
+			Position = UDim2.fromOffset(sideInset + x * PITCH - shear / 2, PADDING + (rowIndex - 1) * PITCH),
+			Size = UDim2.fromOffset(keyWidth + shear, KEY_SIZE),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			ZIndex = 2,
+		}, board)
+		local fill = make("Frame", {
+			Name = "Fill",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(keyWidth * math.cos(tiltRadians), KEY_SIZE * 2 + keyWidth),
+			Rotation = TILT,
+			BackgroundColor3 = keyColor,
 			BackgroundTransparency = KEY_TRANSPARENCY,
 			BorderSizePixel = 0,
 			ZIndex = 2,
-		}, board)
-		make("UICorner", { CornerRadius = UDim.new(0, 6) }, frame)
+		}, clip)
 		local label = make("TextLabel", {
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
 			Text = key.label,
-			TextColor3 = KEY_TEXT_COLOR,
+			TextColor3 = keyTextColor,
 			TextSize = TEXT_SIZE,
 			Font = Enum.Font.GothamMedium,
 			ZIndex = 3,
-		}, frame)
-		keyEntries[#keyEntries + 1] = { frame = frame, label = label, codes = key.codes, pressed = false }
+		}, clip)
+		keyEntries[#keyEntries + 1] = { fill = fill, label = label, codes = key.codes, pressed = false }
 		x += key.width
 	end
 end
@@ -317,8 +347,8 @@ local function refreshKey(entry)
 	entry.pressed = pressed
 
 	local info = TweenInfo.new(PRESS_FADE, Enum.EasingStyle.Linear)
-	TweenService:Create(entry.frame, info, { BackgroundColor3 = pressed and PRESSED_COLOR or KEY_COLOR }):Play()
-	TweenService:Create(entry.label, info, { TextColor3 = pressed and PRESSED_TEXT_COLOR or KEY_TEXT_COLOR }):Play()
+	TweenService:Create(entry.fill, info, { BackgroundColor3 = pressed and pressedColor or keyColor }):Play()
+	TweenService:Create(entry.label, info, { TextColor3 = pressed and pressedTextColor or keyTextColor }):Play()
 end
 
 local function refreshAll()
