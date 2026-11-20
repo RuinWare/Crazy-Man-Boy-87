@@ -6,20 +6,20 @@
 -- SETTINGS
 -- ============================================================
 -- Colors are plain numbers: { red, green, blue }, each from 0 to 255
-local PRESSED_COLOR = { 0, 170, 255 }               -- the color a key turns while it is pressed
+local PRESSED_COLOR = { KBOPC }               -- the color a key turns while it is pressed
 local PRESSED_TEXT_COLOR = { 255, 255, 255 }         -- the color of the letter while it is pressed
-local KEY_COLOR = { 45, 45, 48 }                     -- a key when it is not pressed
-local KEY_TEXT_COLOR = { 235, 235, 235 }             -- the letter on a key when it is not pressed
+local KEY_COLOR = { KBOKC }                     -- a key when it is not pressed
+local KEY_TEXT_COLOR = { 254, 254, 254 }             -- the letter on a key when it is not pressed
 local KEY_TRANSPARENCY = 0                              -- 0 = solid keys, 1 = invisible keys
 
-local BACKGROUND_COLOR = { 70, 70, 74 }              -- the gray box behind the keys
-local BACKGROUND_TRANSPARENCY = 0.35                    -- 0 = solid, 1 = invisible
+local BACKGROUND_COLOR = { KBOBGC }              -- the gray box behind the keys
+local BACKGROUND_TRANSPARENCY = KBOT                    -- 0 = solid, 1 = invisible
 
 local KEY_SIZE = 44                                     -- size of a normal key, in pixels
 local KEY_GAP = 4                                       -- space between keys, in pixels
 local PADDING = 10                                      -- space between the keys and the edge of the gray box
 local TEXT_SIZE = 14
-local TILT = 10                                         -- leans every key (degrees): 0 = |=|, 10 = /=/, -10 = \=\   (the letters stay straight)
+local TILT = KBOTT                                         -- leans every key (degrees): 0 = |=|, 10 = /=/, -10 = \=\   (the letters stay straight)
 local PRESS_FADE = 0.05                                 -- how fast a key changes color (seconds)
 
 local SPAWN = Vector2.new(0.15, 0.78)                   -- where it first appears (0-1 of the screen)
