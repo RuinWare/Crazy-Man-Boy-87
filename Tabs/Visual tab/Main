@@ -1307,103 +1307,121 @@ KB OVERLAY
 ===========================
 ]]--
 
-getgenv().KBON = false
-getgenv().KBOTT = 0
-getgenv().KBOT = 0
-getgenv().KBOBGC = "50, 50, 50"
-getgenv().KBOPC = "255, 0, 0"
-getgenv().KBOKC = "70, 70, 70",
+-- Keyboard Overlay
+local function setGlobal(name, value)
+    getgenv()[name] = value
+    _G[name] = value
+end
+
+local function parseRGB(v)
+    if type(v) == "table" then return v end
+    if typeof and typeof(v) == "Color3" then return { v.R * 255, v.G * 255, v.B * 255 } end
+    if type(v) == "number" then return { v, v, v } end
+    local r, g, b = tostring(v):match("^%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*$")
+    if r then return { tonumber(r), tonumber(g), tonumber(b) } end
+    return { 0, 0, 0 }
+end
+
+setGlobal("KBON",   false)
+setGlobal("KBOTT",  0)
+setGlobal("KBOT",   0)
+setGlobal("KBOBGC", { 50, 50, 50 })
+setGlobal("KBOPC",  { 255, 0, 0 })
+setGlobal("KBOKC",  { 70, 70, 70 })
+
+local reloadQueued = false
+local function reloadOverlay()
+    if not getgenv().KBON then return end
+    if reloadQueued then return end
+    reloadQueued = true
+    task.delay(0.1, function()
+        reloadQueued = false
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Keyboarddelete"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+    end)
+end
+
+local KBODivider = VisTab:CreateDivider({ text = "Keyboard Overlay" })
 
 VisTab:CreateToggle({
     name = "Keyboard Overlay",
     flag = "KBOVERLAYYY",
     value = false,
     callback = function(v)
+        setGlobal("KBON", v)
         if v then
             loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-            KBON = true
         else
             loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Keyboarddelete"))()
-            KBON = false
         end
+       if v then
+        KBODivider:Set("Keyboard Overlay Enabled")
+         task.wait(3)
+         KBODivider:Set("Keyboard Overlay")
+       else
+        KBODivider:Set("Keyboard Overlay Disabled")
+         task.wait(3)
+         KBODivider:Set("Keyboard Overlay")
+      end
     end,
 })
 
 VisTab:CreateSlider({
     name = "Backround Transparency",
+    flag = "KBO_TR_SLIDER",
     range = { 0, 1 },
     increment = 0.01,
     value = 0,
     suffix = "",
     callback = function(v)
-        KBOT = v
-        task.wait(0.01)
-   if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-   else
--- off
-end
+        setGlobal("KBOT", v)
+        reloadOverlay()
     end,
 })
 
 VisTab:CreateToggle({
     name = "Tilt Keyboard",
+    flag = "KBOTT_TILT",
     value = false,
     callback = function(v)
-        if v then
-        KBOTT = 10
-        task.wait(0.01)
-        if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-         else
-      -- nothing
-       end
-        else
-        KBOTT = 0
-        end
+        setGlobal("KBOTT", v and 10 or 0)
+        reloadOverlay()
     end,
 })
 
+local function colorCallback(key)
+    return function(...)
+        local args = table.pack(...)
+        local value
+        if args.n >= 3 then
+            value = { args[1], args[2], args[3] }
+        else
+            value = parseRGB(args[1])
+        end
+        setGlobal(key, value)
+        reloadOverlay()
+    end
+end
+
 VisTab:CreateColorPicker({
     name = "Backround Color",
+    flag = "KBO_BG_PICK",
     color = Color3.fromRGB(50, 50, 50),
-    callback = function(color)
-        KBOBGC = color
-        task.wait(0.01)
-        if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-        else
-       -- nothing
-         end
-    end,
+    callback = colorCallback("KBOBGC"),
 })
 
 VisTab:CreateColorPicker({
     name = "Pressed Key Color",
+    flag = "KBO_OP_PICK",
     color = Color3.fromRGB(255, 0, 0),
-    callback = function(color)
-        KBOPC = color
-        task.wait(0.01)
-        if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-        else
-     -- hi
-        end
-    end,
+    callback = colorCallback("KBOPC"),
 })
 
 VisTab:CreateColorPicker({
     name = "Key Color",
+    flag = "KBO_K_PICK",
     color = Color3.fromRGB(70, 70, 70),
-    callback = function(color)
-        KBOKC = color
-        task.wait(0.01)
-        if KBON == true then
-         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
-        else
-        -- hi
-         end
-    end,
+    callback = colorCallback("KBOKC"),
 })
 
 --[[
