@@ -1308,6 +1308,7 @@ KB OVERLAY
 ]]--
 
 local KBON = false
+getgenv().KBOTT = 0
 
 VisTab:CreateToggle({
     name = "Keyboard Overlay",
