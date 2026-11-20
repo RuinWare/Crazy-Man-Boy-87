@@ -1348,12 +1348,16 @@ VisTab:CreateToggle({
         if v then
         KBOTT = 10
         task.wait(0.01)
+        if KBON == true then
+         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+         else
+      -- nothing
+       end
         else
         KBOTT = 0
+        end
     end,
 })
-
-sprint:Set(false)
 
 VisTab:CreateColorPicker({
     name = "Backround Color",
@@ -1361,7 +1365,11 @@ VisTab:CreateColorPicker({
     callback = function(color)
         KBOBGC = color
         task.wait(0.01)
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+        if KBON == true then
+         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+        else
+       -- nothing
+         end
     end,
 })
 
@@ -1371,7 +1379,11 @@ VisTab:CreateColorPicker({
     callback = function(color)
         KBOPC = color
         task.wait(0.01)
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+        if KBON == true then
+         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+        else
+     -- hi
+        end
     end,
 })
 
@@ -1381,7 +1393,11 @@ VisTab:CreateColorPicker({
     callback = function(color)
         KBOKC = color
         task.wait(0.01)
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+        if KBON == true then
+         loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+        else
+        -- hi
+         end
     end,
 })
 
