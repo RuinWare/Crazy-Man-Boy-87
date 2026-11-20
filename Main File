@@ -75,11 +75,11 @@ local THEMEE = {
         Color3.fromRGB(50, 70, 120)
     ),
     ToggleKnobOff = Color3.fromRGB(50, 50, 50),
-    ElementGradient = {
+    ElementGradient = (
         Color3.fromRGB(22, 21, 26),
         Color3.fromRGB(23, 22, 27)
 
-	}
+	),
 }
 
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
