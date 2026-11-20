@@ -6,13 +6,13 @@
 -- SETTINGS
 -- ============================================================
 -- Colors are plain numbers: { red, green, blue }, each from 0 to 255
-local PRESSED_COLOR = { KBOPC }               -- the color a key turns while it is pressed
+local PRESSED_COLOR = KBOPC               -- the color a key turns while it is pressed
 local PRESSED_TEXT_COLOR = { 255, 255, 255 }         -- the color of the letter while it is pressed
-local KEY_COLOR = { KBOKC }                     -- a key when it is not pressed
+local KEY_COLOR = KBOKC                     -- a key when it is not pressed
 local KEY_TEXT_COLOR = { 254, 254, 254 }             -- the letter on a key when it is not pressed
 local KEY_TRANSPARENCY = 0                              -- 0 = solid keys, 1 = invisible keys
 
-local BACKGROUND_COLOR = { KBOBGC }              -- the gray box behind the keys
+local BACKGROUND_COLOR = KBOBGC              -- the gray box behind the keys
 local BACKGROUND_TRANSPARENCY = KBOT                    -- 0 = solid, 1 = invisible
 
 local KEY_SIZE = 44                                     -- size of a normal key, in pixels
