@@ -1,0 +1,308 @@
+-- ============================================================
+-- Custom UI Library (Evaware Style)
+-- ============================================================
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+
+local Library = {}
+Library.Theme = {
+    Background = Color3.fromRGB(15, 15, 20),
+    Sidebar = Color3.fromRGB(20, 20, 25),
+    Element = Color3.fromRGB(30, 30, 35),
+    ElementHover = Color3.fromRGB(40, 40, 45),
+    Accent = Color3.fromRGB(130, 80, 255),
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDim = Color3.fromRGB(150, 150, 150),
+    Stroke = Color3.fromRGB(45, 45, 55)
+}
+local TweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+local function Create(instance, properties, children)
+    local obj = Instance.new(instance)
+    for k, v in pairs(properties or {}) do obj[k] = v end
+    for _, v in pairs(children or {}) do v.Parent = obj end
+    return obj
+end
+
+-- ============================================================
+-- WINDOW CREATION
+-- ============================================================
+function Library:CreateWindow(config)
+    local Window = { Tabs = {}, CurrentTab = nil }
+    local ScreenGui = Create("ScreenGui", { Name = "CustomUI", ResetOnSpawn = false, Parent = CoreGui })
+    
+    local Main = Create("Frame", {
+        Name = "Main", Parent = ScreenGui, Size = UDim2.new(0, 700, 0, 500),
+        Position = UDim2.new(0.5, -350, 0.5, -250), BackgroundColor3 = self.Theme.Background,
+        BorderSizePixel = 0, ClipsDescendants = true
+    }, { Create("UICorner", { CornerRadius = UDim.new(0, 8) }), Create("UIStroke", { Color = self.Theme.Stroke, Thickness = 1 }) })
+
+    -- Top Bar (Draggable)
+    local TopBar = Create("Frame", { Parent = Main, Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1 })
+    Create("TextLabel", { Parent = TopBar, Text = " " .. config.name, Size = UDim2.new(0.5, 0, 1, 0), BackgroundTransparency = 1, TextColor3 = self.Theme.Text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(0, 15, 0, 0) })
+    Create("TextLabel", { Parent = TopBar, Text = config.subtitle, Size = UDim2.new(0.5, 0, 1, 0), BackgroundTransparency = 1, TextColor3 = self.Theme.TextDim, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(0, 15, 0, 15) })
+    
+    -- Close Button
+    local CloseBtn = Create("TextButton", { Parent = TopBar, Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -35, 0, 5), BackgroundTransparency = 1, Text = "X", TextColor3 = self.Theme.TextDim, Font = Enum.Font.GothamBold, TextSize = 12 })
+    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+    -- Dragging Logic
+    local dragging, dragInput, dragStart, startPos
+    TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = Main.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    TopBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    -- Sidebar
+    local Sidebar = Create("Frame", { Parent = Main, Size = UDim2.new(0, 180, 1, -40), Position = UDim2.new(0, 0, 0, 40), BackgroundColor3 = self.Theme.Sidebar, BorderSizePixel = 0 })
+    Create("UIListLayout", { Parent = Sidebar, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
+    Create("UIPadding", { Parent = Sidebar, PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) })
+    
+    -- Profile Section
+    local Profile = Create("Frame", { Parent = Sidebar, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 1, -50), BackgroundTransparency = 1 })
+    Create("ImageLabel", { Parent = Profile, Size = UDim2.new(0, 30, 0, 30), BackgroundColor3 = self.Theme.Element, Image = "rbxassetid://" .. (config.icon or 0) }, { Create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+    Create("TextLabel", { Parent = Profile, Text = Players.LocalPlayer.Name, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.new(0, 40, 0, 0), BackgroundTransparency = 1, TextColor3 = self.Theme.Text, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left })
+
+    -- Content Container
+    local Content = Create("Frame", { Parent = Main, Size = UDim2.new(1, -180, 1, -40), Position = UDim2.new(0, 180, 0, 40), BackgroundTransparency = 1 })
+    Create("UIPadding", { Parent = Content, PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 15), PaddingRight = UDim.new(0, 15) })
+
+    -- Closing Pill (Minimize)
+    local Pill = Create("TextButton", { Parent = ScreenGui, Size = UDim2.new(0, 100, 0, 30), Position = UDim2.new(0.5, -50, 0, 10), BackgroundColor3 = self.Theme.Sidebar, Text = "Evaware Alpha", TextColor3 = self.Theme.Text, Font = Enum.Font.GothamBold, TextSize = 12, Visible = false }, { Create("UICorner", { CornerRadius = UDim.new(1, 0) }), Create("UIStroke", { Color = self.Theme.Stroke }) })
+    Pill.MouseButton1Click:Connect(function() Main.Visible = true; Pill.Visible = false end)
+    
+    -- Hook close button to show pill
+    local origClose = CloseBtn.MouseButton1Click
+    CloseBtn.MouseButton1Click:Connect(function()
+        Main.Visible = false; Pill.Visible = true
+    end)
+
+    -- ============================================================
+    -- TAB CREATION
+    -- ============================================================
+    function Window:CreateTab(name, icon)
+        local TabBtn = Create("TextButton", { Parent = Sidebar, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = self.Theme.Element, Text = " " .. name, TextColor3 = self.Theme.TextDim, Font = Enum.Font.Gotham, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left }, { Create("UICorner", { CornerRadius = UDim.new(0, 4) }), Create("UIPadding", { PaddingLeft = UDim.new(0, 10) }) })
+        
+        local TabFrame = Create("Frame", { Parent = Content, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false })
+        local LeftCol = Create("ScrollingFrame", { Parent = TabFrame, Size = UDim2.new(0.48, 0, 1, 0), BackgroundTransparency = 1, ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y }, { Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }) })
+        local RightCol = Create("ScrollingFrame", { Parent = TabFrame, Size = UDim2.new(0.48, 0, 1, 0), Position = UDim2.new(0.52, 0, 0, 0), BackgroundTransparency = 1, ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y }, { Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }) })
+
+        local Tab = {}
+        TabBtn.MouseButton1Click:Connect(function()
+            for _, v in pairs(Window.Tabs) do
+                v.TabBtn.BackgroundColor3 = self.Theme.Element
+                v.TabBtn.TextColor3 = self.Theme.TextDim
+                v.TabFrame.Visible = false
+            end
+            TabBtn.BackgroundColor3 = self.Theme.Accent
+            TabBtn.TextColor3 = self.Theme.Text
+            TabFrame.Visible = true
+        end)
+
+        table.insert(Window.Tabs, { TabBtn = TabBtn, TabFrame = TabFrame })
+        if #Window.Tabs == 1 then TabBtn:GetPropertyChangedSignal("BackgroundColor3"):Wait(); TabBtn.MouseButton1Click:Fire() end -- Auto select first
+
+        function Tab:CreateLeft() return LeftCol end
+        function Tab:CreateRight() return RightCol end
+        return Tab
+    end
+
+    return Window
+end
+
+-- ============================================================
+-- ELEMENTS (Base creation functions)
+-- ============================================================
+local function CreateBase(parent, height, text)
+    local Frame = Create("Frame", { Parent = parent, Size = UDim2.new(1, 0, 0, height), BackgroundColor3 = Library.Theme.Element }, { Create("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+    Create("TextLabel", { Parent = Frame, Text = " " .. text, Size = UDim2.new(0.6, 0, 1, 0), BackgroundTransparency = 1, TextColor3 = Library.Theme.Text, Font = Enum.Font.Gotham, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(0, 10, 0, 0) })
+    return Frame
+end
+
+-- Section
+function Library:CreateSection(parent, name)
+    Create("TextLabel", { Parent = parent, Text = name, Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, TextColor3 = Library.Theme.TextDim, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left })
+end
+
+-- Divider
+function Library:CreateDivider(parent)
+    Create("Frame", { Parent = parent, Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = Library.Theme.Stroke, BorderSizePixel = 0 })
+end
+
+-- Toggle
+function Library:CreateToggle(parent, config)
+    local Frame = CreateBase(parent, 35, config.name)
+    local ToggleBg = Create("Frame", { Parent = Frame, Size = UDim2.new(0, 30, 0, 16), Position = UDim2.new(1, -40, 0.5, -8), BackgroundColor3 = Library.Theme.Background }, { Create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+    local Knob = Create("Frame", { Parent = ToggleBg, Size = UDim2.new(0, 12, 0, 12), Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Library.Theme.Text }, { Create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+    local Btn = Create("TextButton", { Parent = Frame, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "" })
+    
+    local state = config.value or false
+    local function update()
+        TweenService:Create(ToggleBg, TweenInfo, { BackgroundColor3 = state and Library.Theme.Accent or Library.Theme.Background }):Play()
+        TweenService:Create(Knob, TweenInfo, { Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6) }):Play()
+        if config.callback then config.callback(state) end
+    end
+    Btn.MouseButton1Click:Connect(function() state = not state; update() end)
+    update()
+end
+
+-- Button
+function Library:CreateButton(parent, config)
+    local Frame = CreateBase(parent, 35, config.name)
+    local Btn = Create("TextButton", { Parent = Frame, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "" })
+    Btn.MouseEnter:Connect(function() TweenService:Create(Frame, TweenInfo, { BackgroundColor3 = Library.Theme.ElementHover }):Play() end)
+    Btn.MouseLeave:Connect(function() TweenService:Create(Frame, TweenInfo, { BackgroundColor3 = Library.Theme.Element }):Play() end)
+    Btn.MouseButton1Click:Connect(function() if config.callback then config.callback() end end)
+end
+
+-- Slider
+function Library:CreateSlider(parent, config)
+    local Frame = CreateBase(parent, 45, config.name)
+    local Bar = Create("Frame", { Parent = Frame, Size = UDim2.new(0.8, 0, 0, 4), Position = UDim2.new(0.1, 0, 1, -15), BackgroundColor3 = Library.Theme.Background }, { Create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+    local Fill = Create("Frame", { Parent = Bar, Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent }, { Create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+    local Knob = Create("Frame", { Parent = Fill, Size = UDim2.new(0, 10, 0, 10), Position = UDim2.new(1, -5, 0.5, -5), BackgroundColor3 = Library.Theme.Text }, { Create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+    
+    local dragging = false
+    local min, max = config.range[1], config.range[2]
+    local value = config.value or min
+    
+    local function set(val)
+        val = math.clamp(val, min, max)
+        value = val
+        Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
+        if config.callback then config.callback(math.floor(val)) end
+    end
+    
+    Bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+    end)
+    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local relX = math.clamp((input.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
+            set(min + (max - min) * relX)
+        end
+    end)
+    set(value)
+end
+
+-- Input
+function Library:CreateInput(parent, config)
+    local Frame = CreateBase(parent, 35, config.name)
+    local Box = Create("TextBox", { Parent = Frame, Size = UDim2.new(0.4, 0, 0.6, 0), Position = UDim2.new(0.6, -10, 0.2, 0), BackgroundColor3 = Library.Theme.Background, TextColor3 = Library.Theme.Text, Font = Enum.Font.Gotham, TextSize = 12, PlaceholderText = config.placeholder or "Input...", PlaceholderColor3 = Library.Theme.TextDim, Text = "" }, { Create("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+    Box.FocusLost:Connect(function() if config.callback then config.callback(Box.Text) end end)
+end
+
+-- Keybind
+function Library:CreateKeybind(parent, config)
+    local Frame = CreateBase(parent, 35, config.name)
+    local Btn = Create("TextButton", { Parent = Frame, Size = UDim2.new(0.3, 0, 0.6, 0), Position = UDim2.new(0.7, -10, 0.2, 0), BackgroundColor3 = Library.Theme.Background, Text = tostring(config.key), TextColor3 = Library.Theme.Text, Font = Enum.Font.Gotham, TextSize = 12 }, { Create("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+    local binding = false
+    Btn.MouseButton1Click:Connect(function()
+        binding = true; Btn.Text = "..."
+        local conn
+        conn = UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                Btn.Text = tostring(input.KeyCode.Name); binding = false
+                if config.callback then config.callback(input.KeyCode) end
+                conn:Disconnect()
+            end
+        end)
+    end)
+end
+
+-- Dropdown
+function Library:CreateDropdown(parent, config)
+    local Frame = CreateBase(parent, 35, config.name)
+    local Btn = Create("TextButton", { Parent = Frame, Size = UDim2.new(0.4, 0, 0.6, 0), Position = UDim2.new(0.6, -10, 0.2, 0), BackgroundColor3 = Library.Theme.Background, Text = "Select...", TextColor3 = Library.Theme.Text, Font = Enum.Font.Gotham, TextSize = 12 }, { Create("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+    local List = Create("Frame", { Parent = Frame, Size = UDim2.new(0.4, 0, 0, 0), Position = UDim2.new(0.6, -10, 1, 2), BackgroundColor3 = Library.Theme.Background, Visible = false }, { Create("UICorner", { CornerRadius = UDim.new(0, 4) }), Create("UIListLayout", { Padding = UDim.new(0, 2) }), Create("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 2) }) })
+    
+    local open = false
+    Btn.MouseButton1Click:Connect(function()
+        open = not open; List.Visible = open
+        TweenService:Create(List, TweenInfo, { Size = open and UDim2.new(0.4, 0, 0, #config.options * 22) or UDim2.new(0.4, 0, 0, 0) }):Play()
+    end)
+    
+    for _, opt in pairs(config.options) do
+        local OptBtn = Create("TextButton", { Parent = List, Size = UDim2.new(1, 0, 0, 20), BackgroundColor3 = Library.Theme.Element, Text = opt, TextColor3 = Library.Theme.Text, Font = Enum.Font.Gotham, TextSize = 12 }, { Create("UICorner", { CornerRadius = UDim.new(0, 2) }) })
+        OptBtn.MouseButton1Click:Connect(function()
+            Btn.Text = opt; open = false; List.Visible = false
+            if config.callback then config.callback(opt) end
+        end)
+    end
+end
+
+local UI = Library
+
+local Window = UI:CreateWindow({
+    name = "Evaware Alpha",
+    subtitle = "Overhaul | Release",
+    icon = 1234
+})
+
+local MainTab = Window:CreateTab("Main")
+local left = MainTab:CreateLeft()
+local right = MainTab:CreateRight()
+
+-- LEFT COLUMN (Speed, Main, Hitbox)
+UI:CreateSection(left, "Speed Changer")
+UI:CreateDivider(left)
+UI:CreateSlider(left, { name = "Strafe speed", range = {0, 200}, value = 100, callback = function(v) print("Strafe:", v) end })
+
+UI:CreateSection(left, "Main")
+UI:CreateToggle(left, { name = "Y lock surf", value = false, callback = function(v) end })
+UI:CreateToggle(left, { name = "Invis wall remover", value = true, callback = function(v) end })
+UI:CreateToggle(left, { name = "Air stuck", value = false, callback = function(v) end })
+UI:CreateToggle(left, { name = "Edge trimp", value = false, callback = function(v) end })
+UI:CreateSlider(left, { name = "Auto bounce", range = {0, 100}, value = 100, callback = function(v) end })
+UI:CreateSlider(left, { name = "Legit bounce", range = {0, 100}, value = 100, callback = function(v) end })
+UI:CreateKeybind(left, { name = "Fly glitch", key = Enum.KeyCode.Q, callback = function(k) end })
+UI:CreateToggle(left, { name = "Easy bounce", value = false, callback = function(v) end })
+UI:CreateDropdown(left, { name = "Emote fling", options = {"None", "Option 1"}, callback = function(v) end })
+UI:CreateToggle(left, { name = "Pixel Surf", value = false, callback = function(v) end })
+
+UI:CreateSection(left, "Hitbox helper")
+UI:CreateDivider(left)
+UI:CreateToggle(left, { name = "Cactus hitbox+", value = false, callback = function(v) end })
+UI:CreateToggle(left, { name = "Bollards hitbox+", value = false, callback = function(v) end })
+UI:CreateToggle(left, { name = "Streetlamps hitbox+", value = false, callback = function(v) end })
+UI:CreateToggle(left, { name = "Cactus hitbox+ V2", value = false, callback = function(v) end })
+UI:CreateToggle(left, { name = "Bollards hitbox+ V2", value = false, callback = function(v) end })
+
+-- RIGHT COLUMN (Advanced, Utilities)
+UI:CreateSection(right, "Advanced")
+UI:CreateDivider(right)
+UI:CreateToggle(right, { name = "Unlock jump in all states", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Force normal POV in all states", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Special rounds effect blocker", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Downed dash", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Auto-revive while downed", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Nonmovable emote hop", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Fix 90+ FOV Hiding character", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "FFlag for lagswitch", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Bounceable terrain", value = false, callback = function(v) end })
+UI:CreateToggle(right, { name = "Move while any emote", value = false, callback = function(v) end })
+UI:CreateInput(right, { name = "Smart turnbinds [A/D]", placeholder = "Enter key...", callback = function(t) end })
+UI:CreateInput(right, { name = "Auto strafe [Mouse movement]", placeholder = "Enter key...", callback = function(t) end })
+UI:CreateKeybind(right, { name = "360 emote hop", key = Enum.KeyCode.None, callback = function(k) end })
+UI:CreateKeybind(right, { name = "360 spin", key = Enum.KeyCode.None, callback = function(k) end })
+UI:CreateInput(right, { name = "Emote turn speed", placeholder = "Enter speed...", callback = function(t) end })
+
+UI:CreateSection(right, "Utilities")
+UI:CreateDivider(right)
+UI:CreateButton(right, { name = "Drink Cola", callback = function() print("Cola") end })
+UI:CreateButton(right, { name = "Spawn Speed Pad", callback = function() print("Speed Pad") end })
+UI:CreateButton(right, { name = "Remove latest speed pad", callback = function() print("Remove Pad") end })
