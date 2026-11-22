@@ -1,4 +1,5 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/UI"))()
+return Library
 
 local window = Library:CreateWindow({
 	title = "RuinWare",         -- the title in the top bar of the window.
