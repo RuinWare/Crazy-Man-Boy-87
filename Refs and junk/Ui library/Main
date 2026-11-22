@@ -1,6 +1,24 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/File"))()
 
+do
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
 local SCSLIDERV = 16
+local speedEnabled = false
+
+local function getHumanoid()
+	local char = Players.LocalPlayer.Character
+	if not char then return nil end
+	return char:FindFirstChildOfClass("Humanoid")
+end
+
+local function applySpeed()
+	local hum = getHumanoid()
+	if hum then
+		hum.WalkSpeed = speedEnabled and SCSLIDERV or 16
+	end
+end
 
 tab:CreateToggle({
 	name = "Speed Changer",
@@ -9,10 +27,30 @@ tab:CreateToggle({
 	flag = "SCFLAG",
 	value = false,
 	callback = function(v)
-		if v then
-         game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = SCSLIDERV
-         else
-game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 16
+		speedEnabled = v
+		applySpeed()
 	end,
 })
 
+tab:CreateSlider({
+	name = "Speed:",
+	range = { 16, 500 },
+	increment = 1,
+	flag = "SpeedChangeSliderFlag",
+	value = 16,
+	callback = function(v)
+		SCSLIDERV = v
+	end,
+})
+
+-- Heartbeat loop: re-applies WalkSpeed every frame while the toggle is on.
+-- Handles the game resetting your speed, respawns, and slider changes mid-flight.
+RunService.Heartbeat:Connect(function()
+	if not speedEnabled then return end
+
+	local hum = getHumanoid()
+	if hum and hum.WalkSpeed ~= SCSLIDERV then
+		hum.WalkSpeed = SCSLIDERV
+      	end
+    end)
+end
