@@ -1,12 +1,18 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/File"))()
 
+SCSLIDERV = 16
+
 tab:CreateToggle({
-	name = "Aimbot",
+	name = "Speed Changer",
 	haveKeybinds = true,
 	haveMB = true,
-	flag = "aimbotflag",
+	flag = "SCFLAG",
 	value = false,
 	callback = function(v)
-		print("Toggle:", v)
+		if v then
+         game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = SCSLIDERV
+         else
+game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 16
 	end,
 })
+
