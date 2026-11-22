@@ -1,0 +1,53 @@
+-- the window creation
+--
+local window = Library:CreateWindow({
+	title = "Test",         -- the title in the top bar of the window.
+	icon = 0,      -- the icon for the title, if 0 no icon will show.
+	CloseIcon = 105495420516711,       -- the minimize icon
+	TBOptionsIcon = 123906774409861,    -- the icon for the mobile buttons / keybinds
+})
+
+-- tabs
+local tab = window:CreateTab({ name = "tab test", icon = 123906774409861 })    -- tab creation
+-- elements
+tab:CreateToggle({
+	name = "Toggle",
+	haveKeybinds = true,
+	haveMB = true,
+	flag = "ToggleFlag",
+	value = false,
+	callback = function(v)
+		print("Toggle:", v)
+	end,
+})
+
+tab:CreateButton({
+	name = "Button",
+	haveKeybinds = true,
+	haveMB = true,
+	flag = "ButtonFlag",
+	callback = function()
+		print("button clicked")
+	end,
+})
+
+tab:CreateSlider({
+	name = "Slider",
+	range = { 0, 120 },
+	increment = 0.01,
+	flag = "SliderFlag",
+	value = 10,
+	callback = function(value)
+		print("Slider:", value)
+	end,
+})
+
+tab:CreateDropdown({
+	name = "DropDown",
+	options = { "option 1", "option 2", "option 3" },
+	flag = "DropDownFlag",
+	value = "option 1",
+	callback = function(selected)
+		print("Dropdown:", selected)
+	end,
+})
