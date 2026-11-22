@@ -1,17 +1,12 @@
--- To use the library from a loadstring, put the body in its own file and end it with `return Library`.
-
-----------------------------------------------------------------
--- LIBRARY BODY
-----------------------------------------------------------------
-local Library = (function()
+local LayerLib = (function()
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
 	local TweenService = game:GetService("TweenService")
 	local UserInputService = game:GetService("UserInputService")
 
-	local Library = {
-		Flags = {},     -- Library.Flags["ToggleFlag"] is the current value of the element with that flag
-		Elements = {},  -- Library.Elements["ToggleFlag"] is the element itself
+	local LayerLib = {
+		Flags = {},     -- LayerLib.Flags["ToggleFlag"] is the current value of the element with that flag
+		Elements = {},  -- LayerLib.Elements["ToggleFlag"] is the element itself
 		Windows = {},
 	}
 
@@ -30,7 +25,7 @@ local Library = (function()
 		toggleOff = Color3.fromRGB(72, 72, 82),
 		white = Color3.new(1, 1, 1),
 	}
-	Library.Theme = THEME
+	LayerLib.Theme = THEME
 
 	----------------------------------------------------------------
 	-- Helpers
@@ -85,13 +80,22 @@ local Library = (function()
 		return "rbxassetid://" .. tostring(id)
 	end
 
+	-- colors can be given as a Color3 or as plain numbers { r, g, b } from 0 to 255
+	local function toColor3(value, fallback)
+		if typeof(value) == "Color3" then return value end
+		if type(value) == "table" and #value >= 3 then
+			return Color3.fromRGB(value[1], value[2], value[3])
+		end
+		return fallback
+	end
+
 	-- Runs a callback on its own thread, so an error in it can't break the UI
 	local function runCallback(callback, ...)
 		if type(callback) ~= "function" then return end
 		local args = table.pack(...)
 		task.spawn(function()
 			local ok, err = pcall(callback, table.unpack(args, 1, args.n))
-			if not ok then warn("[Library] " .. tostring(err)) end
+			if not ok then warn("[LayerLib] " .. tostring(err)) end
 		end)
 	end
 
@@ -134,16 +138,977 @@ local Library = (function()
 	end
 
 	----------------------------------------------------------------
+	-- Mobile button: the same MB as the Button / Toggle GUI scripts (same look, shapes, drag bar, resize,
+	-- saved position in MobileButtons_Positions.json, tag DraggableBoxGui so DestroyAllGuis,
+	-- DeleteGuiByFlag and ResetMBPositions work on it)
+	----------------------------------------------------------------
+	local createMobileButton = (function()
+		local CollectionService = game:GetService("CollectionService")
+		local HttpService = game:GetService("HttpService")
+
+		local TEXT_SIZE = 18
+		local FONT = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Medium)
+		local START_SIZE = Vector2.new(130, 130)
+		local MIN_SIZE = Vector2.new(100, 100)
+		local MAX_SIZE = Vector2.new(520, 520)
+		local SPAWN = Vector2.new(0.5, 0.5)
+		local CORNER = 0.27
+		local MAX_CORNER = 40
+		local BG_COLOR = Color3.fromRGB(18, 18, 18)
+		local BG_TRANSPARENCY = 0.09
+		local GLOW_ASSET = "rbxassetid://138843696730147"
+		local GLOW_COLOR = Color3.new(1, 1, 1)
+		local GLOW_SPREAD = 70
+		local GLOW_BRIGHTNESS = 0.50
+		local GLOW_SLICE = 0.4
+		local SCREEN_MARGIN = 6
+		local TEXT_NUDGE_Y = 0
+		local BAR_DISTANCE = 5
+		local DRAG_FOLLOW_SPEED = 9
+		local RESIZE_FOLLOW_SPEED = 26
+		local PILL_HEIGHT = MIN_SIZE.Y                 -- how tall the pill shape is
+		local PILL_TEXT_NUDGE_Y = 0                    -- text height in the pill shape
+		local CIRCLE_TEXT_NUDGE_Y = TEXT_NUDGE_Y       -- text height in the circle shape
+		local MORPH_FOLLOW_SPEED = 10                  -- lower = slower, smoother shape changes
+		local SAVE_POSITION = true                     -- remember where you left each button (by its FLAG)
+		local SAVE_FILE = "MobileButtons_Positions.json" -- must match ResetMBPositions
+		local MODE_NAMES = { default = "Square", pill = "Pill", circle = "Circle" } -- shown when the shape changes
+		local MODE_TEXT_TIME = 1                       -- seconds the shape name stays before fading back to the title
+
+		local TAG = "DraggableBoxGui" -- must match DestroyAllGuis
+		local player = Players.LocalPlayer
+		local playerGui = player:WaitForChild("PlayerGui")
+
+		local WHITE = Color3.new(1, 1, 1)
+		local BG_HOVER = BG_COLOR:Lerp(WHITE, 0.06)
+		local BG_ON = BG_COLOR:Lerp(WHITE, 0.12)
+		local STROKE_IDLE = 0.9
+		local BAR_IDLE = 0.55
+		local ICON_IDLE = 0.45
+		local TEXT_TRANSPARENCY = 0.05
+
+		-- Drag bar sits outside, below the box
+		local BAR_SIZE = UDim2.fromOffset(51, 3)
+		local BAR_SIZE_ACTIVE = UDim2.fromOffset(61, 4)
+		local BAR_HIT = Vector2.new(72, 22)
+		local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2 -- how far the bar area reaches below the box
+
+		-- Pill shape: a vertical resize bar inside the body (resizes the length only)
+		local PILL_BAR_SIZE = UDim2.fromOffset(3, 36)
+		local PILL_BAR_SIZE_ACTIVE = UDim2.fromOffset(4, 46)
+		local PILL_HIT = Vector2.new(30, 60)
+
+		-- Cycle button (top-left): a circle with two arrows, cycles the shape (default > pill > circle)
+		local CYCLE_BOX = 26
+		local CYCLE_R = 7
+		local CYCLE_THICK = 2
+		local CYCLE_HIT = 34
+		local CYCLE_IDLE = 0.55
+		local CORNER_SPEED = 14 -- how fast the corners ease between shapes
+
+		-- Resize icon: a hollow quarter circle with rounded ends
+		local ICON_R = 15          -- radius of the quarter circle
+		local ICON_THICK = 2.5     -- line thickness
+		local ICON_INSET = 12      -- distance from the box edges
+		local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
+
+		-- Flag rules: no spaces and none of these characters
+		local FLAG_FORBIDDEN = [===['";*()^%$+×÷=/€£¥₩`~\|<>{}[]▪︎○●□■♤♡◇♧☆⊙°•¤《》¡¿,.]===]
+
+		local function flagProblem(flag)
+			if type(flag) ~= "string" or flag == "" then
+				return "the flag is empty"
+			end
+			if flag:find("%s") then
+				return "the flag contains a space"
+			end
+			local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+			for _, cp in utf8.codes(FLAG_FORBIDDEN) do
+				banned[cp] = true
+			end
+			for _, cp in utf8.codes(flag) do
+				if banned[cp] then
+					return 'the flag contains a character that is not allowed: "' .. utf8.char(cp) .. '"'
+				end
+			end
+			return nil
+		end
+
+		-- Turns any text into a valid flag: spaces and the forbidden characters are dropped
+		local function cleanFlag(raw)
+			local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+			pcall(function()
+				for _, cp in utf8.codes(FLAG_FORBIDDEN) do banned[cp] = true end
+			end)
+			local out = {}
+			local ok = pcall(function()
+				for _, cp in utf8.codes(tostring(raw)) do
+					local ch = utf8.char(cp)
+					if not banned[cp] and not ch:find("%s") then out[#out + 1] = ch end
+				end
+			end)
+			local text = table.concat(out)
+			if not ok or text == "" then return "MB" end
+			return text
+		end
+
+		-- Every GUI made by these scripts, wherever it lives
+		local function collectGuis()
+			local list, seen = {}, {}
+			local function add(inst)
+				if inst:IsA("ScreenGui") and not seen[inst] then
+					seen[inst] = true
+					list[#list + 1] = inst
+				end
+			end
+			for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
+
+			local function scan(container)
+				if not container then return end
+				local ok, children = pcall(function() return container:GetChildren() end)
+				if not ok then return end
+				for _, child in ipairs(children) do
+					if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
+				end
+			end
+			scan(playerGui)
+			pcall(function() scan(game:GetService("CoreGui")) end)
+			if gethui then pcall(function() scan(gethui()) end) end
+			return list
+		end
+
+
+		-- Saved positions: kept in a file by FLAG, so they survive between sessions
+		local canUseFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+		local memoryStore = _G
+		pcall(function()
+			if getgenv then memoryStore = getgenv() end
+		end)
+
+		local function loadAllPositions()
+			if canUseFiles then
+				local ok, result = pcall(function()
+					if not isfile(SAVE_FILE) then return {} end
+					local data = HttpService:JSONDecode(readfile(SAVE_FILE))
+					if type(data) == "table" and type(data.positions) == "table" then
+						return data.positions
+					end
+					return {}
+				end)
+				if ok and type(result) == "table" then return result end
+				return {}
+			end
+			return memoryStore.MobileButtonPositions or {} -- no file access here: remembered until the game closes
+		end
+
+		local function saveAllPositions(positions)
+			if canUseFiles then
+				pcall(function()
+					writefile(SAVE_FILE, HttpService:JSONEncode({ version = 1, positions = positions }))
+				end)
+			else
+				memoryStore.MobileButtonPositions = positions
+			end
+		end
+
+		-- Random 20-character name, different for every GUI
+		local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789*^%/?#$"
+		local rng = Random.new()
+
+		local function randomName(length)
+			local out = {}
+			for i = 1, length do
+				local n = rng:NextInteger(1, #CHARS)
+				out[i] = CHARS:sub(n, n)
+			end
+			return table.concat(out)
+		end
+
+		local function tween(obj, time, props, style, direction)
+			local t = TweenService:Create(
+				obj,
+				TweenInfo.new(time, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out),
+				props
+			)
+			t:Play()
+			return t
+		end
+
+		local function make(class, props, parent)
+			local inst = Instance.new(class)
+			for key, value in pairs(props) do
+				inst[key] = value
+			end
+			inst.Parent = parent
+			return inst
+		end
+
+		local function isPress(input)
+			return input.UserInputType == Enum.UserInputType.MouseButton1
+				or input.UserInputType == Enum.UserInputType.Touch
+		end
+
+		local function p2(input)
+			return Vector2.new(input.Position.X, input.Position.Y)
+		end
+
+		local function run(fn)
+			task.spawn(function()
+				local ok, err = pcall(fn)
+				if not ok then warn(err) end
+			end)
+		end
+
+		-- Highest place available: hidden UI container > CoreGui > PlayerGui
+		local function parentGui(gui)
+			local targets = {}
+			if gethui then
+				local ok, container = pcall(gethui)
+				if ok and container then targets[#targets + 1] = container end
+			end
+			local okCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+			if okCore and coreGui then targets[#targets + 1] = coreGui end
+			targets[#targets + 1] = playerGui
+
+			for _, target in ipairs(targets) do
+				local ok = pcall(function() gui.Parent = target end)
+				if ok and gui.Parent == target then return end
+			end
+		end
+
+		local function create(opts)
+			local TEXT = tostring(opts.text or "Button")
+			local kind = opts.kind == "Toggle" and "Toggle" or "Button"
+			local FLAG = cleanFlag(opts.flag or TEXT)
+
+			-- One GUI per flag: making it again with the same flag replaces the old one
+			for _, old in ipairs(collectGuis()) do
+				if old:GetAttribute("Flag") == FLAG then
+					old:Destroy()
+				end
+			end
+
+			local screenGui = make("ScreenGui", {
+				Name = randomName(20),
+				ResetOnSpawn = false,
+				IgnoreGuiInset = true,
+				DisplayOrder = 2147483647, -- above every other GUI
+				OnTopOfCoreBlur = true,
+				ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			}, nil)
+			screenGui:SetAttribute(TAG, kind)
+			screenGui:SetAttribute("Flag", FLAG)
+			CollectionService:AddTag(screenGui, TAG)
+			parentGui(screenGui)
+
+			local function viewport()
+				local size = screenGui.AbsoluteSize
+				if size.X < 1 or size.Y < 1 then
+					size = workspace.CurrentCamera.ViewportSize
+				end
+				return size
+			end
+
+			-- Off-screen protection (the drag bar below the box is counted too)
+			local function fitSize(size)
+				local v = viewport()
+				return Vector2.new(
+					math.min(size.X, v.X - SCREEN_MARGIN * 2),
+					math.min(size.Y, v.Y - SCREEN_MARGIN * 2 - BAR_BELOW)
+				)
+			end
+
+			local function clampCenter(center, size)
+				local v = viewport()
+				local half = size / 2
+				local minX, minY = half.X + SCREEN_MARGIN, half.Y + SCREEN_MARGIN
+				local maxX = v.X - half.X - SCREEN_MARGIN
+				local maxY = v.Y - half.Y - SCREEN_MARGIN - BAR_BELOW
+				return Vector2.new(
+					math.clamp(center.X, minX, math.max(minX, maxX)),
+					math.clamp(center.Y, minY, math.max(minY, maxY))
+				)
+			end
+
+			-- Corner roundness: the default shape scales with the box (never past MAX_CORNER pixels),
+			-- the pill and circle shapes are fully round
+			local function cornerFor(size, forMode)
+				if forMode == "pill" or forMode == "circle" then
+					return math.floor(math.min(size.X, size.Y) / 2 + 0.5)
+				end
+				return math.floor(math.min(CORNER * math.min(size.X, size.Y), MAX_CORNER) + 0.5)
+			end
+
+			-- Both versions use the same size and the same SPAWN point, so they appear in the exact same spot
+			local startSize = fitSize(START_SIZE)
+			local v0 = viewport()
+			local defaultCenter = clampCenter(Vector2.new(v0.X * SPAWN.X + (opts.offset or 0), v0.Y * SPAWN.Y + (opts.offset or 0)), startSize) -- the starting point
+			local startCenter = defaultCenter
+			if SAVE_POSITION then
+				local saved = loadAllPositions()[FLAG]
+				if type(saved) == "table" and type(saved.x) == "number" and type(saved.y) == "number" then
+					startCenter = clampCenter(Vector2.new(v0.X * saved.x, v0.Y * saved.y), startSize)
+				end
+			end
+
+			-- Holder: the thing that moves and resizes. Everything lives inside it.
+			local holder = make("Frame", {
+				Name = "Holder",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(startCenter.X, startCenter.Y),
+				Size = UDim2.fromOffset(startSize.X, startSize.Y),
+				BackgroundTransparency = 1,
+			}, screenGui)
+
+			local popScale = make("UIScale", { Name = "PopScale", Scale = 0.7 }, holder)
+
+			-- Glow: soft image behind the box
+			local glow = make("ImageLabel", {
+				Name = "Glow",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.new(1, GLOW_SPREAD * 2, 1, GLOW_SPREAD * 2),
+				BackgroundTransparency = 1,
+				Image = GLOW_ASSET,
+				ImageColor3 = GLOW_COLOR,
+				ImageTransparency = 1,
+				ScaleType = Enum.ScaleType.Stretch,
+				ZIndex = 1,
+			}, holder)
+
+			-- 9-slice the glow using the image's real size: the corners and soft edges stay a
+			-- constant size and only the middle stretches, so resizing never distorts it.
+			task.spawn(function()
+				local deadline = os.clock() + 5
+				while glow.Parent and os.clock() < deadline do
+					local ok, size = pcall(function() return glow.ContentImageSize end)
+					if not ok then return end -- older client: keep the plain stretch
+					if size.X > 0 and size.Y > 0 then
+						local sx, sy = size.X * GLOW_SLICE, size.Y * GLOW_SLICE
+						glow.SliceCenter = Rect.new(sx, sy, size.X - sx, size.Y - sy)
+						glow.SliceScale = math.max(GLOW_SPREAD, 1) / sx
+						glow.ScaleType = Enum.ScaleType.Slice
+						return
+					end
+					task.wait(0.05)
+				end
+			end)
+
+			-- strength: 0 = off, 1 = full flash
+			local function setGlow(strength, time, style)
+				tween(glow, time, { ImageTransparency = 1 - GLOW_BRIGHTNESS * strength }, style)
+			end
+
+			-- Box
+			local box = make("Frame", {
+				Name = "Box",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = BG_COLOR,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, holder)
+			local boxCorner = make("UICorner", { CornerRadius = UDim.new(0, cornerFor(startSize)) }, box)
+			local stroke = make("UIStroke", {
+				Color = WHITE,
+				Transparency = 1,
+				Thickness = 1,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}, box)
+
+			-- Clickable body
+			local body = make("TextButton", {
+				Name = "Body",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 1,
+			}, box)
+
+			-- Text: fixed size, dead center of the box
+			local label = make("TextLabel", {
+				Name = "Label",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, 0.5, TEXT_NUDGE_Y),
+				Size = UDim2.new(1, -28, 1, -28),
+				BackgroundTransparency = 1,
+				Text = TEXT,
+				TextColor3 = WHITE,
+				TextTransparency = 1,
+				TextSize = TEXT_SIZE,
+				TextScaled = false,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				FontFace = FONT,
+				ZIndex = 2,
+			}, box)
+
+			-- Drag bar: outside the box, just below it (fixed pixel size)
+			local dragHit = make("TextButton", {
+				Name = "DragHit",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, 1, BAR_DISTANCE),
+				Size = UDim2.fromOffset(BAR_HIT.X, BAR_HIT.Y),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 5,
+			}, box)
+			local bar = make("Frame", {
+				Name = "Bar",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = BAR_SIZE,
+				BackgroundColor3 = WHITE,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 5,
+			}, dragHit)
+			make("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
+
+			-- Resize handle in the bottom-right corner (invisible hit area + the arc icon)
+			local handle = make("TextButton", {
+				Name = "ResizeHandle",
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.fromOffset(34, 34),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 5,
+			}, box)
+
+			-- The icon is a quarter circle drawn with round dots, so both ends are rounded.
+			-- It sits in a CanvasGroup so the overlapping dots fade as one clean shape.
+			local iconGroup = make("CanvasGroup", {
+				Name = "Icon",
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, -ICON_INSET, 1, -ICON_INSET),
+				Size = UDim2.fromOffset(ICON_BOX, ICON_BOX),
+				BackgroundTransparency = 1,
+				GroupTransparency = 1,
+				ZIndex = 5,
+			}, handle)
+			do
+				local half = ICON_THICK / 2
+				local steps = math.max(8, math.ceil((math.pi / 2 * ICON_R) / (ICON_THICK / 3)))
+				for i = 0, steps do
+					local angle = (math.pi / 2) * (i / steps)
+					local dot = make("Frame", {
+						Name = "Dot",
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset(half + ICON_R * math.cos(angle), half + ICON_R * math.sin(angle)),
+						Size = UDim2.fromOffset(ICON_THICK, ICON_THICK),
+						BackgroundColor3 = WHITE,
+						BorderSizePixel = 0,
+						ZIndex = 5,
+					}, iconGroup)
+					make("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
+				end
+			end
+
+			-- Pill shape: a vertical bar inside the body at the right end (resizes the length only)
+			local pillHandle = make("TextButton", {
+				Name = "PillHandle",
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -6, 0.5, 0),
+				Size = UDim2.fromOffset(PILL_HIT.X, PILL_HIT.Y),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				Interactable = false,
+				ZIndex = 5,
+			}, box)
+			local pillBar = make("Frame", {
+				Name = "PillBar",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = PILL_BAR_SIZE,
+				BackgroundColor3 = WHITE,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 5,
+			}, pillHandle)
+			make("UICorner", { CornerRadius = UDim.new(1, 0) }, pillBar)
+
+			-- Cycle button (top-left): a circle with two arrows. Tapping it cycles the shape
+			-- default > pill > circle, and the icon spins every time it switches
+			local collapseHit = make("TextButton", {
+				Name = "CycleHit",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0, 21, 0, 21),
+				Size = UDim2.fromOffset(CYCLE_HIT, CYCLE_HIT),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 5,
+			}, box)
+			local cycleIcon = make("CanvasGroup", {
+				Name = "CycleIcon",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(CYCLE_BOX, CYCLE_BOX),
+				BackgroundTransparency = 1,
+				GroupTransparency = 1,
+				ZIndex = 5,
+			}, collapseHit)
+			do
+				local center = CYCLE_BOX / 2
+				local wing = 5              -- length of each arrow-head line
+				local sweep = math.rad(120) -- how much of the circle each arrow covers
+				local steps = math.max(8, math.ceil((CYCLE_R * sweep) / (CYCLE_THICK / 3)))
+
+				local function roundPart(position, size, rotation)
+					local part = make("Frame", {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset(position.X, position.Y),
+						Size = UDim2.fromOffset(size.X, size.Y),
+						Rotation = rotation,
+						BackgroundColor3 = WHITE,
+						BorderSizePixel = 0,
+						ZIndex = 5,
+					}, cycleIcon)
+					make("UICorner", { CornerRadius = UDim.new(1, 0) }, part)
+				end
+
+				for _, startAngle in ipairs({ 0, math.pi }) do
+					-- the arc, drawn with round dots
+					for i = 0, steps do
+						local angle = startAngle + sweep * (i / steps)
+						roundPart(
+							Vector2.new(center + CYCLE_R * math.cos(angle), center + CYCLE_R * math.sin(angle)),
+							Vector2.new(CYCLE_THICK, CYCLE_THICK),
+							0
+						)
+					end
+
+					-- the arrow head at the end of the arc (two short lines meeting at the tip)
+					local endAngle = startAngle + sweep
+					local tip = Vector2.new(center + CYCLE_R * math.cos(endAngle), center + CYCLE_R * math.sin(endAngle))
+					local back = Vector2.new(math.sin(endAngle), -math.cos(endAngle)) -- back along the arc
+					for _, spread in ipairs({ math.rad(40), -math.rad(40) }) do
+						local cosS, sinS = math.cos(spread), math.sin(spread)
+						local dir = Vector2.new(back.X * cosS - back.Y * sinS, back.X * sinS + back.Y * cosS)
+						roundPart(tip + dir * (wing / 2), Vector2.new(wing, CYCLE_THICK), math.deg(math.atan2(dir.Y, dir.X)))
+					end
+				end
+			end
+
+			----------------------------------------------------------------
+			-- Smooth move + resize + shapes
+			----------------------------------------------------------------
+			local connections = {}
+
+			local mode = "default" -- "default", "pill" or "circle"
+			local dragging, resizing = false, false
+			local activeInput, inputStart
+			local dragOrigin, resizeOriginSize, resizeTopLeft
+
+			-- Size limits for the pill and circle shapes
+			local pillMinWidth = math.max(MIN_SIZE.X, PILL_HEIGHT * 1.25)
+			local circleMin = math.max(MIN_SIZE.X, MIN_SIZE.Y)
+			local circleMax = math.min(MAX_SIZE.X, MAX_SIZE.Y)
+
+			local sizeTarget = startSize
+			local posTarget = startCenter
+			local sizeCur, posCur = startSize, startCenter
+			local cornerCur = cornerFor(startSize, "default")
+			local lastCorner = -1
+			local lastInset = -1
+			local morphUntil = 0
+
+			-- Each shape remembers its own size, so switching back and forth feels natural
+			local circleStart = math.clamp((startSize.X + startSize.Y) / 2, circleMin, circleMax)
+			local modeSizes = {
+				default = startSize,
+				pill = Vector2.new(math.clamp(startSize.X, pillMinWidth, MAX_SIZE.X), PILL_HEIGHT),
+				circle = Vector2.new(circleStart, circleStart),
+			}
+
+			connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
+				-- off-screen protection every frame (and the shape rules)
+				sizeTarget = fitSize(sizeTarget)
+				if mode == "circle" then
+					local side = math.min(sizeTarget.X, sizeTarget.Y)
+					sizeTarget = Vector2.new(side, side)
+				elseif mode == "pill" then
+					sizeTarget = Vector2.new(sizeTarget.X, math.min(sizeTarget.Y, PILL_HEIGHT))
+				end
+				posTarget = clampCenter(posTarget, sizeTarget)
+
+				-- slower follow while dragging = the box trails behind the bar, shape changes ease in gently
+				local speed = DRAG_FOLLOW_SPEED
+				if resizing then
+					speed = RESIZE_FOLLOW_SPEED
+				elseif os.clock() < morphUntil then
+					speed = MORPH_FOLLOW_SPEED
+				end
+				local alpha = 1 - math.exp(-dt * speed)
+				sizeCur = fitSize(sizeCur:Lerp(sizeTarget, alpha))
+				posCur = clampCenter(posCur:Lerp(posTarget, alpha), sizeCur)
+
+				holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
+				holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
+
+				-- the corners ease toward the roundness of the current shape
+				cornerCur += (cornerFor(sizeCur, mode) - cornerCur) * (1 - math.exp(-dt * CORNER_SPEED))
+				local corner = math.floor(cornerCur + 0.5)
+				if corner ~= lastCorner then
+					lastCorner = corner
+					boxCorner.CornerRadius = UDim.new(0, corner)
+				end
+
+				-- the corner icons follow the rounded edge, so they always stay inside the shape
+				local inset = math.max(ICON_INSET, 0.293 * cornerCur + 1)
+				if math.abs(inset - lastInset) > 0.05 then
+					lastInset = inset
+					local extra = inset - ICON_INSET
+					handle.Position = UDim2.new(1, -extra, 1, -extra)
+					local c = inset + 9
+					collapseHit.Position = UDim2.new(0, c, 0, c)
+				end
+			end)
+
+			-- Save where this button is (by its FLAG)
+			local function savePosition()
+				if not SAVE_POSITION then return end
+				local v = viewport()
+				local all = loadAllPositions()
+				all[FLAG] = { x = posTarget.X / v.X, y = posTarget.Y / v.Y }
+				saveAllPositions(all)
+			end
+
+			-- ResetMBPositions sends every button back to its starting point
+			screenGui:GetAttributeChangedSignal("ResetPosition"):Connect(function()
+				posTarget = clampCenter(defaultCenter, sizeTarget)
+			end)
+
+			-- Drag: only while holding the bar
+			dragHit.InputBegan:Connect(function(input)
+				if not isPress(input) or dragging or resizing then return end
+				dragging = true
+				activeInput = input
+				inputStart = p2(input)
+				dragOrigin = posTarget
+				tween(bar, 0.2, { BackgroundTransparency = 0.15, Size = BAR_SIZE_ACTIVE })
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragging = false
+						tween(bar, 0.3, { BackgroundTransparency = BAR_IDLE, Size = BAR_SIZE })
+						savePosition()
+					end
+				end)
+			end)
+			dragHit.MouseEnter:Connect(function()
+				if not dragging then tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end
+			end)
+			dragHit.MouseLeave:Connect(function()
+				if not dragging then tween(bar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
+			end)
+
+			-- Resize (default and circle shapes): only while holding the corner handle
+			handle.InputBegan:Connect(function(input)
+				if not isPress(input) or dragging or resizing or mode == "pill" then return end
+				resizing = true
+				activeInput = input
+				inputStart = p2(input)
+				resizeOriginSize = sizeTarget
+				resizeTopLeft = posTarget - sizeTarget / 2
+				tween(iconGroup, 0.2, { GroupTransparency = 0.05 })
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						resizing = false
+						if mode ~= "pill" then tween(iconGroup, 0.3, { GroupTransparency = ICON_IDLE }) end
+					end
+				end)
+			end)
+			handle.MouseEnter:Connect(function()
+				if not resizing and mode ~= "pill" then tween(iconGroup, 0.2, { GroupTransparency = 0.2 }) end
+			end)
+			handle.MouseLeave:Connect(function()
+				if not resizing and mode ~= "pill" then tween(iconGroup, 0.25, { GroupTransparency = ICON_IDLE }) end
+			end)
+
+			-- Resize (pill shape): only the length, by holding the vertical bar
+			pillHandle.InputBegan:Connect(function(input)
+				if not isPress(input) or dragging or resizing or mode ~= "pill" then return end
+				resizing = true
+				activeInput = input
+				inputStart = p2(input)
+				resizeOriginSize = sizeTarget
+				resizeTopLeft = posTarget - sizeTarget / 2
+				tween(pillBar, 0.2, { BackgroundTransparency = 0.15, Size = PILL_BAR_SIZE_ACTIVE })
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						resizing = false
+						if mode == "pill" then tween(pillBar, 0.3, { BackgroundTransparency = BAR_IDLE, Size = PILL_BAR_SIZE }) end
+					end
+				end)
+			end)
+			pillHandle.MouseEnter:Connect(function()
+				if not resizing and mode == "pill" then tween(pillBar, 0.2, { BackgroundTransparency = 0.3 }) end
+			end)
+			pillHandle.MouseLeave:Connect(function()
+				if not resizing and mode == "pill" then tween(pillBar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
+			end)
+
+			connections[#connections + 1] = UserInputService.InputChanged:Connect(function(input)
+				if not (dragging or resizing) then return end
+				if input.UserInputType ~= Enum.UserInputType.MouseMovement and input ~= activeInput then return end
+
+				local delta = p2(input) - inputStart
+				if dragging then
+					posTarget = clampCenter(dragOrigin + delta, sizeTarget)
+				else
+					local v = viewport()
+					local newSize
+					if mode == "pill" then
+						-- only the length changes, the height stays locked
+						newSize = Vector2.new(math.clamp(resizeOriginSize.X + delta.X, pillMinWidth, MAX_SIZE.X), PILL_HEIGHT)
+					elseif mode == "circle" then
+						-- x and y always stay the same size
+						local side = math.clamp(resizeOriginSize.X + (delta.X + delta.Y) / 2, circleMin, circleMax)
+						newSize = Vector2.new(side, side)
+					else
+						newSize = Vector2.new(
+							math.clamp(resizeOriginSize.X + delta.X, MIN_SIZE.X, MAX_SIZE.X),
+							math.clamp(resizeOriginSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y)
+						)
+					end
+					-- never grow past the edge of the screen
+					newSize = Vector2.new(
+						math.min(newSize.X, v.X - SCREEN_MARGIN - resizeTopLeft.X),
+						math.min(newSize.Y, v.Y - SCREEN_MARGIN - BAR_BELOW - resizeTopLeft.Y)
+					)
+					if mode == "circle" then
+						local side = math.min(newSize.X, newSize.Y)
+						newSize = Vector2.new(side, side)
+					end
+					sizeTarget = newSize
+					posTarget = resizeTopLeft + newSize / 2 -- top-left corner stays put
+				end
+			end)
+
+			-- Shape name: sits on top of the title and shows for a moment when the shape changes
+			local modeLabel = make("TextLabel", {
+				Name = "ModeLabel",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = label.Position,
+				Size = label.Size,
+				BackgroundTransparency = 1,
+				Text = "",
+				TextColor3 = WHITE,
+				TextTransparency = 1,
+				TextSize = TEXT_SIZE,
+				TextScaled = false,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				FontFace = FONT,
+				ZIndex = 2,
+			}, box)
+
+			local flashToken = 0
+			local function flashModeName(name)
+				flashToken += 1
+				local token = flashToken
+				modeLabel.Text = name
+
+				-- quick crossfade: the title fades out while the shape name fades in
+				tween(label, 0.2, { TextTransparency = 1 }, Enum.EasingStyle.Quad)
+				tween(modeLabel, 0.2, { TextTransparency = TEXT_TRANSPARENCY }, Enum.EasingStyle.Quad)
+
+				-- after a moment it fades out into the normal title
+				task.delay(0.2 + MODE_TEXT_TIME, function()
+					if token ~= flashToken or not screenGui.Parent then return end
+					tween(modeLabel, 0.4, { TextTransparency = 1 }, Enum.EasingStyle.Sine)
+					tween(label, 0.4, { TextTransparency = TEXT_TRANSPARENCY }, Enum.EasingStyle.Sine)
+				end)
+			end
+
+			-- Shapes: the cycle button goes default > pill > circle > default
+			local MODES = { "default", "pill", "circle" }
+
+			local function setMode(newMode)
+				if newMode == mode or dragging or resizing then return end
+				modeSizes[mode] = sizeTarget -- remember the shape we're leaving
+				mode = newMode
+				sizeTarget = fitSize(modeSizes[newMode])
+				morphUntil = os.clock() + 0.8
+
+				-- the old resize icon fades out, the new one fades in
+				local isPill = newMode == "pill"
+				handle.Interactable = not isPill
+				pillHandle.Interactable = isPill
+				tween(iconGroup, 0.35, { GroupTransparency = isPill and 1 or ICON_IDLE }, Enum.EasingStyle.Quad)
+				tween(pillBar, 0.4, { BackgroundTransparency = isPill and BAR_IDLE or 1 }, Enum.EasingStyle.Quad)
+
+				-- the text glides to the right height for the new shape
+				local nudge = TEXT_NUDGE_Y
+				if isPill then nudge = PILL_TEXT_NUDGE_Y elseif newMode == "circle" then nudge = CIRCLE_TEXT_NUDGE_Y end
+				local textPosition = UDim2.new(0.5, 0, 0.5, nudge)
+				tween(label, 0.45, { Position = textPosition })
+				tween(modeLabel, 0.45, { Position = textPosition })
+
+				flashModeName(MODE_NAMES[newMode] or newMode)
+			end
+
+			local spin = 0
+			collapseHit.Activated:Connect(function()
+				local before = mode
+				setMode(MODES[(table.find(MODES, mode) or 1) % #MODES + 1])
+				if mode == before then return end -- it didn't switch (busy dragging or resizing)
+
+				-- spin once, smoothly, every time the shape switches
+				spin += 360
+				tween(cycleIcon, 0.7, { Rotation = spin }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			end)
+			collapseHit.MouseEnter:Connect(function()
+				tween(cycleIcon, 0.2, { GroupTransparency = 0.2 })
+			end)
+			collapseHit.MouseLeave:Connect(function()
+				tween(cycleIcon, 0.25, { GroupTransparency = CYCLE_IDLE })
+			end)
+
+			----------------------------------------------------------------
+			-- Click: a toggle keeps a steady on/off state, a button flashes
+			----------------------------------------------------------------
+			local isOn = opts.initial == true and kind == "Toggle"
+			local stateToken = 0
+			local glowToken = 0
+
+			local function setState(on)
+				isOn = on
+				stateToken += 1
+				local token = stateToken
+
+				tween(box, 0.25, { BackgroundColor3 = on and BG_ON or BG_COLOR })
+				tween(stroke, 0.25, { Transparency = on and 0.3 or STROKE_IDLE, Thickness = on and 2 or 1 })
+
+				if on then
+					-- bright flash, then settle into a steady glow
+					setGlow(1, 0.08, Enum.EasingStyle.Quad)
+					task.delay(0.1, function()
+						if token ~= stateToken or not screenGui.Parent then return end
+						setGlow(0.55, 0.3, Enum.EasingStyle.Sine)
+					end)
+				else
+					setGlow(0, 0.25, Enum.EasingStyle.Sine)
+				end
+			end
+
+			local function pulse()
+				glowToken += 1
+				local token = glowToken
+				setGlow(1, 0.08, Enum.EasingStyle.Quad)
+				tween(stroke, 0.08, { Transparency = 0.1, Thickness = 2 }, Enum.EasingStyle.Quad)
+
+				task.delay(0.12, function()
+					if token ~= glowToken or not screenGui.Parent then return end
+					setGlow(0, 0.35, Enum.EasingStyle.Sine)
+					tween(stroke, 0.35, { Transparency = STROKE_IDLE, Thickness = 1 }, Enum.EasingStyle.Sine)
+				end)
+			end
+
+			body.InputBegan:Connect(function(input)
+				if isPress(input) then tween(popScale, 0.12, { Scale = 0.96 }) end
+			end)
+			body.InputEnded:Connect(function(input)
+				if isPress(input) then tween(popScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back) end
+			end)
+			body.MouseEnter:Connect(function()
+				tween(box, 0.25, { BackgroundColor3 = isOn and BG_ON:Lerp(WHITE, 0.06) or BG_HOVER })
+			end)
+			body.MouseLeave:Connect(function()
+				tween(box, 0.3, { BackgroundColor3 = isOn and BG_ON or BG_COLOR })
+				tween(popScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+			end)
+
+			body.Activated:Connect(function()
+				if kind == "Toggle" then
+					local nextState = not isOn
+					setState(nextState)
+					if opts.onToggle then run(function() opts.onToggle(nextState) end) end
+				else
+					pulse()
+					if opts.onClick then run(opts.onClick) end
+				end
+			end)
+
+			-- what the library uses to drive this button
+			local api = {}
+			function api.SetState(on)
+				if kind ~= "Toggle" or on == isOn then return end
+				setState(on)
+			end
+			function api.Pulse()
+				if kind == "Button" then pulse() end
+			end
+			function api.Destroy()
+				if screenGui.Parent then screenGui:Destroy() end
+			end
+			api.Gui = screenGui
+
+			----------------------------------------------------------------
+			-- Cleanup + pop-in
+			----------------------------------------------------------------
+			screenGui.Destroying:Connect(function()
+				for _, c in ipairs(connections) do c:Disconnect() end
+				table.clear(connections)
+				if opts.onGone then run(opts.onGone) end
+			end)
+
+
+			local fades = {
+				{ box, "BackgroundTransparency", BG_TRANSPARENCY },
+				{ stroke, "Transparency", STROKE_IDLE },
+				{ label, "TextTransparency", TEXT_TRANSPARENCY },
+				{ bar, "BackgroundTransparency", BAR_IDLE },
+				{ iconGroup, "GroupTransparency", ICON_IDLE },
+				{ cycleIcon, "GroupTransparency", CYCLE_IDLE },
+			}
+			tween(popScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+			for _, f in ipairs(fades) do
+				tween(f[1], 0.4, { [f[2]] = f[3] }, Enum.EasingStyle.Quad)
+			end
+
+
+			-- a toggle that was already on when its button was made shows that after the pop-in
+			if isOn then
+				task.delay(0.45, function()
+					if screenGui.Parent then setState(true) end
+				end)
+			end
+
+			return api
+
+		end
+
+		return create
+	end)()
+
+
+	----------------------------------------------------------------
 	-- Shared state
 	----------------------------------------------------------------
 	local screenGui = nil
 	local connections = {}
-	local mobileButtons = {}    -- element -> mobile button
+	local mobileButtons = {}    -- element -> its mobile button
 	local keybindElements = {}  -- elements that have a key assigned
 	local capturing = nil       -- when set, the next key press goes to this function (picking a keybind)
 	local dragState = nil       -- what is being dragged right now
 	local activeMenu = nil
 	local inputReady = false
+	local popupList = {}        -- popups that are open
+	local openPopups = {}       -- flag -> open popup
+	local popupSaves = {}       -- flag -> the option name saved with Popup:Save() (kept until the game closes)
 
 	local function getGui()
 		if screenGui and screenGui.Parent then return screenGui end
@@ -163,7 +1128,7 @@ local Library = (function()
 		return workspace.CurrentCamera.ViewportSize
 	end
 
-	-- Off-screen protection
+	-- Off-screen protection (windows and popups)
 	local function clampWindow(window, position)
 		local v = viewport()
 		local margin = 6
@@ -173,17 +1138,39 @@ local Library = (function()
 		)
 	end
 
-	local function clampCenter(center, half)
-		local v = viewport()
-		local margin = 6
-		return Vector2.new(
-			math.clamp(center.X, half + margin, math.max(half + margin, v.X - half - margin)),
-			math.clamp(center.Y, half + margin, math.max(half + margin, v.Y - half - margin))
-		)
-	end
-
 	local function closeMenu()
 		if activeMenu then activeMenu.close() end
+	end
+
+	----------------------------------------------------------------
+	-- Dragging: one thing at a time
+	----------------------------------------------------------------
+	local function endDrag(state)
+		if dragState ~= state then return end
+		dragState = nil
+		if state.connection then state.connection:Disconnect() end
+		if state.onEnd then state.onEnd() end
+	end
+
+	local function beginDrag(state)
+		if dragState then return false end
+		dragState = state
+		state.connection = state.input.Changed:Connect(function()
+			local s = state.input.UserInputState
+			if s == Enum.UserInputState.End or s == Enum.UserInputState.Cancel then endDrag(state) end
+		end)
+		return true
+	end
+
+	local function updateDrag(state, input)
+		if state.kind == "window" then
+			local delta = p2(input) - state.start
+			local position = clampWindow(state.window, state.origin + delta)
+			state.window._position = position
+			state.window.root.Position = UDim2.fromOffset(math.floor(position.X), math.floor(position.Y))
+		elseif state.kind == "slider" then
+			state.slider:_dragTo(p2(input).X)
+		end
 	end
 
 	----------------------------------------------------------------
@@ -303,100 +1290,49 @@ local Library = (function()
 	end
 
 	----------------------------------------------------------------
-	-- Mobile buttons
+	-- Mobile buttons (the real MBs: they come from the MB code above)
 	----------------------------------------------------------------
-	local MB_SIZE = 78
-
 	local function destroyMobileButton(element)
-		local mb = mobileButtons[element]
-		if not mb then return end
-		mobileButtons[element] = nil
+		local handle = element._mb
 		element._mb = nil
-		tween(mb.scale, 0.2, { Scale = 0.4 }, Enum.EasingStyle.Quad)
-		tween(mb.frame, 0.2, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
-		tween(mb.label, 0.2, { TextTransparency = 1 }, Enum.EasingStyle.Quad)
-		task.delay(0.22, function() mb.frame:Destroy() end)
+		element.MobileButtonEnabled = false
+		mobileButtons[element] = nil
+		if handle then handle.Destroy() end
 	end
 
 	local function spawnMobileButton(element)
 		if element._mb then return end
-		local gui = getGui()
-		local v = viewport()
+		element.MobileButtonEnabled = true
+
 		local count = 0
 		for _ in pairs(mobileButtons) do count += 1 end
-		local start = element._mbPosition or Vector2.new(v.X - 70, 150 + count * (MB_SIZE + 10))
 
-		local mb = { element = element, _position = clampCenter(start, MB_SIZE / 2) }
-		local frame = make("TextButton", {
-			Name = "MobileButton",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromOffset(mb._position.X, mb._position.Y),
-			Size = UDim2.fromOffset(MB_SIZE, MB_SIZE),
-			BackgroundColor3 = THEME.element,
-			Text = "",
-			AutoButtonColor = false,
-			Selectable = false,
-			ZIndex = 40,
-		}, gui)
-		corner(frame, 14)
-		outline(frame)
-		local scale = make("UIScale", { Scale = 0.4 }, frame)
-		local label = make("TextLabel", {
-			Position = UDim2.fromOffset(6, 6),
-			Size = UDim2.new(1, -12, 1, -12),
-			BackgroundTransparency = 1,
-			Text = element.Name,
-			TextColor3 = THEME.text,
-			TextSize = 12,
-			TextWrapped = true,
-			Font = Enum.Font.GothamMedium,
-			ZIndex = 41,
-		}, frame)
-		local status
-		if element.Type == "Toggle" then
-			status = make("Frame", {
-				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 1, -7),
-				Size = UDim2.fromOffset(26, 4),
-				BackgroundColor3 = THEME.toggleOff,
-				BorderSizePixel = 0,
-				ZIndex = 42,
-			}, frame)
-			corner(status, 2)
+		local handle
+		local ok, result = pcall(createMobileButton, {
+			text = element.Name,
+			flag = element.Flag or element.Name,
+			kind = element.Type,
+			initial = element.Value == true,
+			offset = (count % 5) * 28, -- so several new buttons don't sit exactly on top of each other
+			onToggle = function(on) element:Set(on) end,
+			onClick = function() element:_run() end,
+			onGone = function()
+				-- it was deleted from outside (DestroyAllGuis, DeleteGuiByFlag): the switch goes off too
+				if element._mb ~= handle then return end
+				element._mb = nil
+				element.MobileButtonEnabled = false
+				mobileButtons[element] = nil
+				if element._menuSwitch then element._menuSwitch.set(false) end
+			end,
+		})
+		if not ok then
+			warn("[LayerLib] mobile button: " .. tostring(result))
+			element.MobileButtonEnabled = false
+			return
 		end
-		mb.frame, mb.scale, mb.label, mb.status = frame, scale, label, status
-		tween(scale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
-
-		function mb:Refresh()
-			if element.Type ~= "Toggle" then return end
-			local on = element.Value == true
-			tween(frame, 0.2, { BackgroundColor3 = on and THEME.accent or THEME.element }, Enum.EasingStyle.Quad)
-			tween(status, 0.2, { BackgroundColor3 = on and THEME.white or THEME.toggleOff }, Enum.EasingStyle.Quad)
-		end
-
-		function mb:Move(position)
-			self._position = clampCenter(position, MB_SIZE / 2)
-			element._mbPosition = self._position
-			frame.Position = UDim2.fromOffset(math.floor(self._position.X), math.floor(self._position.Y))
-		end
-
-		-- a tap triggers it, a drag moves it
-		frame.InputBegan:Connect(function(input)
-			if not isPress(input) or dragState then return end
-			dragState = { kind = "mb", mb = mb, input = input, start = p2(input), origin = mb._position, moved = false }
-			tween(scale, 0.08, { Scale = 0.92 }, Enum.EasingStyle.Quad)
-			input.Changed:Connect(function()
-				if input.UserInputState ~= Enum.UserInputState.End then return end
-				local state = dragState
-				dragState = nil
-				tween(scale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
-				if state and state.mb == mb and not state.moved then element:_trigger() end
-			end)
-		end)
-
-		mobileButtons[element] = mb
-		element._mb = mb
-		mb:Refresh()
+		handle = result
+		element._mb = handle
+		mobileButtons[element] = handle
 	end
 
 	----------------------------------------------------------------
@@ -462,6 +1398,7 @@ local Library = (function()
 			closed = true
 			activeMenu = nil
 			capturing = nil
+			element._menuSwitch = nil
 			catcher:Destroy()
 			tween(menuScale, 0.15, { Scale = 0.85 }, Enum.EasingStyle.Quad)
 			tween(menu, 0.15, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
@@ -544,6 +1481,7 @@ local Library = (function()
 				}, rowFrame)
 				local switch = makeSwitch(rowFrame, Vector2.new(1, 0.5), UDim2.new(1, -8, 0.5, 0), 33)
 				switch.set(element.MobileButtonEnabled, false)
+				element._menuSwitch = switch
 				local toggleHit = newHit(rowFrame, 34)
 				toggleHit.Activated:Connect(function()
 					element:SetMobileButton(not element.MobileButtonEnabled)
@@ -615,8 +1553,8 @@ local Library = (function()
 
 	local function register(element)
 		if element.Flag then
-			Library.Flags[element.Flag] = element.Value
-			Library.Elements[element.Flag] = element
+			LayerLib.Flags[element.Flag] = element.Value
+			LayerLib.Elements[element.Flag] = element
 		end
 	end
 
@@ -626,8 +1564,7 @@ local Library = (function()
 			setKeybind(self, keyCode)
 		end
 		function element:SetMobileButton(state)
-			self.MobileButtonEnabled = state == true
-			if self.MobileButtonEnabled then
+			if state == true then
 				spawnMobileButton(self)
 			else
 				destroyMobileButton(self)
@@ -660,31 +1597,29 @@ local Library = (function()
 			local state = dragState
 			if not state then return end
 			if input.UserInputType ~= Enum.UserInputType.MouseMovement and input ~= state.input then return end
-			local delta = p2(input) - state.start
-			if state.kind == "window" then
-				local position = clampWindow(state.window, state.origin + delta)
-				state.window._position = position
-				state.window.root.Position = UDim2.fromOffset(math.floor(position.X), math.floor(position.Y))
-			elseif state.kind == "mb" then
-				if delta.Magnitude > 8 then state.moved = true end
-				if state.moved then state.mb:Move(state.origin + delta) end
-			elseif state.kind == "slider" then
-				state.slider:_dragTo(p2(input).X)
-			end
+			updateDrag(state, input)
 		end)
 
-		-- keep windows and mobile buttons on the screen if the screen changes size
+		-- a second way to notice the finger or button going up, in case the first one is missed
+		connections[#connections + 1] = UserInputService.InputEnded:Connect(function(input)
+			local state = dragState
+			if not state then return end
+			local sameInput = input == state.input
+				or (state.input.UserInputType == Enum.UserInputType.MouseButton1
+					and input.UserInputType == Enum.UserInputType.MouseButton1)
+			if sameInput then endDrag(state) end
+		end)
+
+		-- keep windows and popups on the screen if the screen changes size
 		connections[#connections + 1] = RunService.RenderStepped:Connect(function()
-			for _, window in ipairs(Library.Windows) do
-				local clamped = clampWindow(window, window._position)
-				if clamped ~= window._position then
-					window._position = clamped
-					window.root.Position = UDim2.fromOffset(math.floor(clamped.X), math.floor(clamped.Y))
+			for _, list in ipairs({ LayerLib.Windows, popupList }) do
+				for _, item in ipairs(list) do
+					local clamped = clampWindow(item, item._position)
+					if clamped ~= item._position then
+						item._position = clamped
+						item.root.Position = UDim2.fromOffset(math.floor(clamped.X), math.floor(clamped.Y))
+					end
 				end
-			end
-			for _, mb in pairs(mobileButtons) do
-				local clamped = clampCenter(mb._position, MB_SIZE / 2)
-				if clamped ~= mb._position then mb:Move(clamped) end
 			end
 		end)
 	end
@@ -695,7 +1630,7 @@ local Library = (function()
 	local Tab = {}
 	Tab.__index = Tab
 
-	function Library:CreateWindow(config)
+	function LayerLib:CreateWindow(config)
 		config = config or {}
 		local gui = getGui()
 		ensureInput()
@@ -704,6 +1639,7 @@ local Library = (function()
 		local TOP_H, TAB_H = 42, 36
 		local CONTENT_H = config.contentHeight or 250
 		local FULL_H = TOP_H + TAB_H + CONTENT_H
+		local RADIUS = 10
 
 		local window = {
 			Tabs = {},
@@ -725,13 +1661,15 @@ local Library = (function()
 			ClipsDescendants = true,
 			ZIndex = 1,
 		}, gui)
-		corner(root, 10)
+		corner(root, RADIUS)
 		outline(root)
 		local rootScale = make("UIScale", { Scale = 0.9 }, root)
 		tween(rootScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
 		window.root = root
 
-		-- top bar: icon + title on the left, minimize on the right
+		-- top bar: icon + title on the left, minimize on the right.
+		-- It has the same rounded corners as the window; the flat strip at its bottom squares
+		-- the lower corners while the window is open and fades out when it is minimized.
 		local topbar = make("Frame", {
 			Name = "TopBar",
 			Size = UDim2.new(1, 0, 0, TOP_H),
@@ -739,6 +1677,15 @@ local Library = (function()
 			BorderSizePixel = 0,
 			ZIndex = 5,
 		}, root)
+		corner(topbar, RADIUS)
+		local topbarFlat = make("Frame", {
+			Name = "Flat",
+			Position = UDim2.new(0, 0, 1, -RADIUS),
+			Size = UDim2.new(1, 0, 0, RADIUS),
+			BackgroundColor3 = THEME.topbar,
+			BorderSizePixel = 0,
+			ZIndex = 5,
+		}, topbar)
 
 		local titleX = 14
 		if hasIcon(config.icon) then
@@ -812,11 +1759,8 @@ local Library = (function()
 
 		-- the window is moved by its top bar
 		topbar.InputBegan:Connect(function(input)
-			if not isPress(input) or dragState then return end
-			dragState = { kind = "window", window = window, input = input, start = p2(input), origin = window._position }
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then dragState = nil end
-			end)
+			if not isPress(input) then return end
+			beginDrag({ kind = "window", window = window, input = input, start = p2(input), origin = window._position })
 		end)
 
 		-- tabs along the top
@@ -861,7 +1805,6 @@ local Library = (function()
 			ZIndex = 2,
 		}, root)
 
-		window.Library = Library
 		window._tabList = tabList
 		window._content = content
 
@@ -870,6 +1813,7 @@ local Library = (function()
 			self._height = self._minimized and TOP_H or FULL_H
 			closeMenu()
 			tween(root, 0.4, { Size = UDim2.fromOffset(WIDTH, self._height) }, Enum.EasingStyle.Quint)
+			tween(topbarFlat, 0.3, { BackgroundTransparency = self._minimized and 1 or 0 }, Enum.EasingStyle.Quad)
 			self._position = clampWindow(self, self._position)
 			tween(root, 0.4, { Position = UDim2.fromOffset(self._position.X, self._position.Y) }, Enum.EasingStyle.Quint)
 		end
@@ -971,7 +1915,7 @@ local Library = (function()
 			return tab
 		end
 
-		Library.Windows[#Library.Windows + 1] = window
+		LayerLib.Windows[#LayerLib.Windows + 1] = window
 		return window
 	end
 
@@ -1008,8 +1952,8 @@ local Library = (function()
 			if self.Value == value then return end
 			self.Value = value
 			switch.set(value)
-			if self.Flag then Library.Flags[self.Flag] = value end
-			if self._mb then self._mb:Refresh() end
+			if self.Flag then LayerLib.Flags[self.Flag] = value end
+			if self._mb then self._mb.SetState(value) end
 			if not silent then runCallback(self.Callback, value) end
 		end
 		function element:Get()
@@ -1048,17 +1992,16 @@ local Library = (function()
 		attachHover(row, hit)
 		attachOptions(window, element, row, 10)
 
+		-- runs the callback only (the mobile button already flashes by itself)
+		function element:_run()
+			runCallback(self.Callback)
+		end
 		-- a quick flash of the accent color when it is pressed
 		function element:Fire()
 			row.BackgroundColor3 = THEME.accent:Lerp(THEME.element, 0.55)
 			tween(row, 0.4, { BackgroundColor3 = THEME.element }, Enum.EasingStyle.Quint)
-			runCallback(self.Callback)
-			if self._mb then
-				tween(self._mb.frame, 0.08, { BackgroundColor3 = THEME.accent }, Enum.EasingStyle.Quad)
-				task.delay(0.1, function()
-					if self._mb then tween(self._mb.frame, 0.3, { BackgroundColor3 = THEME.element }, Enum.EasingStyle.Quad) end
-				end)
-			end
+			self:_run()
+			if self._mb then self._mb.Pulse() end
 		end
 		function element:_trigger()
 			self:Fire()
@@ -1074,6 +2017,7 @@ local Library = (function()
 
 	function Tab:CreateSlider(config)
 		config = config or {}
+		local tab = self
 		local minValue, maxValue = 0, 100
 		if type(config.range) == "table" then
 			minValue = tonumber(config.range[1]) or 0
@@ -1142,8 +2086,8 @@ local Library = (function()
 		corner(knob, 7)
 
 		local hit = make("TextButton", {
-			Position = UDim2.fromOffset(0, 24),
-			Size = UDim2.new(1, 0, 0, 30),
+			Position = UDim2.fromOffset(0, 22),
+			Size = UDim2.new(1, 0, 0, 32),
 			BackgroundTransparency = 1,
 			Text = "",
 			AutoButtonColor = false,
@@ -1154,13 +2098,12 @@ local Library = (function()
 
 		local function render(animate)
 			local alpha = (element.Value - minValue) / (maxValue - minValue)
-			local time = animate == false and 0 or 0.08
-			if time == 0 then
+			if animate == false then
 				fill.Size = UDim2.fromScale(alpha, 1)
 				knob.Position = UDim2.fromScale(alpha, 0.5)
 			else
-				tween(fill, time, { Size = UDim2.fromScale(alpha, 1) }, Enum.EasingStyle.Linear)
-				tween(knob, time, { Position = UDim2.fromScale(alpha, 0.5) }, Enum.EasingStyle.Linear)
+				tween(fill, 0.08, { Size = UDim2.fromScale(alpha, 1) }, Enum.EasingStyle.Linear)
+				tween(knob, 0.08, { Position = UDim2.fromScale(alpha, 0.5) }, Enum.EasingStyle.Linear)
 			end
 			valueLabel.Text = string.format("%." .. decimals .. "f", element.Value)
 		end
@@ -1171,7 +2114,7 @@ local Library = (function()
 			if value == self.Value then return end
 			self.Value = value
 			render()
-			if self.Flag then Library.Flags[self.Flag] = value end
+			if self.Flag then LayerLib.Flags[self.Flag] = value end
 			if not silent then runCallback(self.Callback, value) end
 		end
 		function element:Get()
@@ -1182,17 +2125,24 @@ local Library = (function()
 			self:Set(minValue + (maxValue - minValue) * alpha)
 		end
 
+		-- Press and hold on the bar, then slide. The tab's page stops scrolling while you do it,
+		-- otherwise a finger moving sideways gets taken over by the scrolling and only a tap lands.
 		hit.InputBegan:Connect(function(input)
-			if not isPress(input) or dragState then return end
-			dragState = { kind = "slider", slider = element, input = input }
+			if not isPress(input) then return end
+			local page = tab._page
+			local started = beginDrag({
+				kind = "slider",
+				slider = element,
+				input = input,
+				onEnd = function()
+					page.ScrollingEnabled = true
+					tween(knob, 0.2, { Size = UDim2.fromOffset(14, 14) }, Enum.EasingStyle.Quad)
+				end,
+			})
+			if not started then return end
+			page.ScrollingEnabled = false
 			tween(knob, 0.15, { Size = UDim2.fromOffset(18, 18) }, Enum.EasingStyle.Back)
 			element:_dragTo(p2(input).X)
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragState = nil
-					tween(knob, 0.2, { Size = UDim2.fromOffset(14, 14) }, Enum.EasingStyle.Quad)
-				end
-			end)
 		end)
 
 		register(element)
@@ -1331,7 +2281,7 @@ local Library = (function()
 			self.Value = value
 			refresh()
 			if changed then
-				if self.Flag then Library.Flags[self.Flag] = value end
+				if self.Flag then LayerLib.Flags[self.Flag] = value end
 				if not silent then runCallback(self.Callback, value) end
 			end
 		end
@@ -1350,70 +2300,112 @@ local Library = (function()
 	end
 
 	----------------------------------------------------------------
-	-- Popup: a big window with options to pick from. It has no close button: it closes itself when
-	-- an option is picked (pass closeOnSelect = false to keep it open and close it from code).
+	-- Popup: a grid of tiles (image on top, a bar under it, the name below).
+	-- It sits on the screen with no dimmed background, you drag it by its top bar, picking a tile
+	-- highlights it and does not close it. It only closes with Popup:Close().
 	----------------------------------------------------------------
-	function Library:CreatePopup(config)
+	function LayerLib:CreatePopup(config)
 		config = config or {}
 		local gui = getGui()
-		local options = config.options or {}
-		local popup = {}
+		ensureInput()
 
-		local backdrop = make("TextButton", {
-			Name = "PopupBackdrop",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = Color3.new(0, 0, 0),
-			BackgroundTransparency = 1,
-			Text = "",
-			AutoButtonColor = false,
-			Selectable = false,
-			ZIndex = 100,
-		}, gui)
-		tween(backdrop, 0.3, { BackgroundTransparency = 0.5 }, Enum.EasingStyle.Quad)
+		local options = {}
+		for _, option in ipairs(config.options or {}) do options[#options + 1] = option end
+		local flag = config.flag
+		local accent = toColor3(config.color, THEME.accent) -- the bar under each tile: Color3 or { r, g, b }
 
-		local ROW_H = 46
+		-- one popup per flag: opening it again replaces the old one
+		if flag and openPopups[flag] then openPopups[flag]:Close(true) end
+
+		local TILE_W, TILE_H, GAP, PAD, HEAD_H, RADIUS = 132, 150, 8, 14, 40, 12
+		local BAR_LINE = 104 -- the line the bar sits on (the highlight ends here too)
+
 		local v = viewport()
-		local width = math.min(360, v.X - 24)
-		local listHeight = #options * (ROW_H + 6) + 6
-		local height = math.min(listHeight + 64, math.max(160, v.Y * 0.75))
+		local cols = math.max(1, math.floor(tonumber(config.columns) or 4))
+		cols = math.max(1, math.min(cols, math.floor((v.X - 20 - PAD * 2 + GAP) / (TILE_W + GAP))))
+		local rows = math.max(1, math.ceil(#options / cols))
+		local width = cols * TILE_W + (cols - 1) * GAP + PAD * 2
+		local gridHeight = rows * TILE_H + (rows - 1) * GAP + PAD * 2
+		local height = math.min(HEAD_H + gridHeight, math.max(HEAD_H + TILE_H + PAD * 2, v.Y - 20))
 
-		local panel = make("Frame", {
+		local popup = { Name = config.name or "Popup", Flag = flag, _width = width, _height = height }
+		popup._position = clampWindow(popup, Vector2.new(math.floor((v.X - width) / 2), math.floor((v.Y - height) / 2)))
+
+		local root = make("Frame", {
 			Name = "Popup",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
+			Position = UDim2.fromOffset(popup._position.X, popup._position.Y),
 			Size = UDim2.fromOffset(width, height),
 			BackgroundColor3 = THEME.window,
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
-			ZIndex = 101,
-		}, backdrop)
-		corner(panel, 12)
-		outline(panel)
-		local panelScale = make("UIScale", { Scale = 0.88 }, panel)
-		tween(panelScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+			ZIndex = 100,
+		}, gui)
+		corner(root, RADIUS)
+		outline(root)
+		local rootScale = make("UIScale", { Scale = 0.9 }, root)
+		tween(rootScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+		popup.root = root
 
-		make("TextLabel", {
-			Position = UDim2.fromOffset(18, 0),
-			Size = UDim2.new(1, -36, 0, 52),
-			BackgroundTransparency = 1,
-			Text = config.name or "Popup",
-			TextColor3 = THEME.text,
-			TextSize = 16,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Font = Enum.Font.GothamBold,
-			ZIndex = 102,
-		}, panel)
+		-- top bar (rounded like the window): the title and a small grip, drag it to move the popup
+		local head = make("Frame", {
+			Name = "Head",
+			Size = UDim2.new(1, 0, 0, HEAD_H),
+			BackgroundColor3 = THEME.topbar,
+			BorderSizePixel = 0,
+			ZIndex = 2,
+		}, root)
+		corner(head, RADIUS)
 		make("Frame", {
-			Position = UDim2.fromOffset(0, 52),
+			Position = UDim2.new(0, 0, 1, -RADIUS),
+			Size = UDim2.new(1, 0, 0, RADIUS),
+			BackgroundColor3 = THEME.topbar,
+			BorderSizePixel = 0,
+			ZIndex = 2,
+		}, head)
+		make("TextLabel", {
+			Position = UDim2.fromOffset(16, 0),
+			Size = UDim2.new(0.5, -16, 1, 0),
+			BackgroundTransparency = 1,
+			Text = popup.Name,
+			TextColor3 = THEME.text,
+			TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Font = Enum.Font.GothamBold,
+			ZIndex = 3,
+		}, head)
+		local grip = make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(40, 3),
+			BackgroundColor3 = THEME.white,
+			BackgroundTransparency = 0.8,
+			BorderSizePixel = 0,
+			ZIndex = 3,
+		}, head)
+		corner(grip, 2)
+		make("Frame", {
+			Position = UDim2.fromOffset(0, HEAD_H),
 			Size = UDim2.new(1, 0, 0, 1),
 			BackgroundColor3 = THEME.stroke,
 			BorderSizePixel = 0,
-			ZIndex = 102,
-		}, panel)
+			ZIndex = 3,
+		}, root)
+
+		head.InputBegan:Connect(function(input)
+			if not isPress(input) then return end
+			if beginDrag({
+				kind = "window", window = popup, input = input, start = p2(input), origin = popup._position,
+				onEnd = function() tween(grip, 0.25, { BackgroundTransparency = 0.8 }, Enum.EasingStyle.Quad) end,
+			}) then
+				tween(grip, 0.15, { BackgroundTransparency = 0.4 }, Enum.EasingStyle.Quad)
+			end
+		end)
 
 		local scroller = make("ScrollingFrame", {
-			Position = UDim2.fromOffset(0, 53),
-			Size = UDim2.new(1, 0, 1, -53),
+			Name = "Grid",
+			Position = UDim2.fromOffset(0, HEAD_H + 1),
+			Size = UDim2.new(1, 0, 1, -(HEAD_H + 1)),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			ScrollBarThickness = 3,
@@ -1421,126 +2413,231 @@ local Library = (function()
 			CanvasSize = UDim2.new(),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
-			ZIndex = 102,
-		}, panel)
-		make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, scroller)
-		make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10) }, scroller)
+			ZIndex = 2,
+		}, root)
+		make("UIGridLayout", {
+			CellSize = UDim2.fromOffset(TILE_W, TILE_H),
+			CellPadding = UDim2.fromOffset(GAP, GAP),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		}, scroller)
+		make("UIPadding", {
+			PaddingLeft = UDim.new(0, PAD), PaddingRight = UDim.new(0, PAD),
+			PaddingTop = UDim.new(0, PAD - 4), PaddingBottom = UDim.new(0, PAD),
+		}, scroller)
 
 		local closed = false
-		function popup:Close()
-			if closed then return end
-			closed = true
-			tween(panelScale, 0.2, { Scale = 0.9 }, Enum.EasingStyle.Quad)
-			tween(backdrop, 0.2, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
-			task.delay(0.21, function() backdrop:Destroy() end)
-		end
-
-		local selectedIndex = nil
+		local selected = nil -- index of the selected option
 		local entries = {}
 
-		local function updateMarks()
-			for index, entry in ipairs(entries) do
-				local on = index == selectedIndex
-				tween(entry.dot, 0.2, { Size = on and UDim2.fromOffset(10, 10) or UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Back)
-				tween(entry.row, 0.2, { BackgroundColor3 = on and THEME.elementHover or THEME.element }, Enum.EasingStyle.Quad)
+		local function findIndex(name)
+			for index, option in ipairs(options) do
+				if option.name == name then return index end
 			end
+			return nil
+		end
+
+		-- the core: change the selection (the old option gets callback(false), the new one callback(true))
+		local function setSelected(newIndex, silent)
+			local previous = selected
+			if previous == newIndex then return end
+			selected = newIndex
+			if previous and entries[previous] then entries[previous].visual(false) end
+			if newIndex and entries[newIndex] then entries[newIndex].visual(true) end
+			if silent then return end
+			if previous then runCallback(options[previous].callback, false) end
+			if newIndex then runCallback(options[newIndex].callback, true) end
+			if config.autoSave == true then popup:Save() end
 		end
 
 		for index, option in ipairs(options) do
-			local row = make("TextButton", {
+			local tile = make("TextButton", {
+				Name = "Tile",
 				LayoutOrder = index,
-				Size = UDim2.new(1, 0, 0, ROW_H),
-				BackgroundColor3 = THEME.element,
+				BackgroundTransparency = 1,
 				Text = "",
 				AutoButtonColor = false,
 				Selectable = false,
-				ZIndex = 103,
+				ZIndex = 2,
 			}, scroller)
-			corner(row, 8)
-			outline(row)
-			local rowScale = make("UIScale", { Scale = 1 }, row)
-			attachPress(row, rowScale, 0.98)
+			local tileScale = make("UIScale", { Scale = 1 }, tile)
+			attachPress(tile, tileScale, 0.96)
 
-			local textX = 14
-			if hasIcon(option.icon) then
-				makeIcon(row, option.icon, 22, THEME.text, {
-					AnchorPoint = Vector2.new(0, 0.5),
-					Position = UDim2.new(0, 12, 0.5, 0),
-					ZIndex = 104,
-				})
-				textX = 12 + 22 + 10
-			end
-			make("TextLabel", {
-				Position = UDim2.fromOffset(textX, 0),
-				Size = UDim2.new(1, -(textX + 40), 1, 0),
+			-- the highlight panel behind the image and the bar (only the selected tile shows it)
+			local highlight = make("Frame", {
+				Name = "Highlight",
+				Size = UDim2.new(1, 0, 0, BAR_LINE),
+				BackgroundColor3 = THEME.element,
 				BackgroundTransparency = 1,
-				Text = option.name or ("Option " .. index),
-				TextColor3 = THEME.text,
-				TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Font = Enum.Font.GothamMedium,
-				ZIndex = 104,
-			}, row)
-
-			-- a round mark on the right that fills in when the option is selected
-			local mark = make("Frame", {
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -14, 0.5, 0),
-				Size = UDim2.fromOffset(18, 18),
-				BackgroundTransparency = 1,
-				ZIndex = 104,
-			}, row)
-			corner(mark, 9)
-			outline(mark, THEME.subtext)
-			local dot = make("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(0, 0),
-				BackgroundColor3 = THEME.accent,
 				BorderSizePixel = 0,
-				ZIndex = 105,
-			}, mark)
-			corner(dot, 5)
-			entries[index] = { row = row, dot = dot }
+				ZIndex = 2,
+			}, tile)
+			corner(highlight, 10)
 
-			if option.selected then selectedIndex = index end
+			local imageY = (BAR_LINE - 10) / 2
+			if hasIcon(option.icon) then
+				make("ImageLabel", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0.5, 0, 0, imageY),
+					Size = UDim2.fromOffset(66, 66),
+					BackgroundTransparency = 1,
+					Image = assetUrl(option.icon),
+					ScaleType = Enum.ScaleType.Fit,
+					ZIndex = 3,
+				}, tile)
+			else
+				-- no image: the first letter stands in for it
+				make("TextLabel", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0.5, 0, 0, imageY),
+					Size = UDim2.fromOffset(66, 66),
+					BackgroundTransparency = 1,
+					Text = string.upper(string.sub(tostring(option.name or "?"), 1, 1)),
+					TextColor3 = THEME.subtext,
+					TextSize = 38,
+					Font = Enum.Font.GothamBold,
+					ZIndex = 3,
+				}, tile)
+			end
 
-			row.MouseEnter:Connect(function()
-				if index ~= selectedIndex then tween(row, 0.15, { BackgroundColor3 = THEME.elementHover }, Enum.EasingStyle.Quad) end
+			-- the bar: a thin line, and on the selected tile a bigger block sitting on the line
+			local bar = make("Frame", {
+				Name = "Bar",
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.new(0.5, 0, 0, BAR_LINE),
+				Size = UDim2.new(0.62, 0, 0, 4),
+				BackgroundColor3 = accent,
+				BackgroundTransparency = 0.35,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+			}, tile)
+			local barCorner = corner(bar, 2)
+			local barFlat = make("Frame", {
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.fromScale(0, 1),
+				Size = UDim2.new(1, 0, 0, 9),
+				BackgroundColor3 = accent,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+			}, bar)
+
+			local label = make("TextLabel", {
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, BAR_LINE + 8),
+				Size = UDim2.new(1, -12, 0, TILE_H - BAR_LINE - 12),
+				BackgroundTransparency = 1,
+				Text = tostring(option.name or ("Option " .. index)),
+				TextColor3 = THEME.text,
+				TextSize = 13,
+				TextWrapped = true,
+				Font = Enum.Font.GothamMedium,
+				ZIndex = 3,
+			}, tile)
+
+			local entry = { on = false }
+			function entry.visual(on)
+				entry.on = on
+				tween(highlight, 0.25, { BackgroundTransparency = on and 0 or 1 }, Enum.EasingStyle.Quad)
+				tween(bar, 0.4, {
+					Size = on and UDim2.new(0.74, 0, 0, 22) or UDim2.new(0.62, 0, 0, 4),
+					BackgroundTransparency = on and 0 or 0.35,
+				}, Enum.EasingStyle.Back)
+				tween(barCorner, 0.3, { CornerRadius = UDim.new(0, on and 7 or 2) }, Enum.EasingStyle.Quad)
+				tween(barFlat, 0.3, { BackgroundTransparency = on and 0 or 1 }, Enum.EasingStyle.Quad)
+				label.Font = on and Enum.Font.GothamBold or Enum.Font.GothamMedium
+			end
+			entries[index] = entry
+
+			tile.MouseEnter:Connect(function()
+				if not entry.on then tween(highlight, 0.15, { BackgroundTransparency = 0.75 }, Enum.EasingStyle.Quad) end
 			end)
-			row.MouseLeave:Connect(function()
-				if index ~= selectedIndex then tween(row, 0.2, { BackgroundColor3 = THEME.element }, Enum.EasingStyle.Quad) end
+			tile.MouseLeave:Connect(function()
+				if not entry.on then tween(highlight, 0.2, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad) end
 			end)
-			row.Activated:Connect(function()
+			tile.Activated:Connect(function()
 				if closed then return end
-				local previous = selectedIndex
-				selectedIndex = index
-				updateMarks()
-				if previous and previous ~= index then
-					runCallback(options[previous].callback, false)
-				end
-				runCallback(option.callback, true)
-				if config.closeOnSelect ~= false then
-					task.delay(0.25, function() popup:Close() end)
-				end
+				setSelected(index)
 			end)
 		end
-		updateMarks()
 
+		----------------------------------------------------------------
+		-- Popup methods
+		----------------------------------------------------------------
+		-- picks an option by its name, like a click would
+		function popup:Select(name)
+			if closed then return false end
+			local index = findIndex(name)
+			if not index then return false end
+			setSelected(index)
+			return true
+		end
+
+		-- nothing selected any more
+		function popup:Reset()
+			if closed then return end
+			setSelected(nil)
+		end
+
+		-- remembers the current pick under the flag, so a popup opened later with the same flag starts on it
+		-- (kept until the game closes, not saved to a file)
+		function popup:Save()
+			if not flag then return end
+			popupSaves[flag] = selected and options[selected].name or false
+		end
+
+		function popup:GetSelected()
+			return selected and options[selected].name or nil
+		end
+
+		function popup:Close(instant)
+			if closed then return end
+			closed = true
+			if flag and openPopups[flag] == popup then openPopups[flag] = nil end
+			local at = table.find(popupList, popup)
+			if at then table.remove(popupList, at) end
+			if dragState and dragState.window == popup then endDrag(dragState) end
+			if instant then
+				root:Destroy()
+				return
+			end
+			tween(rootScale, 0.2, { Scale = 0.88 }, Enum.EasingStyle.Quad)
+			task.delay(0.2, function() root:Destroy() end)
+		end
+
+		-- start on the saved option (without running its callback), else on the one marked selected = true
+		local startIndex = nil
+		if flag and popupSaves[flag] then
+			startIndex = findIndex(popupSaves[flag])
+		elseif not (flag and popupSaves[flag] == false) then
+			for index, option in ipairs(options) do
+				if option.selected == true then startIndex = index end
+			end
+		end
+		if startIndex then setSelected(startIndex, true) end
+
+		popupList[#popupList + 1] = popup
+		if flag then openPopups[flag] = popup end
 		return popup
 	end
 
-	function Library:Destroy()
+	function LayerLib:Destroy()
+		local gone = {}
+		for element in pairs(mobileButtons) do gone[#gone + 1] = element end
+		for _, element in ipairs(gone) do destroyMobileButton(element) end
 		for _, connection in ipairs(connections) do connection:Disconnect() end
 		table.clear(connections)
 		for _, element in ipairs(table.clone(keybindElements)) do setKeybind(element, nil) end
 		if screenGui then screenGui:Destroy() end
 		screenGui = nil
-		table.clear(Library.Windows)
-		table.clear(mobileButtons)
+		table.clear(LayerLib.Windows)
+		table.clear(popupList)
+		table.clear(openPopups)
+		dragState = nil
 		inputReady = false
 	end
-        return Library
-    end)()
-return Library
+   
+                    	return LayerLib
+               end)()
+return LayerLib
