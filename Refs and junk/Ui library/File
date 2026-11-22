@@ -177,7 +177,7 @@ local LayerLib = (function()
 		local GLOW_BRIGHTNESS = 0.50
 		local GLOW_SLICE = 0.4
 		local SCREEN_MARGIN = 6
-		local TEXT_NUDGE_Y = -30
+		local TEXT_NUDGE_Y = 0
 		local BAR_DISTANCE = 5
 		local DRAG_FOLLOW_SPEED = 9
 		local RESIZE_FOLLOW_SPEED = 26
@@ -187,7 +187,7 @@ local LayerLib = (function()
 		local MORPH_FOLLOW_SPEED = 10                  -- lower = slower, smoother shape changes
 		local SAVE_POSITION = true                     -- remember where you left each button (by its FLAG)
 		local SAVE_FILE = "MobileButtons_Positions.json" -- must match ResetMBPositions
-		local MODE_NAMES = { default = "Default", pill = "Pill", circle = "Circle" } -- shown when the shape changes
+		local MODE_NAMES = { default = "Square", pill = "Pill", circle = "Circle" } -- shown when the shape changes
 		local MODE_TEXT_TIME = 1                       -- seconds the shape name stays before fading back to the title
 
 		local TAG = "DraggableBoxGui" -- must match DestroyAllGuis
@@ -2652,93 +2652,7 @@ local LayerLib = (function()
 		dragState = nil
 		inputReady = false
 	end
-
-	return LayerLib
-end)()
-
-----------------------------------------------------------------
--- TEST
--- Put your own asset ids in these (0 = no icon / a drawn one instead)
-----------------------------------------------------------------
-local ICON_WINDOW = 0
-local ICON_MINIMIZE = 0
-local ICON_OPTIONS = 0 -- the 3 dots
-local ICON_TAB = 0
-
-local window = LayerLib:CreateWindow({
-	title = "Test",         -- the title in the top bar
-	icon = ICON_WINDOW,     -- 0 = no icon, and the title sits on the left with no gap
-	CloseIcon = ICON_MINIMIZE,
-	TBOptionsIcon = ICON_OPTIONS,
-})
-
-local tab = window:CreateTab({ name = "tab test", icon = ICON_TAB })
-
-tab:CreateToggle({
-	name = "Toggle",
-	haveKeybinds = true,
-	haveMB = true,
-	flag = "ToggleFlag",
-	value = false,
-	callback = function(v)
-		print("Toggle:", v)
-	end,
-})
-
-tab:CreateButton({
-	name = "Button",
-	haveKeybinds = true,
-	haveMB = true,
-	flag = "ButtonFlag",
-	callback = function()
-		print("button clicked")
-	end,
-})
-
-tab:CreateSlider({
-	name = "Slider",
-	range = { 0, 120 },
-	increment = 0.01,
-	flag = "SliderFlag",
-	value = 10,
-	callback = function(value)
-		print("Slider:", value)
-	end,
-})
-
-tab:CreateDropdown({
-	name = "DropDown",
-	options = { "option 1", "option 2", "option 3" },
-	flag = "DropDownFlag",
-	value = "option 1",
-	callback = function(selected)
-		print("Dropdown:", selected)
-	end,
-})
-
-local tab2 = window:CreateTab({ name = "popup test", icon = ICON_TAB })
-
-local Popup1 -- set when the popup is opened
-
-tab2:CreateButton({
-	name = "Open Popup",
-	callback = function()
-		Popup1 = LayerLib:CreatePopup({
-			name = "Popup1",
-			flag = "Popup1",    -- the save key for reopens
-			autoSave = false,   -- if it auto saves
-			options = {
-				{
-					name = "Option 1", icon = 0, callback = function(isSelected)
-						print("Option 1 Selected!", isSelected)
-					end,
-				},
-				{
-					name = "Option 2", icon = 0, callback = function(isSelected)
-						print("Option 2 Selected!", isSelected)
-					end,
-				},
-			},
-		})
-	end,
-})
+   
+                    	return LayerLib
+               end)()
+return LayerLib
