@@ -1,7 +1,3 @@
--- UI Library (basic dark theme, runs in CoreGui)
---
--- The first part is the library body: it only declares what everything is, it doesn't build any UI.
--- The second part (below "TEST") builds a small window to try it out.
 -- To use the library from a loadstring, put the body in its own file and end it with `return Library`.
 
 ----------------------------------------------------------------
