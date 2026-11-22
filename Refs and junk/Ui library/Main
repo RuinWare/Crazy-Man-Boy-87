@@ -1,5 +1,12 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/UI"))()
 
+local window = Library:CreateWindow({
+	title = "RuinWare",         -- the title in the top bar of the window.
+	icon = 0,      -- the icon for the title, if 0 no icon will show.
+	CloseIcon = 105495420516711,       -- the minimize icon
+	TBOptionsIcon = 123906774409861,    -- the icon for the mobile buttons / keybinds
+})
+
 local tab = window:CreateTab({ name = "Main", icon = 123906774409861 })
 
 do
