@@ -63,3 +63,6 @@ RunService.Heartbeat:Connect(function()
       	end
     end)
 end
+
+task.wait(5)
+Library:Destroy
