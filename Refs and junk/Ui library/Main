@@ -1,2 +1,12 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/File"))()
 
+tab:CreateToggle({
+	name = "Aimbot",
+	haveKeybinds = true,
+	haveMB = true,
+	flag = "aimbotflag",
+	value = false,
+	callback = function(v)
+		print("Toggle:", v)
+	end,
+})
