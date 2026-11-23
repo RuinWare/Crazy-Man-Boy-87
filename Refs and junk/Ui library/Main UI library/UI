@@ -1,1 +1,4607 @@
+-- Library (the main UI)
+--
+-- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
+-- search, a Settings tab that is always there, notifications and toasts.
+--
+-- The first part is the library body (it only declares things, nothing is built until CreateWindow is called).
+-- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
+-- file and end it with `return Library`.
+--
+-- Handles: every Create... call returns an empty handle. Read and write values through the window:
+--   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
+--   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
+
+----------------------------------------------------------------
+-- LIBRARY BODY
+----------------------------------------------------------------
+local Library = (function()
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local TweenService = game:GetService("TweenService")
+	local UserInputService = game:GetService("UserInputService")
+	local GuiService = game:GetService("GuiService")
+	local HttpService = game:GetService("HttpService")
+	local TextService = game:GetService("TextService")
+
+	local Library = { Windows = {} }
+
+	-- the icons that are part of the UI itself (they are not declared in your script)
+	local ICON_CLOSE = 105495420516711
+	local ICON_CLOSE_CROPPED = 79433481401060
+	local ICON_SEARCH = 77209819096039
+	local ICON_SETTINGS = 140694242057630
+	local ICON_DOTS = 123906774409861
+	local GLOW_ASSET = "rbxassetid://138843696730147"
+
+	-- sizes (pixels)
+	local C = {
+		HEADER_H = 54,
+		SIDEBAR_W = 168,
+		PANEL_PAD = 8,
+		TAB_H = 34,
+		ROW_H = 38,
+		PROFILE_H = 64,
+		PAGE_PAD = 12,
+		COL_GAP = 10,
+		START_SIZE = Vector2.new(680, 420),
+		MIN_SIZE = Vector2.new(500, 280),
+		MAX_SIZE = Vector2.new(1100, 760),
+		SCREEN_MARGIN = 6,
+		-- drag bar + resize corner (same as the mobile buttons)
+		BAR_DISTANCE = 5,
+		BAR_SIZE = Vector2.new(51, 3),
+		BAR_SIZE_ACTIVE = Vector2.new(61, 4),
+		BAR_HIT = Vector2.new(72, 22),
+		DRAG_FOLLOW_SPEED = 9,
+		RESIZE_FOLLOW_SPEED = 26,
+		BAR_IDLE = 0.55,
+		ICON_IDLE = 0.45,
+		ICON_R = 15,
+		ICON_THICK = 2.5,
+		ICON_INSET = 12,
+		GLOW_SPREAD = 46,
+		GLOW_BRIGHTNESS = 0.3,
+		GLOW_SLICE = 0.4,
+	}
+	C.BAR_BELOW = C.BAR_DISTANCE + C.BAR_HIT.Y / 2
+
+	-- colors (plain gray, no blue)
+	local T = {
+		base = Color3.fromRGB(17, 17, 17),
+		baseAlpha = 0.06,
+		panel = Color3.fromRGB(24, 24, 24),
+		panelAlpha = 0.04,
+		card = Color3.fromRGB(30, 30, 30),
+		line = Color3.fromRGB(46, 46, 46),
+		chip = Color3.fromRGB(42, 42, 42),
+		chipHover = Color3.fromRGB(54, 54, 54),
+		selected = Color3.fromRGB(38, 38, 38),
+		text = Color3.fromRGB(236, 236, 236),
+		sub = Color3.fromRGB(140, 140, 140),
+		green = Color3.fromRGB(48, 209, 88),
+		off = Color3.fromRGB(54, 54, 54),
+		knobOff = Color3.fromRGB(150, 150, 150),
+		white = Color3.new(1, 1, 1),
+	}
+
+	local U, D, K, S, N, E, W = {}, {}, {}, {}, {}, {}, {}
+
+	----------------------------------------------------------------
+	-- Helpers
+	----------------------------------------------------------------
+	do
+		local gui = nil
+		local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+		local rng = Random.new()
+
+		function U.tween(obj, time, props, style, direction)
+			local t = TweenService:Create(
+				obj,
+				TweenInfo.new(time, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out),
+				props
+			)
+			t:Play()
+			return t
+		end
+
+		function U.make(class, props, parent)
+			local inst = Instance.new(class)
+			for key, value in pairs(props) do
+				inst[key] = value
+			end
+			inst.Parent = parent
+			return inst
+		end
+
+		function U.corner(parent, radius)
+			return U.make("UICorner", { CornerRadius = typeof(radius) == "UDim" and radius or UDim.new(0, radius) }, parent)
+		end
+
+		function U.stroke(parent, color, transparency, thickness)
+			return U.make("UIStroke", {
+				Color = color or T.line,
+				Transparency = transparency or 0,
+				Thickness = thickness or 1,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}, parent)
+		end
+
+		function U.label(parent, props)
+			local p = {
+				BackgroundTransparency = 1,
+				Text = "",
+				TextColor3 = T.text,
+				TextSize = 13,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+			}
+			for key, value in pairs(props) do p[key] = value end
+			return U.make("TextLabel", p, parent)
+		end
+
+		function U.button(parent, props)
+			local p = {
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+			}
+			for key, value in pairs(props or {}) do p[key] = value end
+			return U.make("TextButton", p, parent)
+		end
+
+		function U.isPress(input)
+			return input.UserInputType == Enum.UserInputType.MouseButton1
+				or input.UserInputType == Enum.UserInputType.Touch
+		end
+
+		function U.p2(input)
+			return Vector2.new(input.Position.X, input.Position.Y)
+		end
+
+		-- screen coordinates that match AbsolutePosition (the GUIs here ignore the top bar inset)
+		function U.screenPos(input)
+			local inset = GuiService:GetGuiInset()
+			return Vector2.new(input.Position.X + inset.X, input.Position.Y + inset.Y)
+		end
+
+		function U.hasIcon(id)
+			return id ~= nil and id ~= 0 and id ~= "0" and id ~= ""
+		end
+
+		function U.assetUrl(id)
+			if type(id) == "string" and id:find("://", 1, true) then return id end
+			return "rbxassetid://" .. tostring(id)
+		end
+
+		-- runs a callback on its own thread so an error in it can't break the UI
+		function U.run(callback, ...)
+			if type(callback) ~= "function" then return end
+			local args = table.pack(...)
+			task.spawn(function()
+				local ok, err = pcall(callback, table.unpack(args, 1, args.n))
+				if not ok then warn("[Library] " .. tostring(err)) end
+			end)
+		end
+
+		function U.randomName(length)
+			local out = {}
+			for i = 1, length do
+				local n = rng:NextInteger(1, #CHARS)
+				out[i] = CHARS:sub(n, n)
+			end
+			return table.concat(out)
+		end
+
+		-- hidden UI container > CoreGui > PlayerGui
+		function U.parentGui(target)
+			local places = {}
+			if gethui then
+				local ok, container = pcall(gethui)
+				if ok and container then places[#places + 1] = container end
+			end
+			local okCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+			if okCore and coreGui then places[#places + 1] = coreGui end
+			local localPlayer = Players.LocalPlayer
+			local playerGui = localPlayer and localPlayer:FindFirstChildOfClass("PlayerGui")
+			if playerGui then places[#places + 1] = playerGui end
+			for _, place in ipairs(places) do
+				local ok = pcall(function() target.Parent = place end)
+				if ok and target.Parent == place then return end
+			end
+		end
+
+		-- the one ScreenGui everything lives in
+		function U.gui()
+			if gui and gui.Parent then return gui end
+			gui = U.make("ScreenGui", {
+				Name = U.randomName(20),
+				ResetOnSpawn = false,
+				IgnoreGuiInset = true,
+				DisplayOrder = 2147483000,
+				ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			}, nil)
+			U.parentGui(gui)
+			return gui
+		end
+
+		function U.destroyGui()
+			if gui then gui:Destroy() end
+			gui = nil
+		end
+
+		function U.viewport()
+			if gui and gui.AbsoluteSize.X > 1 and gui.AbsoluteSize.Y > 1 then return gui.AbsoluteSize end
+			return workspace.CurrentCamera.ViewportSize
+		end
+
+		-- how many decimals a step like 0.01 has
+		function U.decimalsOf(step)
+			local text = string.format("%.8f", step)
+			text = text:gsub("0+$", "")
+			local decimals = text:match("%.(%d*)$")
+			return decimals and #decimals or 0
+		end
+
+		function U.rgbOf(color)
+			return math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5)
+		end
+
+		function U.copyList(list)
+			local out = {}
+			for index, value in ipairs(list) do out[index] = value end
+			return out
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Storage: one file per window name (settings, last session, saved configurations, window position)
+	----------------------------------------------------------------
+	do
+		local canFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+		local memory = {}
+		pcall(function()
+			if getgenv then
+				local env = getgenv()
+				env.__LibraryMemory = env.__LibraryMemory or {}
+				memory = env.__LibraryMemory
+			end
+		end)
+
+		function S.file(name)
+			local clean = tostring(name):gsub("[^%w_%-]", "_")
+			return "Library_" .. clean .. ".json"
+		end
+
+		function S.read(name)
+			local file = S.file(name)
+			local ok, data = pcall(function()
+				if canFiles then
+					if not isfile(file) then return nil end
+					return HttpService:JSONDecode(readfile(file))
+				end
+				if memory[file] then return HttpService:JSONDecode(memory[file]) end
+				return nil
+			end)
+			if ok and type(data) == "table" then return data end
+			return {}
+		end
+
+		function S.write(name, data)
+			local file = S.file(name)
+			local ok, text = pcall(function() return HttpService:JSONEncode(data) end)
+			if not ok then return false end
+			if canFiles then
+				return (pcall(writefile, file, text))
+			end
+			memory[file] = text
+			return true
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Keys: bound keys, and "press a key" capture
+	----------------------------------------------------------------
+	do
+		K.list = {}       -- elements that have a key
+		K.capturing = nil -- when set, the next key press goes to this function
+
+		local NAMES = {
+			One = "1", Two = "2", Three = "3", Four = "4", Five = "5",
+			Six = "6", Seven = "7", Eight = "8", Nine = "9", Zero = "0",
+			Return = "Enter", Backquote = "`", Minus = "-", Equals = "=",
+			LeftBracket = "[", RightBracket = "]", Semicolon = ";", Quote = "'",
+			Comma = ",", Period = ".", Slash = "/", BackSlash = "\\",
+		}
+
+		-- Q, E, Left Shift, Caps Lock ...
+		function K.label(keyCode)
+			if not keyCode then return "None" end
+			local name = keyCode.Name
+			if NAMES[name] then return NAMES[name] end
+			return (name:gsub("(%l)(%u)", "%1 %2"))
+		end
+
+		function K.add(element)
+			if not table.find(K.list, element) then K.list[#K.list + 1] = element end
+		end
+
+		function K.remove(element)
+			local index = table.find(K.list, element)
+			if index then table.remove(K.list, index) end
+		end
+
+		-- cancel runs if the capture is replaced or abandoned
+		function K.capture(callback, cancel)
+			if K.capturing and K.cancel then K.cancel() end
+			K.capturing = callback
+			K.cancel = cancel
+		end
+
+		function K.began(input)
+			if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+			if K.capturing then
+				local callback = K.capturing
+				K.capturing = nil
+				K.cancel = nil
+				callback(input.KeyCode)
+				return
+			end
+			if UserInputService:GetFocusedTextBox() then return end
+			for _, element in ipairs(table.clone(K.list)) do
+				if element._key == input.KeyCode then
+					local ok, err = pcall(element._onKey, element)
+					if not ok then warn("[Library] " .. tostring(err)) end
+				end
+			end
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Dragging: one thing at a time (window bar, resize, slider, color picker)
+	----------------------------------------------------------------
+	do
+		D.state = nil
+
+		function D.finish(state)
+			if D.state ~= state then return end
+			D.state = nil
+			if state.connection then state.connection:Disconnect() end
+			if state.scroller then state.scroller.ScrollingEnabled = true end
+			if state.onEnd then state.onEnd() end
+		end
+
+		-- scroller: a ScrollingFrame to freeze while dragging (otherwise a moving finger gets taken over by the scrolling)
+		function D.begin(input, onMove, onEnd, scroller)
+			if D.state then return false end
+			local state = { input = input, onMove = onMove, onEnd = onEnd, scroller = scroller }
+			D.state = state
+			if scroller then scroller.ScrollingEnabled = false end
+			state.connection = input.Changed:Connect(function()
+				local s = input.UserInputState
+				if s == Enum.UserInputState.End or s == Enum.UserInputState.Cancel then D.finish(state) end
+			end)
+			return true
+		end
+
+		function D.changed(input)
+			local state = D.state
+			if not state then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseMovement and input ~= state.input then return end
+			state.onMove(input)
+		end
+
+		function D.ended(input)
+			local state = D.state
+			if not state then return end
+			local same = input == state.input
+				or (state.input.UserInputType == Enum.UserInputType.MouseButton1
+					and input.UserInputType == Enum.UserInputType.MouseButton1)
+			if same then D.finish(state) end
+		end
+	end
+
+	local initialized = false
+	local connections = {}
+
+	local function ensureInit()
+		if initialized then return end
+		initialized = true
+		U.gui()
+		connections[#connections + 1] = UserInputService.InputChanged:Connect(D.changed)
+		connections[#connections + 1] = UserInputService.InputEnded:Connect(D.ended)
+		connections[#connections + 1] = UserInputService.InputBegan:Connect(K.began)
+	end
+
+	----------------------------------------------------------------
+	-- Notifications (bottom right, click to dismiss) and toasts (a pill from the top)
+	----------------------------------------------------------------
+	do
+		local stack, toastStack = nil, nil
+		local active = {}
+		local counter = 0
+
+		local function autoDuration(...)
+			local length = 0
+			for _, text in ipairs({ ... }) do length += #tostring(text or "") end
+			return math.clamp(3 + length / 25, 3, 9)
+		end
+
+		local function getStack()
+			if stack and stack.Parent then return stack end
+			stack = U.make("Frame", {
+				Name = "Notifications",
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, -14, 1, -14),
+				Size = UDim2.new(0, 290, 1, -28),
+				BackgroundTransparency = 1,
+			}, U.gui())
+			U.make("UIListLayout", {
+				VerticalAlignment = Enum.VerticalAlignment.Bottom,
+				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8),
+			}, stack)
+			return stack
+		end
+
+		local function getToastStack()
+			if toastStack and toastStack.Parent then return toastStack end
+			toastStack = U.make("Frame", {
+				Name = "Toasts",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, 14),
+				Size = UDim2.new(0, 360, 1, -28),
+				BackgroundTransparency = 1,
+			}, U.gui())
+			U.make("UIListLayout", {
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8),
+			}, toastStack)
+			return toastStack
+		end
+
+		-- slides the card out, then closes the gap it leaves
+		local function retire(wrapper, card, offX, offY)
+			if not wrapper.Parent then return end
+			local height = wrapper.AbsoluteSize.Y
+			wrapper.AutomaticSize = Enum.AutomaticSize.None
+			wrapper.Size = UDim2.new(1, 0, 0, height)
+			U.tween(card, 0.3, { Position = UDim2.new(card.Position.X.Scale, offX, 0, offY) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+			task.delay(0.3, function()
+				if not wrapper.Parent then return end
+				U.tween(wrapper, 0.25, { Size = UDim2.new(1, 0, 0, 0) }, Enum.EasingStyle.Quint)
+				task.delay(0.26, function() wrapper:Destroy() end)
+			end)
+		end
+
+		N.enabled = true
+
+		function N.notify(props)
+			if N.enabled == false then return end
+			props = props or {}
+			local list = getStack()
+			counter += 1
+
+			-- the stack holds six: the oldest leaves early
+			while #active >= 6 do
+				local oldest = table.remove(active, 1)
+				oldest.finish(true)
+			end
+
+			local wrapper = U.make("Frame", {
+				Name = "Wrapper",
+				LayoutOrder = counter,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+			}, list)
+			local card = U.button(wrapper, {
+				Name = "Card",
+				Position = UDim2.new(0, 330, 0, 0),
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundColor3 = T.card,
+				BackgroundTransparency = 0.04,
+			})
+			card.Parent = wrapper
+			U.corner(card, 10)
+			U.stroke(card, T.white, 0.88)
+			U.make("UIPadding", {
+				PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12),
+				PaddingTop = UDim.new(0, 11), PaddingBottom = UDim.new(0, 10),
+			}, card)
+			U.make("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, card)
+
+			local head = U.make("Frame", {
+				LayoutOrder = 1,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+			}, card)
+			local titleX = 0
+			if U.hasIcon(props.icon) then
+				U.make("ImageLabel", {
+					Position = UDim2.fromOffset(0, 0),
+					Size = UDim2.fromOffset(18, 18),
+					BackgroundTransparency = 1,
+					Image = U.assetUrl(props.icon),
+					ScaleType = Enum.ScaleType.Fit,
+				}, head)
+				titleX = 26
+			end
+			U.label(head, {
+				Position = UDim2.fromOffset(titleX, 0),
+				Size = UDim2.new(1, -titleX, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Text = tostring(props.title or "Notification"),
+				TextSize = 14,
+				Font = Enum.Font.GothamBold,
+				TextWrapped = true,
+				TextTruncate = Enum.TextTruncate.None,
+			})
+			if props.content and tostring(props.content) ~= "" then
+				U.label(card, {
+					LayoutOrder = 2,
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					Text = tostring(props.content),
+					TextSize = 12,
+					TextColor3 = T.sub,
+					TextWrapped = true,
+					TextTruncate = Enum.TextTruncate.None,
+				})
+			end
+			local track = U.make("Frame", {
+				LayoutOrder = 3,
+				Size = UDim2.new(1, 0, 0, 2),
+				BackgroundColor3 = T.off,
+				BorderSizePixel = 0,
+			}, card)
+			U.corner(track, 1)
+			local fill = U.make("Frame", {
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = T.green,
+				BorderSizePixel = 0,
+			}, track)
+			U.corner(fill, 1)
+
+			U.tween(card, 0.45, { Position = UDim2.new(0, 0, 0, 0) }, Enum.EasingStyle.Back)
+
+			local entry = {}
+			local done = false
+			local paused = false
+			function entry.finish(instant)
+				if done then return end
+				done = true
+				local index = table.find(active, entry)
+				if index then table.remove(active, index) end
+				if instant then
+					wrapper:Destroy()
+				else
+					retire(wrapper, card, 330, 0)
+				end
+			end
+			active[#active + 1] = entry
+
+			card.MouseEnter:Connect(function() paused = true end)
+			card.MouseLeave:Connect(function() paused = false end)
+			card.Activated:Connect(function() entry.finish(true) end)
+
+			local duration = tonumber(props.duration) or autoDuration(props.title, props.content)
+			task.spawn(function()
+				local remaining = duration
+				while remaining > 0 and not done do
+					local dt = task.wait()
+					if not paused then
+						remaining -= dt
+						if fill.Parent then fill.Size = UDim2.fromScale(math.max(remaining, 0) / duration, 1) end
+					end
+				end
+				entry.finish(false)
+			end)
+		end
+
+		function N.toast(props)
+			props = props or {}
+			local list = getToastStack()
+			counter += 1
+
+			local wrapper = U.make("Frame", {
+				Name = "Wrapper",
+				LayoutOrder = -counter, -- newest on top
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+			}, list)
+			local pill = U.make("Frame", {
+				Name = "Toast",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, -90),
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundColor3 = T.card,
+				BackgroundTransparency = 0.04,
+			}, wrapper)
+			U.corner(pill, 22)
+			U.stroke(pill, T.white, 0.88)
+			U.make("UIPadding", {
+				PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 18),
+				PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 9),
+			}, pill)
+			U.make("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, 10),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, pill)
+			U.make("UISizeConstraint", { MaxSize = Vector2.new(340, 200) }, pill)
+
+			if tonumber(props.avatar) then
+				local avatar = U.make("ImageLabel", {
+					LayoutOrder = 1,
+					Size = UDim2.fromOffset(26, 26),
+					BackgroundColor3 = T.chip,
+					Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", props.avatar),
+				}, pill)
+				U.corner(avatar, 13)
+			elseif U.hasIcon(props.icon) then
+				U.make("ImageLabel", {
+					LayoutOrder = 1,
+					Size = UDim2.fromOffset(22, 22),
+					BackgroundTransparency = 1,
+					Image = U.assetUrl(props.icon),
+					ScaleType = Enum.ScaleType.Fit,
+				}, pill)
+			end
+
+			local texts = U.make("Frame", {
+				LayoutOrder = 2,
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+			}, pill)
+			U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 1) }, texts)
+			U.label(texts, {
+				LayoutOrder = 1,
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				Text = tostring(props.title or "Toast"),
+				TextSize = 13,
+				Font = Enum.Font.GothamBold,
+				TextTruncate = Enum.TextTruncate.None,
+			})
+			if props.subtitle and tostring(props.subtitle) ~= "" then
+				U.label(texts, {
+					LayoutOrder = 2,
+					Size = UDim2.fromOffset(0, 0),
+					AutomaticSize = Enum.AutomaticSize.XY,
+					Text = tostring(props.subtitle),
+					TextSize = 11,
+					TextColor3 = T.sub,
+					TextTruncate = Enum.TextTruncate.None,
+				})
+			end
+
+			U.tween(pill, 0.5, { Position = UDim2.new(0.5, 0, 0, 0) }, Enum.EasingStyle.Back)
+
+			local done = false
+			local function finish()
+				if done then return end
+				done = true
+				retire(wrapper, pill, 0, -90)
+			end
+			local duration = tonumber(props.duration) or autoDuration(props.title, props.subtitle)
+			task.delay(duration, finish)
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Mobile button: the same MB as the Button / Toggle GUI scripts (same look, shapes, drag bar, resize,
+	-- saved position in MobileButtons_Positions.json, tag DraggableBoxGui so DestroyAllGuis,
+	-- DeleteGuiByFlag and ResetMBPositions work on it)
+	----------------------------------------------------------------
+	local createMobileButton = (function()
+		local CollectionService = game:GetService("CollectionService")
+		local HttpService = game:GetService("HttpService")
+
+		local TEXT_SIZE = 18
+		local FONT = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Medium)
+		local START_SIZE = Vector2.new(130, 130)
+		local MIN_SIZE = Vector2.new(100, 100)
+		local MAX_SIZE = Vector2.new(520, 520)
+		local SPAWN = Vector2.new(0.5, 0.5)
+		local CORNER = 0.27
+		local MAX_CORNER = 40
+		local BG_COLOR = Color3.fromRGB(18, 18, 18)
+		local BG_TRANSPARENCY = 0.09
+		local GLOW_ASSET = "rbxassetid://138843696730147"
+		local GLOW_COLOR = Color3.new(1, 1, 1)
+		local GLOW_SPREAD = 70
+		local GLOW_BRIGHTNESS = 0.50
+		local GLOW_SLICE = 0.4
+		local SCREEN_MARGIN = 6
+		local TEXT_NUDGE_Y = -30
+		local BAR_DISTANCE = 5
+		local DRAG_FOLLOW_SPEED = 9
+		local RESIZE_FOLLOW_SPEED = 26
+		local PILL_HEIGHT = MIN_SIZE.Y                 -- how tall the pill shape is
+		local PILL_TEXT_NUDGE_Y = 0                    -- text height in the pill shape
+		local CIRCLE_TEXT_NUDGE_Y = TEXT_NUDGE_Y       -- text height in the circle shape
+		local MORPH_FOLLOW_SPEED = 10                  -- lower = slower, smoother shape changes
+		local SAVE_POSITION = true                     -- remember where you left each button (by its FLAG)
+		local SAVE_FILE = "MobileButtons_Positions.json" -- must match ResetMBPositions
+		local MODE_NAMES = { default = "Default", pill = "Pill", circle = "Circle" } -- shown when the shape changes
+		local MODE_TEXT_TIME = 1                       -- seconds the shape name stays before fading back to the title
+
+		local TAG = "DraggableBoxGui" -- must match DestroyAllGuis
+		local player = Players.LocalPlayer
+		local playerGui = player:WaitForChild("PlayerGui")
+
+		local WHITE = Color3.new(1, 1, 1)
+		local BG_HOVER = BG_COLOR:Lerp(WHITE, 0.06)
+		local BG_ON = BG_COLOR:Lerp(WHITE, 0.12)
+		local STROKE_IDLE = 0.9
+		local BAR_IDLE = 0.55
+		local ICON_IDLE = 0.45
+		local TEXT_TRANSPARENCY = 0.05
+
+		-- Drag bar sits outside, below the box
+		local BAR_SIZE = UDim2.fromOffset(51, 3)
+		local BAR_SIZE_ACTIVE = UDim2.fromOffset(61, 4)
+		local BAR_HIT = Vector2.new(72, 22)
+		local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2 -- how far the bar area reaches below the box
+
+		-- Pill shape: a vertical resize bar inside the body (resizes the length only)
+		local PILL_BAR_SIZE = UDim2.fromOffset(3, 36)
+		local PILL_BAR_SIZE_ACTIVE = UDim2.fromOffset(4, 46)
+		local PILL_HIT = Vector2.new(30, 60)
+
+		-- Cycle button (top-left): a circle with two arrows, cycles the shape (default > pill > circle)
+		local CYCLE_BOX = 26
+		local CYCLE_R = 7
+		local CYCLE_THICK = 2
+		local CYCLE_HIT = 34
+		local CYCLE_IDLE = 0.55
+		local CORNER_SPEED = 14 -- how fast the corners ease between shapes
+
+		-- Resize icon: a hollow quarter circle with rounded ends
+		local ICON_R = 15          -- radius of the quarter circle
+		local ICON_THICK = 2.5     -- line thickness
+		local ICON_INSET = 12      -- distance from the box edges
+		local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
+
+		-- Flag rules: no spaces and none of these characters
+		local FLAG_FORBIDDEN = [===['";*()^%$+×÷=/€£¥₩`~\|<>{}[]▪︎○●□■♤♡◇♧☆⊙°•¤《》¡¿,.]===]
+
+		local function flagProblem(flag)
+			if type(flag) ~= "string" or flag == "" then
+				return "the flag is empty"
+			end
+			if flag:find("%s") then
+				return "the flag contains a space"
+			end
+			local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+			for _, cp in utf8.codes(FLAG_FORBIDDEN) do
+				banned[cp] = true
+			end
+			for _, cp in utf8.codes(flag) do
+				if banned[cp] then
+					return 'the flag contains a character that is not allowed: "' .. utf8.char(cp) .. '"'
+				end
+			end
+			return nil
+		end
+
+		-- Turns any text into a valid flag: spaces and the forbidden characters are dropped
+		local function cleanFlag(raw)
+			local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
+			pcall(function()
+				for _, cp in utf8.codes(FLAG_FORBIDDEN) do banned[cp] = true end
+			end)
+			local out = {}
+			local ok = pcall(function()
+				for _, cp in utf8.codes(tostring(raw)) do
+					local ch = utf8.char(cp)
+					if not banned[cp] and not ch:find("%s") then out[#out + 1] = ch end
+				end
+			end)
+			local text = table.concat(out)
+			if not ok or text == "" then return "MB" end
+			return text
+		end
+
+		-- Every GUI made by these scripts, wherever it lives
+		local function collectGuis()
+			local list, seen = {}, {}
+			local function add(inst)
+				if inst:IsA("ScreenGui") and not seen[inst] then
+					seen[inst] = true
+					list[#list + 1] = inst
+				end
+			end
+			for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
+
+			local function scan(container)
+				if not container then return end
+				local ok, children = pcall(function() return container:GetChildren() end)
+				if not ok then return end
+				for _, child in ipairs(children) do
+					if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
+				end
+			end
+			scan(playerGui)
+			pcall(function() scan(game:GetService("CoreGui")) end)
+			if gethui then pcall(function() scan(gethui()) end) end
+			return list
+		end
+
+
+		-- Saved positions: kept in a file by FLAG, so they survive between sessions
+		local canUseFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+		local memoryStore = _G
+		pcall(function()
+			if getgenv then memoryStore = getgenv() end
+		end)
+
+		local function loadAllPositions()
+			if canUseFiles then
+				local ok, result = pcall(function()
+					if not isfile(SAVE_FILE) then return {} end
+					local data = HttpService:JSONDecode(readfile(SAVE_FILE))
+					if type(data) == "table" and type(data.positions) == "table" then
+						return data.positions
+					end
+					return {}
+				end)
+				if ok and type(result) == "table" then return result end
+				return {}
+			end
+			return memoryStore.MobileButtonPositions or {} -- no file access here: remembered until the game closes
+		end
+
+		local function saveAllPositions(positions)
+			if canUseFiles then
+				pcall(function()
+					writefile(SAVE_FILE, HttpService:JSONEncode({ version = 1, positions = positions }))
+				end)
+			else
+				memoryStore.MobileButtonPositions = positions
+			end
+		end
+
+		-- Random 20-character name, different for every GUI
+		local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789*^%/?#$"
+		local rng = Random.new()
+
+		local function randomName(length)
+			local out = {}
+			for i = 1, length do
+				local n = rng:NextInteger(1, #CHARS)
+				out[i] = CHARS:sub(n, n)
+			end
+			return table.concat(out)
+		end
+
+		local function tween(obj, time, props, style, direction)
+			local t = TweenService:Create(
+				obj,
+				TweenInfo.new(time, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out),
+				props
+			)
+			t:Play()
+			return t
+		end
+
+		local function make(class, props, parent)
+			local inst = Instance.new(class)
+			for key, value in pairs(props) do
+				inst[key] = value
+			end
+			inst.Parent = parent
+			return inst
+		end
+
+		local function isPress(input)
+			return input.UserInputType == Enum.UserInputType.MouseButton1
+				or input.UserInputType == Enum.UserInputType.Touch
+		end
+
+		local function p2(input)
+			return Vector2.new(input.Position.X, input.Position.Y)
+		end
+
+		local function run(fn)
+			task.spawn(function()
+				local ok, err = pcall(fn)
+				if not ok then warn(err) end
+			end)
+		end
+
+		-- Highest place available: hidden UI container > CoreGui > PlayerGui
+		local function parentGui(gui)
+			local targets = {}
+			if gethui then
+				local ok, container = pcall(gethui)
+				if ok and container then targets[#targets + 1] = container end
+			end
+			local okCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+			if okCore and coreGui then targets[#targets + 1] = coreGui end
+			targets[#targets + 1] = playerGui
+
+			for _, target in ipairs(targets) do
+				local ok = pcall(function() gui.Parent = target end)
+				if ok and gui.Parent == target then return end
+			end
+		end
+
+		local function create(opts)
+			local TEXT = tostring(opts.text or "Button")
+			local kind = opts.kind == "Toggle" and "Toggle" or "Button"
+			local FLAG = cleanFlag(opts.flag or TEXT)
+
+			-- One GUI per flag: making it again with the same flag replaces the old one
+			for _, old in ipairs(collectGuis()) do
+				if old:GetAttribute("Flag") == FLAG then
+					old:Destroy()
+				end
+			end
+
+			local screenGui = make("ScreenGui", {
+				Name = randomName(20),
+				ResetOnSpawn = false,
+				IgnoreGuiInset = true,
+				DisplayOrder = 2147483647, -- above every other GUI
+				OnTopOfCoreBlur = true,
+				ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			}, nil)
+			screenGui:SetAttribute(TAG, kind)
+			screenGui:SetAttribute("Flag", FLAG)
+			CollectionService:AddTag(screenGui, TAG)
+			parentGui(screenGui)
+
+			local function viewport()
+				local size = screenGui.AbsoluteSize
+				if size.X < 1 or size.Y < 1 then
+					size = workspace.CurrentCamera.ViewportSize
+				end
+				return size
+			end
+
+			-- Off-screen protection (the drag bar below the box is counted too)
+			local function fitSize(size)
+				local v = viewport()
+				return Vector2.new(
+					math.min(size.X, v.X - SCREEN_MARGIN * 2),
+					math.min(size.Y, v.Y - SCREEN_MARGIN * 2 - BAR_BELOW)
+				)
+			end
+
+			local function clampCenter(center, size)
+				local v = viewport()
+				local half = size / 2
+				local minX, minY = half.X + SCREEN_MARGIN, half.Y + SCREEN_MARGIN
+				local maxX = v.X - half.X - SCREEN_MARGIN
+				local maxY = v.Y - half.Y - SCREEN_MARGIN - BAR_BELOW
+				return Vector2.new(
+					math.clamp(center.X, minX, math.max(minX, maxX)),
+					math.clamp(center.Y, minY, math.max(minY, maxY))
+				)
+			end
+
+			-- Corner roundness: the default shape scales with the box (never past MAX_CORNER pixels),
+			-- the pill and circle shapes are fully round
+			local function cornerFor(size, forMode)
+				if forMode == "pill" or forMode == "circle" then
+					return math.floor(math.min(size.X, size.Y) / 2 + 0.5)
+				end
+				return math.floor(math.min(CORNER * math.min(size.X, size.Y), MAX_CORNER) + 0.5)
+			end
+
+			-- Both versions use the same size and the same SPAWN point, so they appear in the exact same spot
+			local startSize = fitSize(START_SIZE)
+			local v0 = viewport()
+			local defaultCenter = clampCenter(Vector2.new(v0.X * SPAWN.X + (opts.offset or 0), v0.Y * SPAWN.Y + (opts.offset or 0)), startSize) -- the starting point
+			local startCenter = defaultCenter
+			if SAVE_POSITION then
+				local saved = loadAllPositions()[FLAG]
+				if type(saved) == "table" and type(saved.x) == "number" and type(saved.y) == "number" then
+					startCenter = clampCenter(Vector2.new(v0.X * saved.x, v0.Y * saved.y), startSize)
+				end
+			end
+
+			-- Holder: the thing that moves and resizes. Everything lives inside it.
+			local holder = make("Frame", {
+				Name = "Holder",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(startCenter.X, startCenter.Y),
+				Size = UDim2.fromOffset(startSize.X, startSize.Y),
+				BackgroundTransparency = 1,
+			}, screenGui)
+
+			local popScale = make("UIScale", { Name = "PopScale", Scale = 0.7 }, holder)
+
+			-- Glow: soft image behind the box
+			local glow = make("ImageLabel", {
+				Name = "Glow",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.new(1, GLOW_SPREAD * 2, 1, GLOW_SPREAD * 2),
+				BackgroundTransparency = 1,
+				Image = GLOW_ASSET,
+				ImageColor3 = GLOW_COLOR,
+				ImageTransparency = 1,
+				ScaleType = Enum.ScaleType.Stretch,
+				ZIndex = 1,
+			}, holder)
+
+			-- 9-slice the glow using the image's real size: the corners and soft edges stay a
+			-- constant size and only the middle stretches, so resizing never distorts it.
+			task.spawn(function()
+				local deadline = os.clock() + 5
+				while glow.Parent and os.clock() < deadline do
+					local ok, size = pcall(function() return glow.ContentImageSize end)
+					if not ok then return end -- older client: keep the plain stretch
+					if size.X > 0 and size.Y > 0 then
+						local sx, sy = size.X * GLOW_SLICE, size.Y * GLOW_SLICE
+						glow.SliceCenter = Rect.new(sx, sy, size.X - sx, size.Y - sy)
+						glow.SliceScale = math.max(GLOW_SPREAD, 1) / sx
+						glow.ScaleType = Enum.ScaleType.Slice
+						return
+					end
+					task.wait(0.05)
+				end
+			end)
+
+			-- strength: 0 = off, 1 = full flash
+			local function setGlow(strength, time, style)
+				tween(glow, time, { ImageTransparency = 1 - GLOW_BRIGHTNESS * strength }, style)
+			end
+
+			-- Box
+			local box = make("Frame", {
+				Name = "Box",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = BG_COLOR,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, holder)
+			local boxCorner = make("UICorner", { CornerRadius = UDim.new(0, cornerFor(startSize)) }, box)
+			local stroke = make("UIStroke", {
+				Color = WHITE,
+				Transparency = 1,
+				Thickness = 1,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			}, box)
+
+			-- Clickable body
+			local body = make("TextButton", {
+				Name = "Body",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 1,
+			}, box)
+
+			-- Text: fixed size, dead center of the box
+			local label = make("TextLabel", {
+				Name = "Label",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, 0.5, TEXT_NUDGE_Y),
+				Size = UDim2.new(1, -28, 1, -28),
+				BackgroundTransparency = 1,
+				Text = TEXT,
+				TextColor3 = WHITE,
+				TextTransparency = 1,
+				TextSize = TEXT_SIZE,
+				TextScaled = false,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				FontFace = FONT,
+				ZIndex = 2,
+			}, box)
+
+			-- Drag bar: outside the box, just below it (fixed pixel size)
+			local dragHit = make("TextButton", {
+				Name = "DragHit",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, 0, 1, BAR_DISTANCE),
+				Size = UDim2.fromOffset(BAR_HIT.X, BAR_HIT.Y),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 5,
+			}, box)
+			local bar = make("Frame", {
+				Name = "Bar",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = BAR_SIZE,
+				BackgroundColor3 = WHITE,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 5,
+			}, dragHit)
+			make("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
+
+			-- Resize handle in the bottom-right corner (invisible hit area + the arc icon)
+			local handle = make("TextButton", {
+				Name = "ResizeHandle",
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.fromOffset(34, 34),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 5,
+			}, box)
+
+			-- The icon is a quarter circle drawn with round dots, so both ends are rounded.
+			-- It sits in a CanvasGroup so the overlapping dots fade as one clean shape.
+			local iconGroup = make("CanvasGroup", {
+				Name = "Icon",
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, -ICON_INSET, 1, -ICON_INSET),
+				Size = UDim2.fromOffset(ICON_BOX, ICON_BOX),
+				BackgroundTransparency = 1,
+				GroupTransparency = 1,
+				ZIndex = 5,
+			}, handle)
+			do
+				local half = ICON_THICK / 2
+				local steps = math.max(8, math.ceil((math.pi / 2 * ICON_R) / (ICON_THICK / 3)))
+				for i = 0, steps do
+					local angle = (math.pi / 2) * (i / steps)
+					local dot = make("Frame", {
+						Name = "Dot",
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset(half + ICON_R * math.cos(angle), half + ICON_R * math.sin(angle)),
+						Size = UDim2.fromOffset(ICON_THICK, ICON_THICK),
+						BackgroundColor3 = WHITE,
+						BorderSizePixel = 0,
+						ZIndex = 5,
+					}, iconGroup)
+					make("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
+				end
+			end
+
+			-- Pill shape: a vertical bar inside the body at the right end (resizes the length only)
+			local pillHandle = make("TextButton", {
+				Name = "PillHandle",
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -6, 0.5, 0),
+				Size = UDim2.fromOffset(PILL_HIT.X, PILL_HIT.Y),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				Interactable = false,
+				ZIndex = 5,
+			}, box)
+			local pillBar = make("Frame", {
+				Name = "PillBar",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = PILL_BAR_SIZE,
+				BackgroundColor3 = WHITE,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 5,
+			}, pillHandle)
+			make("UICorner", { CornerRadius = UDim.new(1, 0) }, pillBar)
+
+			-- Cycle button (top-left): a circle with two arrows. Tapping it cycles the shape
+			-- default > pill > circle, and the icon spins every time it switches
+			local collapseHit = make("TextButton", {
+				Name = "CycleHit",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0, 21, 0, 21),
+				Size = UDim2.fromOffset(CYCLE_HIT, CYCLE_HIT),
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				Selectable = false,
+				ZIndex = 5,
+			}, box)
+			local cycleIcon = make("CanvasGroup", {
+				Name = "CycleIcon",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(CYCLE_BOX, CYCLE_BOX),
+				BackgroundTransparency = 1,
+				GroupTransparency = 1,
+				ZIndex = 5,
+			}, collapseHit)
+			do
+				local center = CYCLE_BOX / 2
+				local wing = 5              -- length of each arrow-head line
+				local sweep = math.rad(120) -- how much of the circle each arrow covers
+				local steps = math.max(8, math.ceil((CYCLE_R * sweep) / (CYCLE_THICK / 3)))
+
+				local function roundPart(position, size, rotation)
+					local part = make("Frame", {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset(position.X, position.Y),
+						Size = UDim2.fromOffset(size.X, size.Y),
+						Rotation = rotation,
+						BackgroundColor3 = WHITE,
+						BorderSizePixel = 0,
+						ZIndex = 5,
+					}, cycleIcon)
+					make("UICorner", { CornerRadius = UDim.new(1, 0) }, part)
+				end
+
+				for _, startAngle in ipairs({ 0, math.pi }) do
+					-- the arc, drawn with round dots
+					for i = 0, steps do
+						local angle = startAngle + sweep * (i / steps)
+						roundPart(
+							Vector2.new(center + CYCLE_R * math.cos(angle), center + CYCLE_R * math.sin(angle)),
+							Vector2.new(CYCLE_THICK, CYCLE_THICK),
+							0
+						)
+					end
+
+					-- the arrow head at the end of the arc (two short lines meeting at the tip)
+					local endAngle = startAngle + sweep
+					local tip = Vector2.new(center + CYCLE_R * math.cos(endAngle), center + CYCLE_R * math.sin(endAngle))
+					local back = Vector2.new(math.sin(endAngle), -math.cos(endAngle)) -- back along the arc
+					for _, spread in ipairs({ math.rad(40), -math.rad(40) }) do
+						local cosS, sinS = math.cos(spread), math.sin(spread)
+						local dir = Vector2.new(back.X * cosS - back.Y * sinS, back.X * sinS + back.Y * cosS)
+						roundPart(tip + dir * (wing / 2), Vector2.new(wing, CYCLE_THICK), math.deg(math.atan2(dir.Y, dir.X)))
+					end
+				end
+			end
+
+			----------------------------------------------------------------
+			-- Smooth move + resize + shapes
+			----------------------------------------------------------------
+			local connections = {}
+
+			local mode = "default" -- "default", "pill" or "circle"
+			local dragging, resizing = false, false
+			local activeInput, inputStart
+			local dragOrigin, resizeOriginSize, resizeTopLeft
+
+			-- Size limits for the pill and circle shapes
+			local pillMinWidth = math.max(MIN_SIZE.X, PILL_HEIGHT * 1.25)
+			local circleMin = math.max(MIN_SIZE.X, MIN_SIZE.Y)
+			local circleMax = math.min(MAX_SIZE.X, MAX_SIZE.Y)
+
+			local sizeTarget = startSize
+			local posTarget = startCenter
+			local sizeCur, posCur = startSize, startCenter
+			local cornerCur = cornerFor(startSize, "default")
+			local lastCorner = -1
+			local lastInset = -1
+			local morphUntil = 0
+
+			-- Each shape remembers its own size, so switching back and forth feels natural
+			local circleStart = math.clamp((startSize.X + startSize.Y) / 2, circleMin, circleMax)
+			local modeSizes = {
+				default = startSize,
+				pill = Vector2.new(math.clamp(startSize.X, pillMinWidth, MAX_SIZE.X), PILL_HEIGHT),
+				circle = Vector2.new(circleStart, circleStart),
+			}
+
+			connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
+				-- off-screen protection every frame (and the shape rules)
+				sizeTarget = fitSize(sizeTarget)
+				if mode == "circle" then
+					local side = math.min(sizeTarget.X, sizeTarget.Y)
+					sizeTarget = Vector2.new(side, side)
+				elseif mode == "pill" then
+					sizeTarget = Vector2.new(sizeTarget.X, math.min(sizeTarget.Y, PILL_HEIGHT))
+				end
+				posTarget = clampCenter(posTarget, sizeTarget)
+
+				-- slower follow while dragging = the box trails behind the bar, shape changes ease in gently
+				local speed = DRAG_FOLLOW_SPEED
+				if resizing then
+					speed = RESIZE_FOLLOW_SPEED
+				elseif os.clock() < morphUntil then
+					speed = MORPH_FOLLOW_SPEED
+				end
+				local alpha = 1 - math.exp(-dt * speed)
+				sizeCur = fitSize(sizeCur:Lerp(sizeTarget, alpha))
+				posCur = clampCenter(posCur:Lerp(posTarget, alpha), sizeCur)
+
+				holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
+				holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
+
+				-- the corners ease toward the roundness of the current shape
+				cornerCur += (cornerFor(sizeCur, mode) - cornerCur) * (1 - math.exp(-dt * CORNER_SPEED))
+				local corner = math.floor(cornerCur + 0.5)
+				if corner ~= lastCorner then
+					lastCorner = corner
+					boxCorner.CornerRadius = UDim.new(0, corner)
+				end
+
+				-- the corner icons follow the rounded edge, so they always stay inside the shape
+				local inset = math.max(ICON_INSET, 0.293 * cornerCur + 1)
+				if math.abs(inset - lastInset) > 0.05 then
+					lastInset = inset
+					local extra = inset - ICON_INSET
+					handle.Position = UDim2.new(1, -extra, 1, -extra)
+					local c = inset + 9
+					collapseHit.Position = UDim2.new(0, c, 0, c)
+				end
+			end)
+
+			-- Save where this button is (by its FLAG)
+			local function savePosition()
+				if not SAVE_POSITION then return end
+				local v = viewport()
+				local all = loadAllPositions()
+				all[FLAG] = { x = posTarget.X / v.X, y = posTarget.Y / v.Y }
+				saveAllPositions(all)
+			end
+
+			-- ResetMBPositions sends every button back to its starting point
+			screenGui:GetAttributeChangedSignal("ResetPosition"):Connect(function()
+				posTarget = clampCenter(defaultCenter, sizeTarget)
+			end)
+
+			-- Drag: only while holding the bar
+			dragHit.InputBegan:Connect(function(input)
+				if not isPress(input) or dragging or resizing then return end
+				dragging = true
+				activeInput = input
+				inputStart = p2(input)
+				dragOrigin = posTarget
+				tween(bar, 0.2, { BackgroundTransparency = 0.15, Size = BAR_SIZE_ACTIVE })
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragging = false
+						tween(bar, 0.3, { BackgroundTransparency = BAR_IDLE, Size = BAR_SIZE })
+						savePosition()
+					end
+				end)
+			end)
+			dragHit.MouseEnter:Connect(function()
+				if not dragging then tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end
+			end)
+			dragHit.MouseLeave:Connect(function()
+				if not dragging then tween(bar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
+			end)
+
+			-- Resize (default and circle shapes): only while holding the corner handle
+			handle.InputBegan:Connect(function(input)
+				if not isPress(input) or dragging or resizing or mode == "pill" then return end
+				resizing = true
+				activeInput = input
+				inputStart = p2(input)
+				resizeOriginSize = sizeTarget
+				resizeTopLeft = posTarget - sizeTarget / 2
+				tween(iconGroup, 0.2, { GroupTransparency = 0.05 })
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						resizing = false
+						if mode ~= "pill" then tween(iconGroup, 0.3, { GroupTransparency = ICON_IDLE }) end
+					end
+				end)
+			end)
+			handle.MouseEnter:Connect(function()
+				if not resizing and mode ~= "pill" then tween(iconGroup, 0.2, { GroupTransparency = 0.2 }) end
+			end)
+			handle.MouseLeave:Connect(function()
+				if not resizing and mode ~= "pill" then tween(iconGroup, 0.25, { GroupTransparency = ICON_IDLE }) end
+			end)
+
+			-- Resize (pill shape): only the length, by holding the vertical bar
+			pillHandle.InputBegan:Connect(function(input)
+				if not isPress(input) or dragging or resizing or mode ~= "pill" then return end
+				resizing = true
+				activeInput = input
+				inputStart = p2(input)
+				resizeOriginSize = sizeTarget
+				resizeTopLeft = posTarget - sizeTarget / 2
+				tween(pillBar, 0.2, { BackgroundTransparency = 0.15, Size = PILL_BAR_SIZE_ACTIVE })
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						resizing = false
+						if mode == "pill" then tween(pillBar, 0.3, { BackgroundTransparency = BAR_IDLE, Size = PILL_BAR_SIZE }) end
+					end
+				end)
+			end)
+			pillHandle.MouseEnter:Connect(function()
+				if not resizing and mode == "pill" then tween(pillBar, 0.2, { BackgroundTransparency = 0.3 }) end
+			end)
+			pillHandle.MouseLeave:Connect(function()
+				if not resizing and mode == "pill" then tween(pillBar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
+			end)
+
+			connections[#connections + 1] = UserInputService.InputChanged:Connect(function(input)
+				if not (dragging or resizing) then return end
+				if input.UserInputType ~= Enum.UserInputType.MouseMovement and input ~= activeInput then return end
+
+				local delta = p2(input) - inputStart
+				if dragging then
+					posTarget = clampCenter(dragOrigin + delta, sizeTarget)
+				else
+					local v = viewport()
+					local newSize
+					if mode == "pill" then
+						-- only the length changes, the height stays locked
+						newSize = Vector2.new(math.clamp(resizeOriginSize.X + delta.X, pillMinWidth, MAX_SIZE.X), PILL_HEIGHT)
+					elseif mode == "circle" then
+						-- x and y always stay the same size
+						local side = math.clamp(resizeOriginSize.X + (delta.X + delta.Y) / 2, circleMin, circleMax)
+						newSize = Vector2.new(side, side)
+					else
+						newSize = Vector2.new(
+							math.clamp(resizeOriginSize.X + delta.X, MIN_SIZE.X, MAX_SIZE.X),
+							math.clamp(resizeOriginSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y)
+						)
+					end
+					-- never grow past the edge of the screen
+					newSize = Vector2.new(
+						math.min(newSize.X, v.X - SCREEN_MARGIN - resizeTopLeft.X),
+						math.min(newSize.Y, v.Y - SCREEN_MARGIN - BAR_BELOW - resizeTopLeft.Y)
+					)
+					if mode == "circle" then
+						local side = math.min(newSize.X, newSize.Y)
+						newSize = Vector2.new(side, side)
+					end
+					sizeTarget = newSize
+					posTarget = resizeTopLeft + newSize / 2 -- top-left corner stays put
+				end
+			end)
+
+			-- Shape name: sits on top of the title and shows for a moment when the shape changes
+			local modeLabel = make("TextLabel", {
+				Name = "ModeLabel",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = label.Position,
+				Size = label.Size,
+				BackgroundTransparency = 1,
+				Text = "",
+				TextColor3 = WHITE,
+				TextTransparency = 1,
+				TextSize = TEXT_SIZE,
+				TextScaled = false,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				FontFace = FONT,
+				ZIndex = 2,
+			}, box)
+
+			local flashToken = 0
+			local function flashModeName(name)
+				flashToken += 1
+				local token = flashToken
+				modeLabel.Text = name
+
+				-- quick crossfade: the title fades out while the shape name fades in
+				tween(label, 0.2, { TextTransparency = 1 }, Enum.EasingStyle.Quad)
+				tween(modeLabel, 0.2, { TextTransparency = TEXT_TRANSPARENCY }, Enum.EasingStyle.Quad)
+
+				-- after a moment it fades out into the normal title
+				task.delay(0.2 + MODE_TEXT_TIME, function()
+					if token ~= flashToken or not screenGui.Parent then return end
+					tween(modeLabel, 0.4, { TextTransparency = 1 }, Enum.EasingStyle.Sine)
+					tween(label, 0.4, { TextTransparency = TEXT_TRANSPARENCY }, Enum.EasingStyle.Sine)
+				end)
+			end
+
+			-- Shapes: the cycle button goes default > pill > circle > default
+			local MODES = { "default", "pill", "circle" }
+
+			local function setMode(newMode)
+				if newMode == mode or dragging or resizing then return end
+				modeSizes[mode] = sizeTarget -- remember the shape we're leaving
+				mode = newMode
+				sizeTarget = fitSize(modeSizes[newMode])
+				morphUntil = os.clock() + 0.8
+
+				-- the old resize icon fades out, the new one fades in
+				local isPill = newMode == "pill"
+				handle.Interactable = not isPill
+				pillHandle.Interactable = isPill
+				tween(iconGroup, 0.35, { GroupTransparency = isPill and 1 or ICON_IDLE }, Enum.EasingStyle.Quad)
+				tween(pillBar, 0.4, { BackgroundTransparency = isPill and BAR_IDLE or 1 }, Enum.EasingStyle.Quad)
+
+				-- the text glides to the right height for the new shape
+				local nudge = TEXT_NUDGE_Y
+				if isPill then nudge = PILL_TEXT_NUDGE_Y elseif newMode == "circle" then nudge = CIRCLE_TEXT_NUDGE_Y end
+				local textPosition = UDim2.new(0.5, 0, 0.5, nudge)
+				tween(label, 0.45, { Position = textPosition })
+				tween(modeLabel, 0.45, { Position = textPosition })
+
+				flashModeName(MODE_NAMES[newMode] or newMode)
+			end
+
+			local spin = 0
+			collapseHit.Activated:Connect(function()
+				local before = mode
+				setMode(MODES[(table.find(MODES, mode) or 1) % #MODES + 1])
+				if mode == before then return end -- it didn't switch (busy dragging or resizing)
+
+				-- spin once, smoothly, every time the shape switches
+				spin += 360
+				tween(cycleIcon, 0.7, { Rotation = spin }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			end)
+			collapseHit.MouseEnter:Connect(function()
+				tween(cycleIcon, 0.2, { GroupTransparency = 0.2 })
+			end)
+			collapseHit.MouseLeave:Connect(function()
+				tween(cycleIcon, 0.25, { GroupTransparency = CYCLE_IDLE })
+			end)
+
+			----------------------------------------------------------------
+			-- Click: a toggle keeps a steady on/off state, a button flashes
+			----------------------------------------------------------------
+			local isOn = opts.initial == true and kind == "Toggle"
+			local stateToken = 0
+			local glowToken = 0
+
+			local function setState(on)
+				isOn = on
+				stateToken += 1
+				local token = stateToken
+
+				tween(box, 0.25, { BackgroundColor3 = on and BG_ON or BG_COLOR })
+				tween(stroke, 0.25, { Transparency = on and 0.3 or STROKE_IDLE, Thickness = on and 2 or 1 })
+
+				if on then
+					-- bright flash, then settle into a steady glow
+					setGlow(1, 0.08, Enum.EasingStyle.Quad)
+					task.delay(0.1, function()
+						if token ~= stateToken or not screenGui.Parent then return end
+						setGlow(0.55, 0.3, Enum.EasingStyle.Sine)
+					end)
+				else
+					setGlow(0, 0.25, Enum.EasingStyle.Sine)
+				end
+			end
+
+			local function pulse()
+				glowToken += 1
+				local token = glowToken
+				setGlow(1, 0.08, Enum.EasingStyle.Quad)
+				tween(stroke, 0.08, { Transparency = 0.1, Thickness = 2 }, Enum.EasingStyle.Quad)
+
+				task.delay(0.12, function()
+					if token ~= glowToken or not screenGui.Parent then return end
+					setGlow(0, 0.35, Enum.EasingStyle.Sine)
+					tween(stroke, 0.35, { Transparency = STROKE_IDLE, Thickness = 1 }, Enum.EasingStyle.Sine)
+				end)
+			end
+
+			body.InputBegan:Connect(function(input)
+				if isPress(input) then tween(popScale, 0.12, { Scale = 0.96 }) end
+			end)
+			body.InputEnded:Connect(function(input)
+				if isPress(input) then tween(popScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back) end
+			end)
+			body.MouseEnter:Connect(function()
+				tween(box, 0.25, { BackgroundColor3 = isOn and BG_ON:Lerp(WHITE, 0.06) or BG_HOVER })
+			end)
+			body.MouseLeave:Connect(function()
+				tween(box, 0.3, { BackgroundColor3 = isOn and BG_ON or BG_COLOR })
+				tween(popScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+			end)
+
+			body.Activated:Connect(function()
+				if kind == "Toggle" then
+					local nextState = not isOn
+					setState(nextState)
+					if opts.onToggle then run(function() opts.onToggle(nextState) end) end
+				else
+					pulse()
+					if opts.onClick then run(opts.onClick) end
+				end
+			end)
+
+			-- what the library uses to drive this button
+			local api = {}
+			function api.SetState(on)
+				if kind ~= "Toggle" or on == isOn then return end
+				setState(on)
+			end
+			function api.Pulse()
+				if kind == "Button" then pulse() end
+			end
+			function api.Destroy()
+				if screenGui.Parent then screenGui:Destroy() end
+			end
+			api.Gui = screenGui
+
+			----------------------------------------------------------------
+			-- Cleanup + pop-in
+			----------------------------------------------------------------
+			screenGui.Destroying:Connect(function()
+				for _, c in ipairs(connections) do c:Disconnect() end
+				table.clear(connections)
+				if opts.onGone then run(opts.onGone) end
+			end)
+
+
+			local fades = {
+				{ box, "BackgroundTransparency", BG_TRANSPARENCY },
+				{ stroke, "Transparency", STROKE_IDLE },
+				{ label, "TextTransparency", TEXT_TRANSPARENCY },
+				{ bar, "BackgroundTransparency", BAR_IDLE },
+				{ iconGroup, "GroupTransparency", ICON_IDLE },
+				{ cycleIcon, "GroupTransparency", CYCLE_IDLE },
+			}
+			tween(popScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+			for _, f in ipairs(fades) do
+				tween(f[1], 0.4, { [f[2]] = f[3] }, Enum.EasingStyle.Quad)
+			end
+
+
+			-- a toggle that was already on when its button was made shows that after the pop-in
+			if isOn then
+				task.delay(0.45, function()
+					if screenGui.Parent then setState(true) end
+				end)
+			end
+
+			return api
+
+		end
+
+		return create
+	end)()
+
+	----------------------------------------------------------------
+	-- Components
+	----------------------------------------------------------------
+	do
+		local ROW_H = C.ROW_H
+
+		-- the frame every component lives in (the thin line under it is shown by the layout when another component follows)
+		local function makeItem(row, height)
+			local frame = U.make("Frame", {
+				Name = "Item",
+				Size = UDim2.new(1, 0, 0, height or ROW_H),
+				BackgroundTransparency = 1,
+			}, row._frame)
+			local sep = U.make("Frame", {
+				Name = "Sep",
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.new(0, 10, 1, 0),
+				Size = UDim2.new(1, -20, 0, 1),
+				BackgroundColor3 = T.line,
+				BorderSizePixel = 0,
+				Visible = false,
+				ZIndex = 2,
+			}, frame)
+			return frame, sep
+		end
+
+		local function makeHit(frame, height)
+			return U.button(frame, { Name = "Hit", Size = UDim2.new(1, 0, 0, height or ROW_H), ZIndex = 1 })
+		end
+
+		local function makeSwitch(parent, position, anchor)
+			local track = U.make("Frame", {
+				AnchorPoint = anchor,
+				Position = position,
+				Size = UDim2.fromOffset(40, 22),
+				BackgroundColor3 = T.off,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, parent)
+			U.corner(track, 11)
+			local knob = U.make("Frame", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, 3, 0.5, 0),
+				Size = UDim2.fromOffset(16, 16),
+				BackgroundColor3 = T.knobOff,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+			}, track)
+			U.corner(knob, 8)
+			local function set(on, instant)
+				local trackProps = { BackgroundColor3 = on and T.green or T.off }
+				local knobProps = {
+					Position = on and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
+					BackgroundColor3 = on and T.white or T.knobOff,
+				}
+				if instant then
+					for key, value in pairs(trackProps) do track[key] = value end
+					for key, value in pairs(knobProps) do knob[key] = value end
+				else
+					U.tween(track, 0.22, trackProps, Enum.EasingStyle.Quad)
+					U.tween(knob, 0.3, knobProps, Enum.EasingStyle.Back)
+				end
+			end
+			return { track = track, knob = knob, set = set }
+		end
+
+		-- a small rounded box with a text box inside
+		local function makeChipBox(parent, props)
+			local chip = U.make("Frame", {
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = props.position,
+				Size = props.size,
+				BackgroundColor3 = T.chip,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+			}, parent)
+			U.corner(chip, 6)
+			local ring = U.stroke(chip, T.green, 1)
+			local box = U.make("TextBox", {
+				Position = UDim2.fromOffset(8, 0),
+				Size = UDim2.new(1, -16, 1, 0),
+				BackgroundTransparency = 1,
+				ClearTextOnFocus = false,
+				Text = props.text or "",
+				PlaceholderText = props.placeholder or "",
+				PlaceholderColor3 = T.sub,
+				TextColor3 = T.text,
+				TextSize = 12,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = props.align or Enum.TextXAlignment.Left,
+				ClipsDescendants = true,
+				ZIndex = 4,
+			}, chip)
+			box.Focused:Connect(function()
+				U.tween(ring, 0.15, { Transparency = 0.2 }, Enum.EasingStyle.Quad)
+			end)
+			box.FocusLost:Connect(function()
+				U.tween(ring, 0.2, { Transparency = 1 }, Enum.EasingStyle.Quad)
+			end)
+			return chip, box
+		end
+
+		----------------------------------------------------------------
+		-- The 3 dots on toggles and buttons: Keybind + Mobile Button
+		----------------------------------------------------------------
+		local function closeMenu(window)
+			if window._menu then window._menu.close() end
+		end
+
+		local function setKey(el, keyCode)
+			el._key = keyCode
+			if keyCode then K.add(el) else K.remove(el) end
+			el._window:_changed()
+		end
+
+		local function destroyMB(el)
+			local handle = el._mb
+			el._mb = nil
+			el._mbOn = false
+			if handle then handle.Destroy() end
+		end
+
+		local function spawnMB(el)
+			if el._mb then return end
+			local window = el._window
+			el._mbOn = true
+
+			local count = 0
+			for _, other in ipairs(window._allList) do
+				if other._mb then count += 1 end
+			end
+
+			local handle
+			local ok, result = pcall(createMobileButton, {
+				text = el.name,
+				flag = el.flag,
+				kind = el.kind == "toggle" and "Toggle" or "Button",
+				initial = el.kind == "toggle" and el.value == true,
+				offset = (count % 5) * 28,
+				onToggle = function(on) el:_set(on) end,
+				onClick = function() el:_run() end,
+				onGone = function()
+					-- it was deleted from outside (DestroyAllGuis, DeleteGuiByFlag): the switch goes off too
+					if el._mb ~= handle then return end
+					el._mb = nil
+					el._mbOn = false
+					if el._menuSwitch then el._menuSwitch.set(false) end
+					window:_changed()
+				end,
+			})
+			if not ok then
+				warn("[Library] mobile button: " .. tostring(result))
+				el._mbOn = false
+				return
+			end
+			handle = result
+			el._mb = handle
+		end
+
+		local function openMenu(window, el, anchor)
+			closeMenu(window)
+
+			local rows = {}
+			if el.haveKeybinds then rows[#rows + 1] = "keybind" end
+			if el.haveMB then rows[#rows + 1] = "mb" end
+			if #rows == 0 then return end
+
+			local root = window._root
+			local MENU_W, ROW = 212, 36
+			local menuH = #rows * ROW + (#rows - 1) * 4 + 12
+
+			local catcher = U.button(root, { Name = "MenuCatcher", Size = UDim2.fromScale(1, 1), ZIndex = 60 })
+
+			local rootSize = root.AbsoluteSize
+			local relative = anchor.AbsolutePosition - root.AbsolutePosition
+			local x = math.clamp(relative.X + anchor.AbsoluteSize.X - MENU_W, 8, math.max(8, rootSize.X - MENU_W - 8))
+			local y = math.clamp(relative.Y + anchor.AbsoluteSize.Y + 4, 8, math.max(8, rootSize.Y - menuH - 8))
+
+			local menu = U.make("Frame", {
+				Name = "Menu",
+				Position = UDim2.fromOffset(x, y),
+				Size = UDim2.fromOffset(MENU_W, menuH),
+				BackgroundColor3 = T.card,
+				BorderSizePixel = 0,
+				ZIndex = 61,
+			}, root)
+			U.corner(menu, 10)
+			U.stroke(menu, T.white, 0.85)
+			local menuScale = U.make("UIScale", { Scale = 0.85 }, menu)
+			U.tween(menuScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+
+			local closed = false
+			local function close()
+				if closed then return end
+				closed = true
+				window._menu = nil
+				el._menuSwitch = nil
+				if K.capturing then
+					if K.cancel then K.cancel() end
+					K.capturing = nil
+					K.cancel = nil
+				end
+				catcher:Destroy()
+				U.tween(menuScale, 0.15, { Scale = 0.85 }, Enum.EasingStyle.Quad)
+				U.tween(menu, 0.15, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
+				task.delay(0.16, function() menu:Destroy() end)
+			end
+			window._menu = { close = close }
+			catcher.Activated:Connect(close)
+
+			for index, kind in ipairs(rows) do
+				local line = U.make("Frame", {
+					Position = UDim2.fromOffset(6, 6 + (index - 1) * (ROW + 4)),
+					Size = UDim2.new(1, -12, 0, ROW),
+					BackgroundColor3 = T.chip,
+					BorderSizePixel = 0,
+					ZIndex = 62,
+				}, menu)
+				U.corner(line, 8)
+
+				if kind == "keybind" then
+					U.label(line, {
+						Position = UDim2.fromOffset(10, 0),
+						Size = UDim2.new(1, -100, 1, 0),
+						Text = "Keybind",
+						ZIndex = 63,
+					})
+					local keyButton = U.button(line, {
+						AnchorPoint = Vector2.new(1, 0.5),
+						Position = UDim2.new(1, -6, 0.5, 0),
+						Size = UDim2.fromOffset(84, 24),
+						BackgroundTransparency = 0,
+						BackgroundColor3 = T.off,
+						Text = K.label(el._key),
+						TextColor3 = T.text,
+						TextSize = 12,
+						Font = Enum.Font.GothamMedium,
+						ZIndex = 63,
+					})
+					U.corner(keyButton, 6)
+					keyButton.Activated:Connect(function()
+						-- the next key you press becomes the keybind (Escape cancels, Backspace clears it)
+						keyButton.Text = "..."
+						U.tween(keyButton, 0.15, { BackgroundColor3 = T.green }, Enum.EasingStyle.Quad)
+						K.capture(function(keyCode)
+							if keyCode == Enum.KeyCode.Backspace then
+								setKey(el, nil)
+							elseif keyCode ~= Enum.KeyCode.Escape then
+								setKey(el, keyCode)
+							end
+							if keyButton.Parent then
+								keyButton.Text = K.label(el._key)
+								U.tween(keyButton, 0.2, { BackgroundColor3 = T.off }, Enum.EasingStyle.Quad)
+							end
+						end, function()
+							if keyButton.Parent then
+								keyButton.Text = K.label(el._key)
+								U.tween(keyButton, 0.2, { BackgroundColor3 = T.off }, Enum.EasingStyle.Quad)
+							end
+						end)
+					end)
+				else
+					U.label(line, {
+						Position = UDim2.fromOffset(10, 0),
+						Size = UDim2.new(1, -70, 1, 0),
+						Text = "Mobile Button",
+						ZIndex = 63,
+					})
+					local switch = makeSwitch(line, UDim2.new(1, -8, 0.5, 0), Vector2.new(1, 0.5))
+					switch.track.ZIndex = 63
+					switch.knob.ZIndex = 64
+					switch.set(el._mbOn == true, true)
+					el._menuSwitch = switch
+					local hit = U.button(line, { Size = UDim2.fromScale(1, 1), ZIndex = 65 })
+					hit.Activated:Connect(function()
+						el:_setMB(not el._mbOn)
+						switch.set(el._mbOn == true)
+						window:_changed()
+					end)
+				end
+			end
+		end
+
+		-- the 3 dots (only when the component has a keybind or a mobile button), and the methods the window
+		-- uses to apply saved extras
+		local function attachOptions(el, frame, rightOffset)
+			function el:_setKey(keyCode) setKey(self, keyCode) end
+			function el:_setMB(state)
+				if state then spawnMB(self) else destroyMB(self) end
+			end
+			if not (el.haveKeybinds or el.haveMB) then return end
+			el._hasOptions = true
+			local window = el._window
+
+			local dots = U.button(frame, {
+				Name = "Options",
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -rightOffset, 0.5, 0),
+				Size = UDim2.fromOffset(26, 26),
+				BackgroundColor3 = T.white,
+				ZIndex = 3,
+			})
+			U.corner(dots, 13)
+			local icon = U.make("ImageLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(18, 18),
+				BackgroundTransparency = 1,
+				Image = U.assetUrl(ICON_DOTS),
+				ImageColor3 = T.sub,
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 4,
+			}, dots)
+			dots.MouseEnter:Connect(function()
+				U.tween(dots, 0.15, { BackgroundTransparency = 0.88 }, Enum.EasingStyle.Quad)
+				U.tween(icon, 0.15, { ImageColor3 = T.text }, Enum.EasingStyle.Quad)
+			end)
+			dots.MouseLeave:Connect(function()
+				U.tween(dots, 0.2, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
+				U.tween(icon, 0.2, { ImageColor3 = T.sub }, Enum.EasingStyle.Quad)
+			end)
+			dots.Activated:Connect(function()
+				openMenu(window, el, dots)
+			end)
+		end
+
+		-- the part every value component shares: its flag, saved values, and the search list
+		local function finish(row, el, cfg, frame, sep)
+			return row._window:_register(el, row, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Toggle
+		----------------------------------------------------------------
+		function E.toggle(row, cfg)
+			local window = row._window
+			local el = {
+				kind = "toggle",
+				_window = window,
+				name = tostring(cfg.name or "Toggle"),
+				callback = cfg.callback,
+				value = cfg.value == true,
+				haveKeybinds = cfg.haveKeybinds == true,
+				haveMB = cfg.haveMB == true,
+			}
+			local frame, sep = makeItem(row)
+			local hit = makeHit(frame)
+			local label = U.label(frame, {
+				Name = "Name",
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(1, -72, 1, 0),
+				Text = el.name,
+				ZIndex = 2,
+			})
+			local switch = makeSwitch(frame, UDim2.new(1, -12, 0.5, 0), Vector2.new(1, 0.5))
+			switch.set(el.value, true)
+			attachOptions(el, frame, 12 + 40 + 8)
+
+			function el:_updateLabel()
+				local reserve = 12 + 40 + 12
+				if self._hasOptions then reserve += 30 end
+				label.Size = UDim2.new(1, -reserve, 1, 0)
+			end
+			el:_updateLabel()
+
+			function el:_natural() return self.value end
+			function el:_serialize() return self.value end
+			function el:_set(value, quiet)
+				value = value == true
+				if self.value == value then return end
+				self.value = value
+				switch.set(value)
+				window._values[self.flag] = value
+				if self._mb then self._mb.SetState(value) end
+				window:_changed()
+				if not quiet then U.run(self.callback, value) end
+			end
+			function el:_load(data)
+				if type(data) ~= "boolean" then return false end
+				self:_set(data, true)
+				return true
+			end
+			function el:_fire() U.run(self.callback, self.value) end
+			function el:_onKey() self:_set(not self.value) end
+
+			hit.Activated:Connect(function() el:_onKey() end)
+			return finish(row, el, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Button (no flash, no label)
+		----------------------------------------------------------------
+		function E.button(row, cfg)
+			local window = row._window
+			local el = {
+				kind = "button",
+				_window = window,
+				name = tostring(cfg.name or "Button"),
+				callback = cfg.callback,
+				haveKeybinds = cfg.haveKeybinds == true,
+				haveMB = cfg.haveMB == true,
+			}
+			local frame, sep = makeItem(row)
+			local hit = makeHit(frame)
+			local label = U.label(frame, {
+				Name = "Name",
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(1, -24, 1, 0),
+				Text = el.name,
+				ZIndex = 2,
+			})
+			attachOptions(el, frame, 10)
+
+			function el:_updateLabel()
+				local reserve = 24
+				if self._hasOptions then reserve += 30 end
+				label.Size = UDim2.new(1, -reserve, 1, 0)
+			end
+			el:_updateLabel()
+
+			function el:_run() U.run(self.callback) end
+			function el:_onKey()
+				self:_run()
+				if self._mb then self._mb.Pulse() end
+			end
+
+			hit.Activated:Connect(function() el:_run() end)
+			return finish(row, el, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Slider
+		----------------------------------------------------------------
+		function E.slider(row, cfg)
+			local window = row._window
+			local minValue, maxValue = 0, 100
+			if type(cfg.range) == "table" then
+				minValue = tonumber(cfg.range[1]) or 0
+				maxValue = tonumber(cfg.range[2]) or (minValue + 100)
+			end
+			if maxValue <= minValue then maxValue = minValue + 1 end
+			local increment = tonumber(cfg.increment) or 1
+			if increment <= 0 then increment = 1 end
+			local decimals = U.decimalsOf(increment)
+
+			local function snap(value)
+				value = math.clamp(value, minValue, maxValue)
+				local steps = math.floor((value - minValue) / increment + 0.5)
+				value = minValue + steps * increment
+				value = tonumber(string.format("%." .. decimals .. "f", value)) or value
+				return math.clamp(value, minValue, maxValue)
+			end
+
+			local el = {
+				kind = "slider",
+				_window = window,
+				name = tostring(cfg.name or "Slider"),
+				callback = cfg.callback,
+				value = snap(tonumber(cfg.value) or minValue),
+			}
+
+			local frame, sep = makeItem(row)
+			U.label(frame, {
+				Name = "Name",
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(0.4, -12, 1, 0),
+				Text = el.name,
+				ZIndex = 2,
+			})
+			local chip, valueBox = makeChipBox(frame, {
+				position = UDim2.new(1, -10, 0.5, 0),
+				size = UDim2.fromOffset(48, 24),
+				text = "",
+				align = Enum.TextXAlignment.Center,
+			})
+			valueBox.Position = UDim2.fromOffset(2, 0)
+			valueBox.Size = UDim2.new(1, -4, 1, 0)
+
+			local track = U.make("Frame", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0.4, 0, 0.5, 0),
+				Size = UDim2.new(0.6, -(10 + 48 + 12), 0, 6),
+				BackgroundColor3 = T.off,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, frame)
+			U.corner(track, 3)
+			local fill = U.make("Frame", {
+				Size = UDim2.fromScale(0, 1),
+				BackgroundColor3 = T.green,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+			}, track)
+			U.corner(fill, 3)
+			local knob = U.make("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0, 0.5),
+				Size = UDim2.fromOffset(12, 12),
+				BackgroundColor3 = T.white,
+				BorderSizePixel = 0,
+				ZIndex = 4,
+			}, track)
+			U.corner(knob, 6)
+
+			-- the grab area: the track, a little wider than it is, the full height of the row
+			local hit = U.button(frame, {
+				Name = "Hit",
+				Position = UDim2.new(0.4, -8, 0, 0),
+				Size = UDim2.new(0.6, -(10 + 48 + 6), 1, 0),
+				ZIndex = 5,
+			})
+
+			local function render(instant)
+				local alpha = (el.value - minValue) / (maxValue - minValue)
+				if instant then
+					fill.Size = UDim2.fromScale(alpha, 1)
+					knob.Position = UDim2.fromScale(alpha, 0.5)
+				else
+					U.tween(fill, 0.06, { Size = UDim2.fromScale(alpha, 1) }, Enum.EasingStyle.Linear)
+					U.tween(knob, 0.06, { Position = UDim2.fromScale(alpha, 0.5) }, Enum.EasingStyle.Linear)
+				end
+				valueBox.Text = string.format("%." .. decimals .. "f", el.value)
+			end
+			render(true)
+
+			function el:_natural() return self.value end
+			function el:_serialize() return self.value end
+			function el:_set(value, quiet)
+				value = snap(tonumber(value) or self.value)
+				if value == self.value then
+					render(true)
+					return
+				end
+				self.value = value
+				render()
+				window._values[self.flag] = value
+				window:_changed()
+				if not quiet then U.run(self.callback, value) end
+			end
+			function el:_load(data)
+				if type(data) ~= "number" then return false end
+				self:_set(data, true)
+				return true
+			end
+			function el:_fire() U.run(self.callback, self.value) end
+
+			local function fromX(x)
+				local alpha = math.clamp((x - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
+				el:_set(minValue + (maxValue - minValue) * alpha)
+			end
+
+			-- press and slide: the tab stops scrolling while you do
+			hit.InputBegan:Connect(function(input)
+				if not U.isPress(input) then return end
+				local started = D.begin(input, function(moved)
+					fromX(U.p2(moved).X)
+				end, function()
+					U.tween(knob, 0.2, { Size = UDim2.fromOffset(12, 12) }, Enum.EasingStyle.Quad)
+				end, row._tab._page)
+				if not started then return end
+				U.tween(knob, 0.15, { Size = UDim2.fromOffset(16, 16) }, Enum.EasingStyle.Back)
+				fromX(U.p2(input).X)
+			end)
+
+			valueBox.FocusLost:Connect(function()
+				local typed = tonumber(valueBox.Text)
+				if typed then el:_set(typed) else render(true) end
+			end)
+
+			return finish(row, el, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Dropdown (multiSelect for several)
+		----------------------------------------------------------------
+		function E.dropdown(row, cfg)
+			local window = row._window
+			local OPTION_H = 30
+			local el = {
+				kind = "dropdown",
+				_window = window,
+				name = tostring(cfg.name or "Dropdown"),
+				callback = cfg.callback,
+				multi = cfg.multiSelect == true,
+				options = {},
+				selected = {},
+			}
+			for _, option in ipairs(cfg.options or {}) do el.options[#el.options + 1] = tostring(option) end
+
+			local function pick(value)
+				local chosen = {}
+				local list = type(value) == "table" and value or (value ~= nil and { value } or {})
+				for _, entry in ipairs(list) do
+					entry = tostring(entry)
+					if table.find(el.options, entry) and not table.find(chosen, entry) then
+						chosen[#chosen + 1] = entry
+						if not el.multi then break end
+					end
+				end
+				el.selected = chosen
+			end
+			pick(cfg.value)
+
+			local frame, sep = makeItem(row)
+			frame.ClipsDescendants = true
+			local hit = makeHit(frame)
+			U.label(frame, {
+				Name = "Name",
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(0.5, -12, 0, ROW_H),
+				Text = el.name,
+				ZIndex = 2,
+			})
+
+			local chip = U.make("Frame", {
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -10, 0, (ROW_H - 24) / 2),
+				Size = UDim2.new(0.5, -14, 0, 24),
+				BackgroundColor3 = T.chip,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, frame)
+			U.corner(chip, 6)
+			local valueLabel = U.label(chip, {
+				Position = UDim2.fromOffset(8, 0),
+				Size = UDim2.new(1, -28, 1, 0),
+				Text = "None",
+				TextSize = 12,
+				TextColor3 = T.text,
+				ZIndex = 3,
+			})
+			local chevron = U.make("Frame", {
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -8, 0.5, 0),
+				Size = UDim2.fromOffset(12, 12),
+				BackgroundTransparency = 1,
+				ZIndex = 3,
+			}, chip)
+			for _, spec in ipairs({ { -3, 45 }, { 3, -45 } }) do
+				local arm = U.make("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0.5, spec[1], 0.5, 0),
+					Size = UDim2.fromOffset(7, 2),
+					Rotation = spec[2],
+					BackgroundColor3 = T.sub,
+					BorderSizePixel = 0,
+					ZIndex = 3,
+				}, chevron)
+				U.corner(arm, 1)
+			end
+
+			local list = U.make("ScrollingFrame", {
+				Name = "List",
+				Position = UDim2.fromOffset(8, ROW_H + 2),
+				Size = UDim2.new(1, -16, 0, 0),
+				BackgroundColor3 = T.panel,
+				BorderSizePixel = 0,
+				ScrollBarThickness = 3,
+				ScrollBarImageColor3 = T.line,
+				CanvasSize = UDim2.new(),
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				ScrollingDirection = Enum.ScrollingDirection.Y,
+				ZIndex = 2,
+			}, frame)
+			U.corner(list, 8)
+			U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, list)
+			U.make("UIPadding", {
+				PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4),
+				PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4),
+			}, list)
+
+			local buttons = {}
+			local open = false
+			local listHeight = 0
+
+			local function refresh()
+				if #el.selected == 0 then
+					valueLabel.Text = "None"
+				elseif #el.selected == 1 or not el.multi then
+					valueLabel.Text = el.selected[1]
+				else
+					valueLabel.Text = #el.selected .. " selected"
+				end
+				for index, entry in ipairs(buttons) do
+					local on = table.find(el.selected, el.options[index]) ~= nil
+					U.tween(entry.dot, 0.2, { BackgroundTransparency = on and 0 or 1 }, Enum.EasingStyle.Quad)
+					U.tween(entry.button, 0.2, { TextColor3 = on and T.text or T.sub }, Enum.EasingStyle.Quad)
+				end
+			end
+
+			local function setOpen(state)
+				open = state
+				local height = state and (ROW_H + 2 + listHeight + 8) or ROW_H
+				U.tween(frame, 0.35, { Size = UDim2.new(1, 0, 0, height) }, Enum.EasingStyle.Quint)
+				U.tween(list, 0.35, { Size = UDim2.new(1, -16, 0, listHeight) }, Enum.EasingStyle.Quint)
+				U.tween(chevron, 0.35, { Rotation = state and 180 or 0 }, Enum.EasingStyle.Quint)
+			end
+
+			local function build()
+				for _, entry in ipairs(buttons) do entry.button:Destroy() end
+				buttons = {}
+				listHeight = math.min(#el.options * OPTION_H + 8, 164)
+				for index, option in ipairs(el.options) do
+					local button = U.button(list, {
+						LayoutOrder = index,
+						Size = UDim2.new(1, 0, 0, OPTION_H),
+						Text = option,
+						TextColor3 = T.sub,
+						TextSize = 12,
+						Font = Enum.Font.GothamMedium,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						ZIndex = 3,
+					})
+					U.make("UIPadding", { PaddingLeft = UDim.new(0, 10) }, button)
+					local dot = U.make("Frame", {
+						AnchorPoint = Vector2.new(1, 0.5),
+						Position = UDim2.new(1, -8, 0.5, 0),
+						Size = UDim2.fromOffset(7, 7),
+						BackgroundColor3 = T.green,
+						BackgroundTransparency = 1,
+						BorderSizePixel = 0,
+						ZIndex = 4,
+					}, button)
+					U.corner(dot, 4)
+					button.Activated:Connect(function()
+						if el.multi then
+							local chosen = U.copyList(el.selected)
+							local at = table.find(chosen, option)
+							if at then table.remove(chosen, at) else chosen[#chosen + 1] = option end
+							el:_set(chosen)
+						else
+							if el.selected[1] ~= option then el:_set(option) end
+							setOpen(false)
+						end
+					end)
+					buttons[index] = { button = button, dot = dot }
+				end
+				refresh()
+				if open then setOpen(true) end
+			end
+
+			function el:_natural()
+				if self.multi then return U.copyList(self.selected) end
+				return self.selected[1]
+			end
+			function el:_serialize() return U.copyList(self.selected) end
+			function el:_set(value, quiet)
+				pick(value)
+				refresh()
+				window._values[self.flag] = self:_natural()
+				window:_changed()
+				if not quiet then U.run(self.callback, self:_natural()) end
+			end
+			function el:_load(data)
+				if type(data) ~= "table" and type(data) ~= "string" then return false end
+				self:_set(data, true)
+				return true
+			end
+			function el:_fire() U.run(self.callback, self:_natural()) end
+			-- (used by the Settings tab) replace the options, dropping a selection that no longer exists
+			function el:_setOptions(options)
+				self.options = {}
+				for _, option in ipairs(options) do self.options[#self.options + 1] = tostring(option) end
+				pick(self.selected)
+				build()
+			end
+
+			hit.Activated:Connect(function() setOpen(not open) end)
+			build()
+			return finish(row, el, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Input (a text box, commits when you press enter or click away)
+		----------------------------------------------------------------
+		function E.input(row, cfg)
+			local window = row._window
+			local el = {
+				kind = "input",
+				_window = window,
+				name = tostring(cfg.name or "Input"),
+				callback = cfg.callback,
+				value = tostring(cfg.value or ""),
+			}
+			local frame, sep = makeItem(row)
+			U.label(frame, {
+				Name = "Name",
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(0.4, -12, 1, 0),
+				Text = el.name,
+				ZIndex = 2,
+			})
+			local chip, box = makeChipBox(frame, {
+				position = UDim2.new(1, -10, 0.5, 0),
+				size = UDim2.new(0.6, -16, 0, 26),
+				text = el.value,
+				placeholder = tostring(cfg.placeholder or ""),
+			})
+
+			function el:_natural() return self.value end
+			function el:_serialize() return self.value end
+			function el:_set(value, quiet)
+				value = tostring(value or "")
+				box.Text = value
+				if value == self.value then return end
+				self.value = value
+				window._values[self.flag] = value
+				window:_changed()
+				if not quiet then U.run(self.callback, value) end
+			end
+			function el:_load(data)
+				if type(data) ~= "string" then return false end
+				self:_set(data, true)
+				return true
+			end
+			function el:_fire() U.run(self.callback, self.value) end
+			function el:_currentText() return box.Text end
+
+			box.FocusLost:Connect(function()
+				el:_set(box.Text)
+			end)
+			return finish(row, el, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Keybind (shows the key, outputs an Enum.KeyCode)
+		----------------------------------------------------------------
+		function E.keybind(row, cfg)
+			local window = row._window
+			local function toKey(value)
+				if typeof(value) == "EnumItem" then return value end
+				if type(value) == "string" and value ~= "" then
+					local ok, key = pcall(function() return Enum.KeyCode[value] end)
+					if ok then return key end
+				end
+				return nil
+			end
+
+			local el = {
+				kind = "keybind",
+				_window = window,
+				name = tostring(cfg.name or "Keybind"),
+				callback = cfg.callback,
+				onChanged = cfg.onChanged,
+				value = toKey(cfg.value),
+			}
+			el._key = el.value
+			if el._key then K.add(el) end
+
+			local frame, sep = makeItem(row)
+			U.label(frame, {
+				Name = "Name",
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(0.5, -12, 1, 0),
+				Text = el.name,
+				ZIndex = 2,
+			})
+			local chip = U.button(frame, {
+				Name = "Key",
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -10, 0.5, 0),
+				Size = UDim2.fromOffset(96, 24),
+				BackgroundTransparency = 0,
+				BackgroundColor3 = T.chip,
+				Text = K.label(el.value),
+				TextColor3 = T.text,
+				TextSize = 12,
+				Font = Enum.Font.GothamMedium,
+				ZIndex = 3,
+			})
+			U.corner(chip, 6)
+			local chipScale = U.make("UIScale", { Scale = 1 }, chip)
+
+			function el:_natural() return self.value end
+			function el:_serialize() return self.value and self.value.Name or "" end
+			-- changing the key never runs the press callback
+			function el:_set(value)
+				value = toKey(value)
+				self.value = value
+				self._key = value
+				if value then K.add(self) else K.remove(self) end
+				chip.Text = K.label(value)
+				window._values[self.flag] = value
+				window:_changed()
+				if self.onChanged then U.run(self.onChanged, value) end
+			end
+			function el:_load(data)
+				if type(data) ~= "string" then return false end
+				self:_set(data)
+				return false -- nothing to fire: the callback is for presses
+			end
+			function el:_fire() end
+			function el:_onKey() U.run(self.callback, self.value) end
+
+			local function restore()
+				if chip.Parent then
+					chip.Text = K.label(el.value)
+					U.tween(chip, 0.2, { BackgroundColor3 = T.chip }, Enum.EasingStyle.Quad)
+				end
+			end
+			chip.MouseEnter:Connect(function()
+				if not K.capturing then U.tween(chip, 0.15, { BackgroundColor3 = T.chipHover }, Enum.EasingStyle.Quad) end
+			end)
+			chip.MouseLeave:Connect(function()
+				if not K.capturing then U.tween(chip, 0.2, { BackgroundColor3 = T.chip }, Enum.EasingStyle.Quad) end
+			end)
+			chip.InputBegan:Connect(function(input)
+				if U.isPress(input) then U.tween(chipScale, 0.08, { Scale = 0.94 }, Enum.EasingStyle.Quad) end
+			end)
+			chip.InputEnded:Connect(function(input)
+				if U.isPress(input) then U.tween(chipScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back) end
+			end)
+			chip.Activated:Connect(function()
+				-- press a key to bind it: Backspace clears, Escape keeps the current one
+				chip.Text = "..."
+				U.tween(chip, 0.15, { BackgroundColor3 = T.green }, Enum.EasingStyle.Quad)
+				K.capture(function(keyCode)
+					if keyCode == Enum.KeyCode.Backspace then
+						el:_set(nil)
+					elseif keyCode ~= Enum.KeyCode.Escape then
+						el:_set(keyCode)
+					end
+					restore()
+				end, restore)
+			end)
+
+			return finish(row, el, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Color picker (whole-number RGB, no alpha)
+		----------------------------------------------------------------
+		function E.colorpicker(row, cfg)
+			local window = row._window
+			local PICK_H = 112
+			local FIELDS_Y = ROW_H + 4 + PICK_H + 8
+			local OPEN_H = FIELDS_Y + 24 + 10
+
+			local function quantize(color)
+				local r, g, b = U.rgbOf(color)
+				return Color3.fromRGB(r, g, b)
+			end
+			local function toColor(value)
+				if typeof(value) == "Color3" then return quantize(value) end
+				if type(value) == "table" and #value >= 3 then
+					return Color3.fromRGB(
+						math.clamp(math.floor(tonumber(value[1]) or 0), 0, 255),
+						math.clamp(math.floor(tonumber(value[2]) or 0), 0, 255),
+						math.clamp(math.floor(tonumber(value[3]) or 0), 0, 255)
+					)
+				end
+				return nil
+			end
+
+			local el = {
+				kind = "color",
+				_window = window,
+				name = tostring(cfg.name or "Color Picker"),
+				callback = cfg.callback,
+				value = toColor(cfg.color) or Color3.new(1, 1, 1),
+			}
+			local hue, sat, val = el.value:ToHSV()
+
+			local frame, sep = makeItem(row)
+			frame.ClipsDescendants = true
+			local hit = makeHit(frame)
+			U.label(frame, {
+				Name = "Name",
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(1, -90, 0, ROW_H),
+				Text = el.name,
+				ZIndex = 2,
+			})
+			local swatch = U.make("Frame", {
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -12, 0, ROW_H / 2),
+				Size = UDim2.fromOffset(46, 22),
+				BackgroundColor3 = el.value,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, frame)
+			U.corner(swatch, 6)
+			U.stroke(swatch, T.white, 0.8)
+
+			-- the map: saturation across, brightness down
+			local map = U.make("Frame", {
+				Position = UDim2.new(0, 12, 0, ROW_H + 4),
+				Size = UDim2.new(1, -50, 0, PICK_H),
+				BackgroundColor3 = Color3.fromHSV(hue, 1, 1),
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, frame)
+			U.corner(map, 6)
+			local whiteLayer = U.make("Frame", {
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = T.white,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+			}, map)
+			U.corner(whiteLayer, 6)
+			U.make("UIGradient", {
+				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }),
+			}, whiteLayer)
+			local blackLayer = U.make("Frame", {
+				Size = UDim2.fromScale(1, 1),
+				BackgroundColor3 = Color3.new(0, 0, 0),
+				BorderSizePixel = 0,
+				ZIndex = 4,
+			}, map)
+			U.corner(blackLayer, 6)
+			U.make("UIGradient", {
+				Rotation = 90,
+				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }),
+			}, blackLayer)
+			local mapCursor = U.make("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Size = UDim2.fromOffset(12, 12),
+				BackgroundTransparency = 1,
+				ZIndex = 6,
+			}, map)
+			U.corner(mapCursor, 6)
+			U.stroke(mapCursor, T.white, 0, 2)
+
+			-- the hue bar
+			local bar = U.make("Frame", {
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -12, 0, ROW_H + 4),
+				Size = UDim2.fromOffset(16, PICK_H),
+				BackgroundColor3 = T.white,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, frame)
+			U.corner(bar, 6)
+			local keypoints = {}
+			for step = 0, 6 do
+				keypoints[#keypoints + 1] = ColorSequenceKeypoint.new(step / 6, Color3.fromHSV(math.min(step / 6, 0.9999), 1, 1))
+			end
+			U.make("UIGradient", { Rotation = 90, Color = ColorSequence.new(keypoints) }, bar)
+			local barCursor = U.make("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Size = UDim2.fromOffset(22, 4),
+				BackgroundColor3 = T.white,
+				BorderSizePixel = 0,
+				ZIndex = 6,
+			}, bar)
+			U.corner(barCursor, 2)
+			U.stroke(barCursor, Color3.new(0, 0, 0), 0.6, 1)
+
+			-- R G B and hex
+			local fields = U.make("Frame", {
+				Position = UDim2.new(0, 12, 0, FIELDS_Y),
+				Size = UDim2.new(1, -24, 0, 24),
+				BackgroundTransparency = 1,
+				ZIndex = 2,
+			}, frame)
+			U.make("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				Padding = UDim.new(0, 6),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, fields)
+			local boxes = {}
+			local function field(order, width, placeholder)
+				local chip = U.make("Frame", {
+					LayoutOrder = order,
+					Size = width,
+					BackgroundColor3 = T.chip,
+					BorderSizePixel = 0,
+					ZIndex = 2,
+				}, fields)
+				U.corner(chip, 6)
+				local box = U.make("TextBox", {
+					Size = UDim2.fromScale(1, 1),
+					BackgroundTransparency = 1,
+					ClearTextOnFocus = false,
+					Text = "",
+					PlaceholderText = placeholder,
+					PlaceholderColor3 = T.sub,
+					TextColor3 = T.text,
+					TextSize = 12,
+					Font = Enum.Font.GothamMedium,
+					ZIndex = 3,
+				}, chip)
+				return box
+			end
+			boxes.r = field(1, UDim2.new(0.19, -5, 1, 0), "R")
+			boxes.g = field(2, UDim2.new(0.19, -5, 1, 0), "G")
+			boxes.b = field(3, UDim2.new(0.19, -5, 1, 0), "B")
+			boxes.hex = field(4, UDim2.new(0.43, -5, 1, 0), "#RRGGBB")
+
+			local function paint()
+				local r, g, b = U.rgbOf(el.value)
+				swatch.BackgroundColor3 = el.value
+				map.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+				mapCursor.Position = UDim2.fromScale(sat, 1 - val)
+				barCursor.Position = UDim2.fromScale(0.5, hue)
+				boxes.r.Text, boxes.g.Text, boxes.b.Text = tostring(r), tostring(g), tostring(b)
+				boxes.hex.Text = string.format("#%02X%02X%02X", r, g, b)
+			end
+
+			-- takes the current hue / saturation / value and publishes the color if it changed
+			local function commit(quiet)
+				local color = quantize(Color3.fromHSV(hue, sat, val))
+				paint()
+				if color == el.value then return end
+				el.value = color
+				paint()
+				window._values[el.flag] = color
+				window:_changed()
+				if not quiet then U.run(el.callback, color) end
+			end
+			paint()
+
+			function el:_natural() return self.value end
+			function el:_serialize()
+				local r, g, b = U.rgbOf(self.value)
+				return { r, g, b }
+			end
+			function el:_set(value, quiet)
+				local color = toColor(value)
+				if not color then return end
+				local h, s, v = color:ToHSV()
+				if s > 0 and v > 0 then hue = h end
+				sat, val = s, v
+				el.value = quantize(Color3.fromHSV(hue, sat, val))
+				if el.value ~= color then el.value = color end
+				paint()
+				window._values[self.flag] = el.value
+				window:_changed()
+				if not quiet then U.run(self.callback, el.value) end
+			end
+			function el:_load(data)
+				if not toColor(data) then return false end
+				self:_set(data, true)
+				return true
+			end
+			function el:_fire() U.run(self.callback, self.value) end
+
+			local function dragMap(input)
+				local pos = U.screenPos(input)
+				sat = math.clamp((pos.X - map.AbsolutePosition.X) / math.max(1, map.AbsoluteSize.X), 0, 1)
+				val = 1 - math.clamp((pos.Y - map.AbsolutePosition.Y) / math.max(1, map.AbsoluteSize.Y), 0, 1)
+				commit(false)
+			end
+			local function dragBar(input)
+				local pos = U.screenPos(input)
+				hue = math.clamp((pos.Y - bar.AbsolutePosition.Y) / math.max(1, bar.AbsoluteSize.Y), 0, 0.9999)
+				commit(false)
+			end
+			map.InputBegan:Connect(function(input)
+				if not U.isPress(input) then return end
+				if D.begin(input, dragMap, nil, row._tab._page) then dragMap(input) end
+			end)
+			bar.InputBegan:Connect(function(input)
+				if not U.isPress(input) then return end
+				if D.begin(input, dragBar, nil, row._tab._page) then dragBar(input) end
+			end)
+
+			local function typed()
+				local r, g, b = tonumber(boxes.r.Text), tonumber(boxes.g.Text), tonumber(boxes.b.Text)
+				if r and g and b then
+					el:_set(Color3.fromRGB(
+						math.clamp(math.floor(r), 0, 255), math.clamp(math.floor(g), 0, 255), math.clamp(math.floor(b), 0, 255)
+					))
+				else
+					paint()
+				end
+			end
+			boxes.r.FocusLost:Connect(typed)
+			boxes.g.FocusLost:Connect(typed)
+			boxes.b.FocusLost:Connect(typed)
+			boxes.hex.FocusLost:Connect(function()
+				local r, g, b = boxes.hex.Text:match("^#?(%x%x)(%x%x)(%x%x)$")
+				if r then
+					el:_set(Color3.fromRGB(tonumber(r, 16), tonumber(g, 16), tonumber(b, 16)))
+				else
+					paint()
+				end
+			end)
+
+			local open = false
+			hit.Activated:Connect(function()
+				open = not open
+				U.tween(frame, 0.35, { Size = UDim2.new(1, 0, 0, open and OPEN_H or ROW_H) }, Enum.EasingStyle.Quint)
+			end)
+
+			return finish(row, el, cfg, frame, sep)
+		end
+
+		----------------------------------------------------------------
+		-- Divider (a line, with a word in the middle if you give it one)
+		----------------------------------------------------------------
+		function E.divider(row, cfg)
+			cfg = cfg or {}
+			local text = tostring(cfg.text or "")
+			local frame = U.make("Frame", {
+				Name = "Divider",
+				Size = UDim2.new(1, 0, 0, 26),
+				BackgroundTransparency = 1,
+			}, row._frame)
+			local left = U.make("Frame", { BackgroundColor3 = T.line, BorderSizePixel = 0 }, frame)
+			local right = U.make("Frame", { BackgroundColor3 = T.line, BorderSizePixel = 0 }, frame)
+			local label = U.label(frame, {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(10, 16),
+				Text = text,
+				TextSize = 11,
+				TextColor3 = T.sub,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextTruncate = Enum.TextTruncate.None,
+			})
+
+			local function layout()
+				if text == "" then
+					label.Visible = false
+					right.Visible = false
+					left.AnchorPoint = Vector2.new(0, 0.5)
+					left.Position = UDim2.new(0, 12, 0.5, 0)
+					left.Size = UDim2.new(1, -24, 0, 1)
+					return
+				end
+				label.Visible = true
+				right.Visible = true
+				local width = frame.AbsoluteSize.X
+				local textWidth = label.TextBounds.X
+				label.Size = UDim2.fromOffset(textWidth + 4, 16)
+				local side = math.max(0, (width - 24 - textWidth - 20) / 2)
+				left.AnchorPoint = Vector2.new(0, 0.5)
+				left.Position = UDim2.new(0, 12, 0.5, 0)
+				left.Size = UDim2.fromOffset(side, 1)
+				right.AnchorPoint = Vector2.new(1, 0.5)
+				right.Position = UDim2.new(1, -12, 0.5, 0)
+				right.Size = UDim2.fromOffset(side, 1)
+			end
+			frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+			label:GetPropertyChangedSignal("TextBounds"):Connect(layout)
+			layout()
+
+			row:_add({ kind = "divider", frame = frame })
+			return {}
+		end
+
+		----------------------------------------------------------------
+		-- Section (the small heading above a box)
+		----------------------------------------------------------------
+		function E.section(row, cfg)
+			cfg = cfg or {}
+			local name = tostring(cfg.name or "Section")
+			local frame = U.make("Frame", {
+				Name = "Section",
+				Size = UDim2.new(1, 0, 0, 28),
+				BackgroundTransparency = 1,
+			}, row._frame)
+			local x = 6
+			if U.hasIcon(cfg.icon) then
+				U.make("ImageLabel", {
+					AnchorPoint = Vector2.new(0, 1),
+					Position = UDim2.new(0, 6, 1, -3),
+					Size = UDim2.fromOffset(14, 14),
+					BackgroundTransparency = 1,
+					Image = U.assetUrl(cfg.icon),
+					ImageColor3 = T.sub,
+					ScaleType = Enum.ScaleType.Fit,
+				}, frame)
+				x = 26
+			end
+			U.label(frame, {
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.new(0, x, 1, -2),
+				Size = UDim2.new(1, -(x + 6), 0, 18),
+				Text = name,
+				TextSize = 12,
+				TextColor3 = T.sub,
+			})
+			row._lastSection = name
+			row:_add({ kind = "section", frame = frame })
+			return {}
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Rows, tabs and the window object
+	----------------------------------------------------------------
+	local Row, Tab, Window = {}, {}, {}
+	Row.__index = Row
+	Tab.__index = Tab
+	Window.__index = Window
+
+	local COMPONENTS = {
+		"CreateSection", "CreateToggle", "CreateButton", "CreateSlider", "CreateDropdown",
+		"CreateInput", "CreateKeybind", "CreateColorPicker", "CreateDivider",
+	}
+
+	-- Row: one of the two scrolling columns. Components that follow each other form one box; a section or a
+	-- standalone divider breaks the box.
+	do
+		local function makeCard(parent)
+			local card = U.make("Frame", {
+				Name = "Card",
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundColor3 = T.card,
+				BorderSizePixel = 0,
+			}, parent)
+			U.corner(card, 10)
+			U.stroke(card, T.white, 0.93)
+			U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, card)
+			return card
+		end
+
+		function Row:_add(item)
+			self._items[#self._items + 1] = item
+			self:_queueLayout()
+		end
+
+		function Row:_queueLayout()
+			if self._queued then return end
+			self._queued = true
+			task.defer(function()
+				self._queued = false
+				if self._frame.Parent then self:_layout() end
+			end)
+		end
+
+		function Row:_layout()
+			local items = self._items
+			local count = #items
+			local blocks = {}
+
+			-- sections are free; every run of other items between sections becomes a box,
+			-- except dividers at the start or the end of the run (those stay outside)
+			local i = 1
+			while i <= count do
+				if items[i].kind == "section" then
+					blocks[#blocks + 1] = { type = "free", item = items[i] }
+					i += 1
+				else
+					local j = i
+					while j <= count and items[j].kind ~= "section" do j += 1 end
+					local first, last = i, j - 1
+					while first <= last and items[first].kind == "divider" do
+						blocks[#blocks + 1] = { type = "free", item = items[first] }
+						first += 1
+					end
+					local trailing = {}
+					while last >= first and items[last].kind == "divider" do
+						table.insert(trailing, 1, items[last])
+						last -= 1
+					end
+					if first <= last then
+						local group = {}
+						for k = first, last do group[#group + 1] = items[k] end
+						blocks[#blocks + 1] = { type = "card", items = group }
+					end
+					for _, item in ipairs(trailing) do
+						blocks[#blocks + 1] = { type = "free", item = item }
+					end
+					i = j
+				end
+			end
+
+			local order, cardIndex = 0, 0
+			for _, block in ipairs(blocks) do
+				order += 1
+				if block.type == "free" then
+					block.item.frame.Parent = self._frame
+					block.item.frame.LayoutOrder = order
+					if block.item.sep then block.item.sep.Visible = false end
+				else
+					cardIndex += 1
+					local card = self._cards[cardIndex]
+					if not card then
+						card = makeCard(self._frame)
+						self._cards[cardIndex] = card
+					end
+					card.LayoutOrder = order
+					for index, item in ipairs(block.items) do
+						item.frame.Parent = card
+						item.frame.LayoutOrder = index
+						local following = block.items[index + 1]
+						if item.sep then
+							item.sep.Visible = following ~= nil and following.kind == "component" and item.kind == "component"
+						end
+					end
+				end
+			end
+			for k = cardIndex + 1, #self._cards do
+				self._cards[k]:Destroy()
+				self._cards[k] = nil
+			end
+		end
+
+		function Row:CreateSection(cfg) return E.section(self, cfg or {}) end
+		function Row:CreateToggle(cfg) return E.toggle(self, cfg or {}) end
+		function Row:CreateButton(cfg) return E.button(self, cfg or {}) end
+		function Row:CreateSlider(cfg) return E.slider(self, cfg or {}) end
+		function Row:CreateDropdown(cfg) return E.dropdown(self, cfg or {}) end
+		function Row:CreateInput(cfg) return E.input(self, cfg or {}) end
+		function Row:CreateKeybind(cfg) return E.keybind(self, cfg or {}) end
+		function Row:CreateColorPicker(cfg) return E.colorpicker(self, cfg or {}) end
+		function Row:CreateDivider(cfg) return E.divider(self, cfg or {}) end
+	end
+
+	-- Tab: tab:CreateLeftRow() / tab:CreateRightRow() choose where the components below go.
+	-- (they also return the row, so row:CreateToggle(...) works too)
+	do
+		function Tab:CreateLeftRow()
+			self._current = self.Left
+			return self.Left
+		end
+
+		function Tab:CreateRightRow()
+			self._current = self.Right
+			return self.Right
+		end
+
+		for _, method in ipairs(COMPONENTS) do
+			Tab[method] = function(self, cfg)
+				local row = self._current
+				return row[method](row, cfg)
+			end
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Window internals
+	----------------------------------------------------------------
+	function W.newRow(tab, side)
+		local frame = U.make("Frame", {
+			Name = side .. "Row",
+			LayoutOrder = side == "Left" and 1 or 2,
+			Size = UDim2.new(0.5, -C.COL_GAP / 2, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+		}, tab._cols)
+		U.make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, frame)
+		return setmetatable({
+			_tab = tab,
+			_window = tab._window,
+			_frame = frame,
+			_items = {},
+			_cards = {},
+			_queued = false,
+		}, Row)
+	end
+
+	function W.newTab(window, config, isSettings)
+		local tab = setmetatable({
+			_window = window,
+			_title = tostring(config.title or config.name or "Tab"),
+		}, Tab)
+
+		-- the sidebar button
+		local button = U.button(window._tabList, {
+			Name = tab._title,
+			LayoutOrder = isSettings and 1000000 or (#window.Tabs + 1),
+			Size = UDim2.new(1, 0, 0, C.TAB_H),
+			BackgroundTransparency = 1,
+			BackgroundColor3 = T.selected,
+		})
+		U.corner(button, 8)
+		local textX = 12
+		if U.hasIcon(config.icon) then
+			tab._icon = U.make("ImageLabel", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, 10, 0.5, 0),
+				Size = UDim2.fromOffset(18, 18),
+				BackgroundTransparency = 1,
+				Image = U.assetUrl(config.icon),
+				ImageColor3 = T.sub,
+				ScaleType = Enum.ScaleType.Fit,
+			}, button)
+			textX = 38
+		end
+		tab._label = U.label(button, {
+			Position = UDim2.fromOffset(textX, 0),
+			Size = UDim2.new(1, -(textX + 6), 1, 0),
+			Text = tab._title,
+			TextColor3 = T.sub,
+		})
+		tab._button = button
+		button.MouseEnter:Connect(function()
+			if window._selected ~= tab then U.tween(button, 0.15, { BackgroundTransparency = 0.7 }, Enum.EasingStyle.Quad) end
+		end)
+		button.MouseLeave:Connect(function()
+			if window._selected ~= tab then U.tween(button, 0.2, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad) end
+		end)
+		button.Activated:Connect(function()
+			window:_closeSearch()
+			window:_select(tab)
+		end)
+
+		-- the page: one scrolling frame holding both rows, so they scroll together
+		local page = U.make("ScrollingFrame", {
+			Name = tab._title,
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ScrollBarThickness = 3,
+			ScrollBarImageColor3 = T.line,
+			CanvasSize = UDim2.new(),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			Visible = false,
+		}, window._content)
+		U.make("UIPadding", {
+			PaddingLeft = UDim.new(0, C.PAGE_PAD), PaddingRight = UDim.new(0, C.PAGE_PAD),
+			PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 28),
+		}, page)
+		tab._page = page
+		tab._cols = U.make("Frame", {
+			Name = "Columns",
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+		}, page)
+		U.make("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, C.COL_GAP),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, tab._cols)
+
+		tab.Left = W.newRow(tab, "Left")
+		tab.Right = W.newRow(tab, "Right")
+		tab._current = tab.Left
+
+		window.Tabs[#window.Tabs + 1] = tab
+		return tab
+	end
+
+	function Window:_select(tab)
+		if self._selected == tab then return end
+		local previous = self._selected
+		self._selected = tab
+		for _, other in ipairs(self.Tabs) do
+			local on = other == tab
+			U.tween(other._button, 0.2, { BackgroundTransparency = on and 0 or 1 }, Enum.EasingStyle.Quad)
+			U.tween(other._label, 0.2, { TextColor3 = on and T.text or T.sub }, Enum.EasingStyle.Quad)
+			if other._icon then
+				U.tween(other._icon, 0.2, { ImageColor3 = on and T.text or T.sub }, Enum.EasingStyle.Quad)
+			end
+		end
+		if self._menu then self._menu.close() end
+		if previous then previous._page.Visible = false end
+		tab._page.Visible = not self._searching
+		tab._page.Position = UDim2.fromOffset(0, 12)
+		U.tween(tab._page, 0.35, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
+	end
+
+	-- takes you to a tab (by its handle or its title)
+	function Window:Navigate(target)
+		for _, tab in ipairs(self.Tabs) do
+			if tab == target or tab._title == target then
+				self:_closeSearch()
+				self:_select(tab)
+				return true
+			end
+		end
+		return false
+	end
+
+	function Window:CreateTab(config)
+		config = config or {}
+		local tab = W.newTab(self, config, false)
+		-- the first tab you make is the one that opens (Settings is only the start until then)
+		if self._userTabs == 0 then self:_select(tab) end
+		self._userTabs += 1
+		return tab
+	end
+
+	----------------------------------------------------------------
+	-- Values, saving, resetting
+	----------------------------------------------------------------
+	function Window:_register(el, row, cfg, frame, sep)
+		local tab = row._tab
+		el._tab = tab
+		el._frame = frame
+		el._internal = cfg.internal == true
+
+		local flag = cfg.flag
+		if flag == nil then
+			local base = tab._title .. "/" .. el.name
+			self._flagCount[base] = (self._flagCount[base] or 0) + 1
+			flag = self._flagCount[base] > 1 and (base .. "#" .. self._flagCount[base]) or base
+		end
+		el.flag = tostring(flag)
+		if cfg._out then cfg._out.el = el end
+
+		if el._serialize then
+			if cfg.default ~= nil then el._default = cfg.default else el._default = el:_serialize() end
+		end
+		row:_add({ kind = "component", frame = frame, sep = sep, el = el })
+		self._search[#self._search + 1] = { el = el, tab = tab, section = row._lastSection or "" }
+
+		if el._internal then
+			if cfg.setting then self._settingEls[#self._settingEls + 1] = el end
+			return {}
+		end
+
+		self._all[el.flag] = el
+		self._allList[#self._allList + 1] = el
+		if el._natural then self._values[el.flag] = el:_natural() end
+
+		-- start from the last session when Auto Load Last Settings is on
+		if self._settings.autoLoad then
+			local last = self._store.last.values[el.flag]
+			if last ~= nil then self:_applyData(el, last) end
+			local extras = self._store.last.extras[el.flag]
+			if type(extras) == "table" then self:_applyExtras(el, extras) end
+		end
+		return {}
+	end
+
+	-- applies saved data to a component and runs its callback (on the next frame, so your script has finished)
+	function Window:_applyData(el, data)
+		if el._load and el:_load(data) then
+			task.defer(function()
+				if not self._unloaded then el:_fire() end
+			end)
+		end
+	end
+
+	function Window:_applyExtras(el, extras)
+		if not el._hasOptions then return end
+		if el.haveKeybinds then
+			local key = nil
+			if type(extras.key) == "string" then
+				local ok, found = pcall(function() return Enum.KeyCode[extras.key] end)
+				if ok then key = found end
+			end
+			el:_setKey(key)
+		end
+		if el.haveMB then el:_setMB(extras.mb == true) end
+	end
+
+	function Window:_snapshot()
+		local values, extras = {}, {}
+		for _, el in ipairs(self._allList) do
+			if el._serialize then values[el.flag] = el:_serialize() end
+			if el._hasOptions then
+				local entry = {}
+				if el._key then entry.key = el._key.Name end
+				if el._mbOn then entry.mb = true end
+				extras[el.flag] = entry
+			end
+		end
+		return values, extras
+	end
+
+	function Window:_flush()
+		S.write(self.Name, self._store)
+	end
+
+	-- remembers the last session (a second and a half after the last change)
+	function Window:_changed()
+		if self._flushQueued or self._unloaded then return end
+		self._flushQueued = true
+		task.delay(1.5, function()
+			self._flushQueued = false
+			if self._unloaded then return end
+			local values, extras = self:_snapshot()
+			for flag, value in pairs(values) do self._store.last.values[flag] = value end
+			for flag, entry in pairs(extras) do self._store.last.extras[flag] = entry end
+			self:_flush()
+		end)
+	end
+
+	function Window:_saveSettings()
+		local s = self._settings
+		self._store.settings = {
+			autoLoad = s.autoLoad, protect = s.protect, hidePill = s.hidePill,
+			notifications = s.notifications, reopen = s.reopen,
+		}
+		self:_flush()
+	end
+
+	function Window:Get(flag)
+		return self._values[flag]
+	end
+
+	function Window:Set(flag, value)
+		local el = self._all[flag]
+		if not el then return false end
+		el:_set(value)
+		return true
+	end
+
+	function Window:Save(name)
+		name = tostring(name or "default")
+		local values, extras = self:_snapshot()
+		self._store.configs[name] = { values = values, extras = extras }
+		self:_flush()
+		return true
+	end
+
+	function Window:Load(name)
+		local config = self._store.configs[tostring(name)]
+		if type(config) ~= "table" then return false end
+		for flag, data in pairs(config.values or {}) do
+			local el = self._all[flag]
+			if el then self:_applyData(el, data) end
+		end
+		for flag, entry in pairs(config.extras or {}) do
+			local el = self._all[flag]
+			if el and type(entry) == "table" then self:_applyExtras(el, entry) end
+		end
+		return true
+	end
+
+	function Window:ListConfigs()
+		local names = {}
+		for name in pairs(self._store.configs) do names[#names + 1] = name end
+		table.sort(names)
+		return names
+	end
+
+	function Window:DeleteConfig(name)
+		if self._store.configs[tostring(name)] == nil then return false end
+		self._store.configs[tostring(name)] = nil
+		self:_flush()
+		return true
+	end
+
+	function Window:_resetElement(el)
+		if el._serialize and el._default ~= nil and el:_load(el._default) then el:_fire() end
+		if el._hasOptions then
+			if el.haveKeybinds then el:_setKey(nil) end
+			if el.haveMB then el:_setMB(false) end
+		end
+	end
+
+	-- every component back to the value it was created with (callbacks run)
+	function Window:_resetAll()
+		for _, el in ipairs(self._allList) do self:_resetElement(el) end
+		for _, el in ipairs(self._settingEls) do self:_resetElement(el) end
+	end
+
+	function Window:_destroy()
+		if self._unloaded then return end
+		self._unloaded = true
+		if self._menu then self._menu.close() end
+		for _, el in ipairs(self._allList) do
+			if el._setMB then el:_setMB(false) end
+			K.remove(el)
+		end
+		for _, el in ipairs(self._settingEls) do K.remove(el) end
+		for _, connection in ipairs(self._conns) do connection:Disconnect() end
+		table.clear(self._conns)
+		if D.state then D.finish(D.state) end
+		if self._holder then self._holder:Destroy() end
+		if self._pillGui then self._pillGui:Destroy() end
+		local at = table.find(Library.Windows, self)
+		if at then table.remove(Library.Windows, at) end
+		if #Library.Windows == 0 then
+			for _, connection in ipairs(connections) do connection:Disconnect() end
+			table.clear(connections)
+			initialized = false
+			U.destroyGui()
+		end
+	end
+
+	-- every component back to default, then the window (and its mobile buttons) is gone
+	function Window:Unload()
+		if self._unloaded then return end
+		self:_resetAll()
+		self:_destroy()
+	end
+
+	----------------------------------------------------------------
+	-- Open / closed (mobile: a pill, PC: a keybind)
+	----------------------------------------------------------------
+	function Window:_setOpen(state)
+		if self._unloaded or self._open == state then return end
+		self._open = state
+		if self._menu then self._menu.close() end
+		self:_closeSearch()
+		if D.state then D.finish(D.state) end
+		self._openToken += 1
+		local mine = self._openToken
+
+		if state then
+			self._holder.Visible = true
+			self._popScale.Scale = 0.9
+			U.tween(self._popScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+			self:_pillHide()
+		else
+			U.tween(self._popScale, 0.2, { Scale = 0.9 }, Enum.EasingStyle.Quad)
+			task.delay(0.21, function()
+				if not self._open and mine == self._openToken and self._holder.Parent then
+					self._holder.Visible = false
+				end
+			end)
+			if self._mobile then self:_pillShow() end
+		end
+	end
+
+	function Window:_toggleOpen()
+		self:_setOpen(not self._open)
+	end
+
+	-- PC or mobile changed: the close button and the pill follow, with animations
+	function Window:_applyMode(animate)
+		if self._layoutHeader then self:_layoutHeader(animate) end
+		if not self._open then
+			if self._mobile then self:_pillShow() else self:_pillHide() end
+		end
+	end
+
+	-- touch and controller = mobile, keyboard and mouse = PC; it follows whatever was used last
+	function W.mode(window)
+		local function classify(inputType)
+			if inputType == Enum.UserInputType.Touch or inputType.Name:find("^Gamepad") then return true end
+			if inputType == Enum.UserInputType.Keyboard or inputType.Name:find("^Mouse") then return false end
+			return nil
+		end
+
+		local mobile = classify(UserInputService:GetLastInputType())
+		if mobile == nil then
+			mobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+		end
+		window._mobile = mobile
+
+		window._conns[#window._conns + 1] = UserInputService.LastInputTypeChanged:Connect(function(inputType)
+			local result = classify(inputType)
+			if result == nil or result == window._mobile then return end
+			window._mobile = result
+			window:_applyMode(true)
+		end)
+	end
+
+	-- the small pill at the top center: icon + title + the cropped icon. Click anywhere to reopen.
+	function W.pill(window, config)
+		local gui = U.gui()
+		local title = window.Name
+		local hasLogo = U.hasIcon(config.icon)
+		local textWidth = math.min(TextService:GetTextSize(title, 13, Enum.Font.GothamBold, Vector2.new(1000, 20)).X, 170)
+		local leftPad = 14 + (hasLogo and 28 or 0)
+		local width = leftPad + textWidth + 12 + 18 + 14
+
+		local pill = U.make("CanvasGroup", {
+			Name = "Pill",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, -60),
+			Size = UDim2.fromOffset(width, 36),
+			BackgroundColor3 = T.card,
+			BackgroundTransparency = 0.04,
+			GroupTransparency = 0,
+			Visible = false,
+		}, gui)
+		U.corner(pill, 18)
+		U.stroke(pill, T.white, 0.88)
+		if hasLogo then
+			U.make("ImageLabel", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, 14, 0.5, 0),
+				Size = UDim2.fromOffset(20, 20),
+				BackgroundTransparency = 1,
+				Image = U.assetUrl(config.icon),
+				ScaleType = Enum.ScaleType.Fit,
+			}, pill)
+		end
+		U.label(pill, {
+			Position = UDim2.fromOffset(leftPad, 0),
+			Size = UDim2.fromOffset(textWidth, 36),
+			Text = title,
+			TextSize = 13,
+			Font = Enum.Font.GothamBold,
+		})
+		U.make("ImageLabel", {
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -14, 0.5, 0),
+			Size = UDim2.fromOffset(18, 18),
+			BackgroundTransparency = 1,
+			Image = U.assetUrl(ICON_CLOSE_CROPPED),
+			ImageColor3 = T.sub,
+			ScaleType = Enum.ScaleType.Fit,
+		}, pill)
+
+		-- the click area: the whole pill, on top of everything in it
+		local hit = U.button(pill, { Name = "Hit", Size = UDim2.fromScale(1, 1), ZIndex = 10 })
+		local function reopen() window:_setOpen(true) end
+		hit.Activated:Connect(reopen)
+		hit.InputBegan:Connect(function(input)
+			if U.isPress(input) then reopen() end
+		end)
+
+		window._pillGui = pill
+		local token = 0
+
+		-- "Hide Mobile Pill": it stays there and stays clickable, you just can't see it
+		function window:_pillRefresh(animate)
+			local target = self._settings.hidePill and 0.995 or 0
+			if animate then
+				U.tween(pill, 0.3, { GroupTransparency = target }, Enum.EasingStyle.Quad)
+			else
+				pill.GroupTransparency = target
+			end
+		end
+
+		function window:_pillShow()
+			token += 1
+			pill.Visible = true
+			self:_pillRefresh(false)
+			U.tween(pill, 0.45, { Position = UDim2.new(0.5, 0, 0, 8) }, Enum.EasingStyle.Back)
+		end
+
+		function window:_pillHide()
+			token += 1
+			local mine = token
+			U.tween(pill, 0.25, { Position = UDim2.new(0.5, 0, 0, -60) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+			task.delay(0.26, function()
+				if token == mine then pill.Visible = false end
+			end)
+		end
+	end
+
+	----------------------------------------------------------------
+	-- The window shell: glow, body, drag bar, resize corner
+	----------------------------------------------------------------
+	function W.shell(window, config)
+		local gui = U.gui()
+		local conns = window._conns
+		local HEADER_H, SIDEBAR_W, PAD = C.HEADER_H, C.SIDEBAR_W, C.PANEL_PAD
+		local MARGIN = C.SCREEN_MARGIN
+
+		local function protect() return window._settings.protect ~= false end
+
+		local function fit(size)
+			local v = U.viewport()
+			local maxX, maxY = C.MAX_SIZE.X, C.MAX_SIZE.Y
+			if protect() then
+				maxX = math.min(maxX, v.X - MARGIN * 2)
+				maxY = math.min(maxY, v.Y - MARGIN * 2 - C.BAR_BELOW)
+			end
+			return Vector2.new(math.max(1, math.min(size.X, maxX)), math.max(1, math.min(size.Y, maxY)))
+		end
+
+		-- Off Screen Protection on: the whole window stays on screen.
+		-- Off: it can hang over the edges, but the drag bar stays reachable.
+		local function clampCenter(center, size)
+			local v = U.viewport()
+			local half = size / 2
+			local minX, maxX, minY, maxY
+			if protect() then
+				minX, maxX = half.X + MARGIN, v.X - half.X - MARGIN
+				minY, maxY = half.Y + MARGIN, v.Y - half.Y - MARGIN - C.BAR_BELOW
+			else
+				minX, maxX = 10, v.X - 10
+				minY, maxY = 60 - half.Y, v.Y - C.BAR_BELOW - 4 - half.Y
+			end
+			return Vector2.new(
+				math.clamp(center.X, minX, math.max(minX, maxX)),
+				math.clamp(center.Y, minY, math.max(minY, maxY))
+			)
+		end
+
+		local startSize = fit(C.START_SIZE)
+		local v0 = U.viewport()
+		local center = Vector2.new(v0.X / 2, (v0.Y - C.BAR_BELOW) / 2)
+		local saved = window._store.window
+		if type(saved) == "table" and tonumber(saved.x) and tonumber(saved.y) then
+			center = Vector2.new(v0.X * saved.x, v0.Y * saved.y)
+		end
+		center = clampCenter(center, startSize)
+
+		local sizeTarget, posTarget = startSize, center
+		local sizeCur, posCur = startSize, center
+		local dragging, resizing = false, false
+
+		local holder = U.make("Frame", {
+			Name = "Window",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(center.X, center.Y),
+			Size = UDim2.fromOffset(startSize.X, startSize.Y),
+			BackgroundTransparency = 1,
+		}, gui)
+		local popScale = U.make("UIScale", { Scale = 0.92 }, holder)
+		U.tween(popScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+		window._holder, window._popScale = holder, popScale
+
+		-- glow: a soft image behind the window (9-sliced so resizing never distorts it)
+		local glow = U.make("ImageLabel", {
+			Name = "Glow",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, C.GLOW_SPREAD * 2, 1, C.GLOW_SPREAD * 2),
+			BackgroundTransparency = 1,
+			Image = GLOW_ASSET,
+			ImageColor3 = T.white,
+			ImageTransparency = 1 - C.GLOW_BRIGHTNESS,
+			ScaleType = Enum.ScaleType.Stretch,
+			ZIndex = 0,
+		}, holder)
+		task.spawn(function()
+			local deadline = os.clock() + 5
+			while glow.Parent and os.clock() < deadline do
+				local ok, size = pcall(function() return glow.ContentImageSize end)
+				if not ok then return end
+				if size.X > 0 and size.Y > 0 then
+					local sx, sy = size.X * C.GLOW_SLICE, size.Y * C.GLOW_SLICE
+					glow.SliceCenter = Rect.new(sx, sy, size.X - sx, size.Y - sy)
+					glow.SliceScale = math.max(C.GLOW_SPREAD, 1) / sx
+					glow.ScaleType = Enum.ScaleType.Slice
+					return
+				end
+				task.wait(0.05)
+			end
+		end)
+
+		-- the body (gray, a little see-through)
+		local root = U.make("Frame", {
+			Name = "Body",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = T.base,
+			BackgroundTransparency = T.baseAlpha,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			ZIndex = 1,
+		}, holder)
+		U.corner(root, 14)
+		U.stroke(root, T.white, 0.9)
+		window._root = root
+
+		-- the lighter panel on the right: its top strip holds search + close, the rest is the page
+		local panel = U.make("Frame", {
+			Name = "Panel",
+			Position = UDim2.new(0, SIDEBAR_W, 0, PAD),
+			Size = UDim2.new(1, -(SIDEBAR_W + PAD), 1, -PAD * 2),
+			BackgroundColor3 = T.panel,
+			BackgroundTransparency = T.panelAlpha,
+			BorderSizePixel = 0,
+			ZIndex = 2,
+		}, root)
+		U.corner(panel, 12)
+		U.make("Frame", {
+			Name = "TopLine",
+			Position = UDim2.fromOffset(0, HEADER_H - PAD - 1),
+			Size = UDim2.new(1, 0, 0, 1),
+			BackgroundColor3 = T.line,
+			BorderSizePixel = 0,
+			ZIndex = 3,
+		}, panel)
+		window._content = U.make("Frame", {
+			Name = "Content",
+			Position = UDim2.fromOffset(0, HEADER_H - PAD),
+			Size = UDim2.new(1, 0, 1, -(HEADER_H - PAD)),
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			ZIndex = 3,
+		}, panel)
+		window._panel = panel
+
+		window._sidebar = U.make("Frame", {
+			Name = "Sidebar",
+			Position = UDim2.fromOffset(0, HEADER_H),
+			Size = UDim2.new(0, SIDEBAR_W, 1, -HEADER_H),
+			BackgroundTransparency = 1,
+			ZIndex = 2,
+		}, root)
+
+		-- drag bar: outside the body, just below it
+		local dragHit = U.button(holder, {
+			Name = "DragHit",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 1, C.BAR_DISTANCE),
+			Size = UDim2.fromOffset(C.BAR_HIT.X, C.BAR_HIT.Y),
+			ZIndex = 5,
+		})
+		local bar = U.make("Frame", {
+			Name = "Bar",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(C.BAR_SIZE.X, C.BAR_SIZE.Y),
+			BackgroundColor3 = T.white,
+			BackgroundTransparency = C.BAR_IDLE,
+			BorderSizePixel = 0,
+			ZIndex = 5,
+		}, dragHit)
+		U.corner(bar, UDim.new(1, 0))
+
+		-- resize corner: a hollow quarter circle drawn with round dots
+		local handle = U.button(root, {
+			Name = "ResizeHandle",
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, 0, 1, 0),
+			Size = UDim2.fromOffset(34, 34),
+			ZIndex = 8,
+		})
+		local boxSize = math.ceil(C.ICON_R + C.ICON_THICK)
+		local iconGroup = U.make("CanvasGroup", {
+			Name = "Icon",
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -C.ICON_INSET, 1, -C.ICON_INSET),
+			Size = UDim2.fromOffset(boxSize, boxSize),
+			BackgroundTransparency = 1,
+			GroupTransparency = C.ICON_IDLE,
+			ZIndex = 8,
+		}, handle)
+		do
+			local half = C.ICON_THICK / 2
+			local steps = math.max(8, math.ceil((math.pi / 2 * C.ICON_R) / (C.ICON_THICK / 3)))
+			for step = 0, steps do
+				local angle = (math.pi / 2) * (step / steps)
+				local dot = U.make("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromOffset(half + C.ICON_R * math.cos(angle), half + C.ICON_R * math.sin(angle)),
+					Size = UDim2.fromOffset(C.ICON_THICK, C.ICON_THICK),
+					BackgroundColor3 = T.white,
+					BorderSizePixel = 0,
+					ZIndex = 8,
+				}, iconGroup)
+				U.corner(dot, UDim.new(1, 0))
+			end
+		end
+
+		local function saveWindowPosition()
+			local v = U.viewport()
+			window._store.window = { x = posTarget.X / v.X, y = posTarget.Y / v.Y }
+			window:_flush()
+		end
+
+		-- drag (the bar)
+		dragHit.InputBegan:Connect(function(input)
+			if not U.isPress(input) or dragging or resizing then return end
+			local start, origin = U.p2(input), posTarget
+			local started = D.begin(input, function(moved)
+				posTarget = clampCenter(origin + (U.p2(moved) - start), sizeTarget)
+			end, function()
+				dragging = false
+				U.tween(bar, 0.3, { BackgroundTransparency = C.BAR_IDLE, Size = UDim2.fromOffset(C.BAR_SIZE.X, C.BAR_SIZE.Y) })
+				saveWindowPosition()
+			end)
+			if not started then return end
+			dragging = true
+			U.tween(bar, 0.2, {
+				BackgroundTransparency = 0.15,
+				Size = UDim2.fromOffset(C.BAR_SIZE_ACTIVE.X, C.BAR_SIZE_ACTIVE.Y),
+			})
+		end)
+		dragHit.MouseEnter:Connect(function()
+			if not dragging then U.tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end
+		end)
+		dragHit.MouseLeave:Connect(function()
+			if not dragging then U.tween(bar, 0.25, { BackgroundTransparency = C.BAR_IDLE }) end
+		end)
+
+		-- resize (the corner)
+		handle.InputBegan:Connect(function(input)
+			if not U.isPress(input) or dragging or resizing then return end
+			local startSize2, start = sizeTarget, U.p2(input)
+			local topLeft = posTarget - sizeTarget / 2
+			local started = D.begin(input, function(moved)
+				local v = U.viewport()
+				local target = startSize2 + (U.p2(moved) - start)
+				local maxX, maxY = C.MAX_SIZE.X, C.MAX_SIZE.Y
+				if protect() then
+					maxX = math.min(maxX, v.X - MARGIN - topLeft.X)
+					maxY = math.min(maxY, v.Y - MARGIN - C.BAR_BELOW - topLeft.Y)
+				end
+				local newSize = Vector2.new(
+					math.clamp(target.X, math.min(C.MIN_SIZE.X, maxX), math.max(C.MIN_SIZE.X, maxX)),
+					math.clamp(target.Y, math.min(C.MIN_SIZE.Y, maxY), math.max(C.MIN_SIZE.Y, maxY))
+				)
+				sizeTarget = newSize
+				posTarget = topLeft + newSize / 2
+			end, function()
+				resizing = false
+				U.tween(iconGroup, 0.3, { GroupTransparency = C.ICON_IDLE })
+			end)
+			if not started then return end
+			resizing = true
+			U.tween(iconGroup, 0.2, { GroupTransparency = 0.05 })
+		end)
+		handle.MouseEnter:Connect(function()
+			if not resizing then U.tween(iconGroup, 0.2, { GroupTransparency = 0.2 }) end
+		end)
+		handle.MouseLeave:Connect(function()
+			if not resizing then U.tween(iconGroup, 0.25, { GroupTransparency = C.ICON_IDLE }) end
+		end)
+
+		-- smooth follow (same feel as the mobile buttons)
+		conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
+			sizeTarget = fit(sizeTarget)
+			posTarget = clampCenter(posTarget, sizeTarget)
+			local speed = resizing and C.RESIZE_FOLLOW_SPEED or C.DRAG_FOLLOW_SPEED
+			local alpha = 1 - math.exp(-dt * speed)
+			sizeCur = fit(sizeCur:Lerp(sizeTarget, alpha))
+			posCur = clampCenter(posCur:Lerp(posTarget, alpha), sizeCur)
+			holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
+			holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
+		end)
+	end
+
+	----------------------------------------------------------------
+	-- Header: logo, title, subtitle, search, close
+	----------------------------------------------------------------
+	function W.header(window, config)
+		local root = window._root
+		local HEADER_H = C.HEADER_H
+		local SEARCH_W = 180
+
+		local header = U.make("Frame", {
+			Name = "Header",
+			Size = UDim2.new(1, 0, 0, HEADER_H),
+			BackgroundTransparency = 1,
+			ZIndex = 5,
+		}, root)
+		window._header = header
+
+		local titleX = 16
+		if U.hasIcon(config.icon) then
+			U.make("ImageLabel", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, 14, 0.5, 0),
+				Size = UDim2.fromOffset(32, 32),
+				BackgroundTransparency = 1,
+				Image = U.assetUrl(config.icon),
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 6,
+			}, header)
+			titleX = 14 + 32 + 10
+		end
+		local hasSubtitle = config.subtitle ~= nil and tostring(config.subtitle) ~= ""
+		local textWidth = C.SIDEBAR_W - titleX - 6
+		U.label(header, {
+			Position = UDim2.fromOffset(titleX, hasSubtitle and 9 or 0),
+			Size = UDim2.fromOffset(textWidth, hasSubtitle and 20 or HEADER_H),
+			Text = window.Name,
+			TextSize = 15,
+			Font = Enum.Font.GothamBold,
+			ZIndex = 6,
+		})
+		if hasSubtitle then
+			U.label(header, {
+				Position = UDim2.fromOffset(titleX, 28),
+				Size = UDim2.fromOffset(textWidth, 14),
+				Text = tostring(config.subtitle),
+				TextSize = 11,
+				TextColor3 = T.sub,
+				ZIndex = 6,
+			})
+		end
+
+		local function iconButton(name, icon)
+			local button = U.button(header, {
+				Name = name,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Size = UDim2.fromOffset(30, 30),
+				BackgroundColor3 = T.white,
+				ZIndex = 6,
+			})
+			U.corner(button, 8)
+			local image = U.make("ImageLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(20, 20),
+				BackgroundTransparency = 1,
+				Image = U.assetUrl(icon),
+				ImageColor3 = T.sub,
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 7,
+			}, button)
+			local scale = U.make("UIScale", { Scale = 1 }, button)
+			button.MouseEnter:Connect(function()
+				U.tween(button, 0.15, { BackgroundTransparency = 0.9 }, Enum.EasingStyle.Quad)
+				U.tween(image, 0.15, { ImageColor3 = T.text }, Enum.EasingStyle.Quad)
+			end)
+			button.MouseLeave:Connect(function()
+				U.tween(button, 0.2, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
+				U.tween(image, 0.2, { ImageColor3 = T.sub }, Enum.EasingStyle.Quad)
+			end)
+			button.InputBegan:Connect(function(input)
+				if U.isPress(input) then U.tween(scale, 0.08, { Scale = 0.88 }, Enum.EasingStyle.Quad) end
+			end)
+			button.InputEnded:Connect(function(input)
+				if U.isPress(input) then U.tween(scale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back) end
+			end)
+			return button, scale
+		end
+
+		local closeButton, closeScale = iconButton("Close", ICON_CLOSE)
+		local searchButton = iconButton("Search", ICON_SEARCH)
+		closeButton.Position = UDim2.new(1, -12, 0.5, 0)
+
+		local searchOpen = false
+		local searchBox = U.make("Frame", {
+			Name = "SearchBox",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Size = UDim2.fromOffset(0, 28),
+			BackgroundColor3 = T.chip,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			ZIndex = 6,
+		}, header)
+		U.corner(searchBox, 8)
+		local input = U.make("TextBox", {
+			Position = UDim2.fromOffset(10, 0),
+			Size = UDim2.new(1, -20, 1, 0),
+			BackgroundTransparency = 1,
+			ClearTextOnFocus = false,
+			Text = "",
+			PlaceholderText = "Search",
+			PlaceholderColor3 = T.sub,
+			TextColor3 = T.text,
+			TextSize = 12,
+			Font = Enum.Font.GothamMedium,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 7,
+		}, searchBox)
+
+		-- where the buttons sit: the close button is only there on mobile, search takes its place on PC
+		local function searchRight() return window._mobile and (12 + 30 + 4) or 12 end
+
+		function window:_layoutHeader(animate)
+			local mobile = self._mobile
+			local searchX = searchRight()
+			local boxProps = {
+				Position = UDim2.new(1, -(searchX + 30 + 6), 0.5, 0),
+				Size = UDim2.fromOffset(searchOpen and SEARCH_W or 0, 28),
+			}
+			local buttonProps = { Position = UDim2.new(1, -searchX, 0.5, 0) }
+			if animate then
+				U.tween(searchButton, 0.3, buttonProps, Enum.EasingStyle.Quint)
+				U.tween(searchBox, 0.3, boxProps, Enum.EasingStyle.Quint)
+			else
+				for key, value in pairs(buttonProps) do searchButton[key] = value end
+				for key, value in pairs(boxProps) do searchBox[key] = value end
+			end
+			if mobile then
+				closeButton.Visible = true
+				if animate then
+					closeScale.Scale = 0.4
+					U.tween(closeScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+				else
+					closeScale.Scale = 1
+				end
+			elseif animate then
+				U.tween(closeScale, 0.2, { Scale = 0 }, Enum.EasingStyle.Quad)
+				task.delay(0.21, function()
+					if not window._mobile then closeButton.Visible = false end
+				end)
+			else
+				closeButton.Visible = false
+			end
+		end
+
+		function window:_closeSearch()
+			if not searchOpen then return end
+			searchOpen = false
+			self._searching = false
+			input.Text = ""
+			input:ReleaseFocus()
+			U.tween(searchBox, 0.25, { Size = UDim2.fromOffset(0, 28) }, Enum.EasingStyle.Quint)
+			if self._searchPage then self._searchPage.Visible = false end
+			if self._selected then self._selected._page.Visible = true end
+		end
+
+		searchButton.Activated:Connect(function()
+			if searchOpen then
+				window:_closeSearch()
+				return
+			end
+			searchOpen = true
+			U.tween(searchBox, 0.3, { Size = UDim2.fromOffset(SEARCH_W, 28) }, Enum.EasingStyle.Quint)
+			task.delay(0.1, function() input:CaptureFocus() end)
+		end)
+		input:GetPropertyChangedSignal("Text"):Connect(function()
+			if searchOpen then window:_runSearch(input.Text) end
+		end)
+
+		-- the close button (mobile): collapses the window into the pill
+		closeButton.Activated:Connect(function()
+			window:_setOpen(false)
+		end)
+	end
+
+	----------------------------------------------------------------
+	-- Search: finds components on every tab; tapping one takes you there
+	----------------------------------------------------------------
+	function W.search(window)
+		local page = U.make("ScrollingFrame", {
+			Name = "SearchResults",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ScrollBarThickness = 3,
+			ScrollBarImageColor3 = T.line,
+			CanvasSize = UDim2.new(),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			Visible = false,
+		}, window._content)
+		U.make("UIPadding", {
+			PaddingLeft = UDim.new(0, C.PAGE_PAD), PaddingRight = UDim.new(0, C.PAGE_PAD),
+			PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 28),
+		}, page)
+		window._searchPage = page
+
+		local card = U.make("Frame", {
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = T.card,
+			BorderSizePixel = 0,
+		}, page)
+		U.corner(card, 10)
+		U.stroke(card, T.white, 0.93)
+		U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, card)
+
+		function window:_runSearch(text)
+			text = (text or ""):lower():match("^%s*(.-)%s*$")
+			for _, child in ipairs(card:GetChildren()) do
+				if child:IsA("GuiObject") then child:Destroy() end
+			end
+			if text == "" then
+				self._searching = false
+				page.Visible = false
+				if self._selected then self._selected._page.Visible = true end
+				return
+			end
+			self._searching = true
+			if self._selected then self._selected._page.Visible = false end
+			page.Visible = true
+
+			local count = 0
+			for _, entry in ipairs(self._search) do
+				if entry.el.name:lower():find(text, 1, true) then
+					count += 1
+					local result = U.button(card, { LayoutOrder = count, Size = UDim2.new(1, 0, 0, 40), ZIndex = 1 })
+					U.label(result, {
+						Position = UDim2.fromOffset(12, 0),
+						Size = UDim2.new(0.55, -12, 1, 0),
+						Text = entry.el.name,
+					})
+					local where = entry.tab._title
+					if entry.section ~= "" then where = where .. "  >  " .. entry.section end
+					U.label(result, {
+						AnchorPoint = Vector2.new(1, 0),
+						Position = UDim2.new(1, -12, 0, 0),
+						Size = UDim2.new(0.45, -12, 1, 0),
+						Text = where,
+						TextSize = 11,
+						TextColor3 = T.sub,
+						TextXAlignment = Enum.TextXAlignment.Right,
+					})
+					U.make("Frame", {
+						AnchorPoint = Vector2.new(0, 1),
+						Position = UDim2.new(0, 10, 1, 0),
+						Size = UDim2.new(1, -20, 0, 1),
+						BackgroundColor3 = T.line,
+						BorderSizePixel = 0,
+					}, result)
+					result.MouseEnter:Connect(function()
+						U.tween(result, 0.15, { BackgroundTransparency = 0.94, BackgroundColor3 = T.white }, Enum.EasingStyle.Quad)
+					end)
+					result.MouseLeave:Connect(function()
+						U.tween(result, 0.2, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
+					end)
+					result.Activated:Connect(function()
+						self:_goTo(entry)
+					end)
+				end
+			end
+			if count == 0 then
+				U.label(card, {
+					Size = UDim2.new(1, 0, 0, 44),
+					Text = "No results",
+					TextColor3 = T.sub,
+					TextXAlignment = Enum.TextXAlignment.Center,
+				})
+			end
+		end
+
+		-- opens the tab, scrolls to the component and flashes it
+		function window:_goTo(entry)
+			self:_closeSearch()
+			self:_select(entry.tab)
+			task.delay(0.3, function()
+				local tabPage, frame = entry.tab._page, entry.el._frame
+				if not (tabPage.Parent and frame.Parent) then return end
+				local target = frame.AbsolutePosition.Y - tabPage.AbsolutePosition.Y + tabPage.CanvasPosition.Y - 24
+				tabPage.CanvasPosition = Vector2.new(0, math.max(0, target))
+				local flash = U.make("Frame", {
+					Size = UDim2.fromScale(1, 1),
+					BackgroundColor3 = T.green,
+					BackgroundTransparency = 0.7,
+					BorderSizePixel = 0,
+					ZIndex = 9,
+				}, frame)
+				U.corner(flash, 8)
+				U.tween(flash, 0.9, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
+				task.delay(0.95, function() flash:Destroy() end)
+			end)
+		end
+	end
+
+	----------------------------------------------------------------
+	-- Sidebar: tab list + the profile card
+	----------------------------------------------------------------
+	function W.sidebar(window)
+		local sidebar = window._sidebar
+		local PROFILE_H = C.PROFILE_H
+
+		local list = U.make("ScrollingFrame", {
+			Name = "Tabs",
+			Size = UDim2.new(1, 0, 1, -PROFILE_H),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ScrollBarThickness = 0,
+			CanvasSize = UDim2.new(),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			ZIndex = 2,
+		}, sidebar)
+		U.make("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, list)
+		U.make("UIPadding", {
+			PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 4),
+		}, list)
+		window._tabList = list
+
+		-- profile: headshot, display name, username (no arrow)
+		local profile = U.make("Frame", {
+			Name = "Profile",
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.new(0, 0, 1, 0),
+			Size = UDim2.new(1, 0, 0, PROFILE_H),
+			BackgroundTransparency = 1,
+			ZIndex = 2,
+		}, sidebar)
+		U.make("Frame", {
+			Position = UDim2.fromOffset(12, 0),
+			Size = UDim2.new(1, -24, 0, 1),
+			BackgroundColor3 = T.line,
+			BorderSizePixel = 0,
+		}, profile)
+
+		local player = Players.LocalPlayer
+		local avatar = U.make("ImageLabel", {
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 14, 0.5, 1),
+			Size = UDim2.fromOffset(38, 38),
+			BackgroundColor3 = T.chip,
+			Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150", player.UserId),
+			ScaleType = Enum.ScaleType.Crop,
+		}, profile)
+		U.corner(avatar, UDim.new(1, 0))
+		U.label(profile, {
+			Position = UDim2.new(0, 62, 0.5, -17),
+			Size = UDim2.new(1, -70, 0, 18),
+			Text = player.DisplayName,
+			TextSize = 14,
+			Font = Enum.Font.GothamBold,
+		})
+		U.label(profile, {
+			Position = UDim2.new(0, 62, 0.5, 1),
+			Size = UDim2.new(1, -70, 0, 16),
+			Text = player.Name,
+			TextSize = 11,
+			TextColor3 = T.sub,
+		})
+	end
+
+	----------------------------------------------------------------
+	-- The Settings tab (always there, always last)
+	----------------------------------------------------------------
+	function W.buildSettings(window, tab)
+		local settings = window._settings
+
+		tab:CreateLeftRow()
+		tab:CreateSection({ name = "Configuration Saving" })
+		local nameOut, listOut = {}, {}
+		tab:CreateInput({ name = "Name:", placeholder = "Configuration name", internal = true, _out = nameOut })
+		tab:CreateDropdown({
+			name = "Configurations:",
+			options = window:ListConfigs(),
+			internal = true,
+			_out = listOut,
+		})
+
+		local function refreshList(select)
+			listOut.el:_setOptions(window:ListConfigs())
+			if select then listOut.el:_set(select, true) end
+		end
+
+		tab:CreateButton({
+			name = "Save",
+			internal = true,
+			callback = function()
+				local name = nameOut.el:_currentText():match("^%s*(.-)%s*$")
+				if name == "" then
+					Library:Toast({ title = "Type a name first", subtitle = "Use the Name: box" })
+					return
+				end
+				window:Save(name)
+				refreshList(name)
+				Library:Toast({ title = "Saved", subtitle = name })
+			end,
+		})
+		tab:CreateButton({
+			name = "Load",
+			internal = true,
+			callback = function()
+				local name = listOut.el.selected[1]
+				if not name then
+					Library:Toast({ title = "Pick a configuration first" })
+					return
+				end
+				if window:Load(name) then
+					Library:Toast({ title = "Loaded", subtitle = name })
+				end
+			end,
+		})
+		tab:CreateButton({
+			name = "Delete",
+			internal = true,
+			callback = function()
+				local name = listOut.el.selected[1]
+				if not name then
+					Library:Toast({ title = "Pick a configuration first" })
+					return
+				end
+				window:DeleteConfig(name)
+				listOut.el:_set(nil, true)
+				refreshList()
+				Library:Toast({ title = "Deleted", subtitle = name })
+			end,
+		})
+		tab:CreateToggle({
+			name = "Auto Load Last Settings",
+			value = settings.autoLoad,
+			default = false,
+			internal = true,
+			setting = true,
+			callback = function(on)
+				settings.autoLoad = on
+				window:_saveSettings()
+				if on then window:_changed() end
+			end,
+		})
+
+		tab:CreateSection({ name = "Danger Zone" })
+		tab:CreateButton({
+			name = "Unload",
+			internal = true,
+			callback = function()
+				window:Unload()
+			end,
+		})
+		tab:CreateButton({
+			name = "Reset All Settings",
+			internal = true,
+			callback = function()
+				window:_resetAll()
+				Library:Toast({ title = "Settings reset", subtitle = "Everything is back to default" })
+			end,
+		})
+
+		tab:CreateRightRow()
+		tab:CreateSection({ name = "Menu" })
+		tab:CreateToggle({
+			name = "Off Screen Protection",
+			value = settings.protect,
+			default = true,
+			internal = true,
+			setting = true,
+			callback = function(on)
+				settings.protect = on
+				window:_saveSettings()
+			end,
+		})
+		tab:CreateToggle({
+			name = "Hide Mobile Pill",
+			value = settings.hidePill,
+			default = false,
+			internal = true,
+			setting = true,
+			callback = function(on)
+				settings.hidePill = on
+				window:_saveSettings()
+				window:_pillRefresh(true)
+			end,
+		})
+		tab:CreateToggle({
+			name = "Notifications",
+			value = settings.notifications,
+			default = true,
+			internal = true,
+			setting = true,
+			callback = function(on)
+				settings.notifications = on
+				N.enabled = on
+				window:_saveSettings()
+			end,
+		})
+		local reopenKey = nil
+		local okKey, foundKey = pcall(function() return Enum.KeyCode[settings.reopen] end)
+		if okKey then reopenKey = foundKey end
+		tab:CreateKeybind({
+			name = "Reopen Keybind",
+			value = reopenKey or Enum.KeyCode.RightShift,
+			default = "RightShift",
+			internal = true,
+			setting = true,
+			callback = function()
+				window:_toggleOpen()
+			end,
+			onChanged = function(key)
+				settings.reopen = key and key.Name or ""
+				window:_saveSettings()
+			end,
+		})
+	end
+
+	----------------------------------------------------------------
+	-- Library:CreateWindow
+	----------------------------------------------------------------
+	function Library:CreateWindow(config)
+		config = config or {}
+		ensureInit()
+
+		local window = setmetatable({
+			Name = tostring(config.name or "Window"),
+			Tabs = {},
+			_values = {},
+			_all = {},
+			_allList = {},
+			_search = {},
+			_flagCount = {},
+			_settingEls = {},
+			_conns = {},
+			_userTabs = 0,
+			_open = true,
+			_openToken = 0,
+		}, Window)
+
+		-- the saved file: settings, last session, configurations, window position
+		local store = S.read(window.Name)
+		store.settings = type(store.settings) == "table" and store.settings or {}
+		store.last = type(store.last) == "table" and store.last or {}
+		store.last.values = type(store.last.values) == "table" and store.last.values or {}
+		store.last.extras = type(store.last.extras) == "table" and store.last.extras or {}
+		store.configs = type(store.configs) == "table" and store.configs or {}
+		window._store = store
+		local saved = store.settings
+		window._settings = {
+			autoLoad = saved.autoLoad == true,
+			protect = saved.protect ~= false,
+			hidePill = saved.hidePill == true,
+			notifications = saved.notifications ~= false,
+			reopen = type(saved.reopen) == "string" and saved.reopen or "RightShift",
+		}
+		N.enabled = window._settings.notifications
+
+		-- window.Flags.Name reads a value, window.Flags.Name = value writes it
+		window.Flags = setmetatable({}, {
+			__index = function(_, flag) return window._values[flag] end,
+			__newindex = function(_, flag, value)
+				local el = window._all[flag]
+				if el then el:_set(value) end
+			end,
+			__iter = function() return next, window._values end,
+		})
+
+		W.shell(window, config)
+		W.header(window, config)
+		W.sidebar(window)
+		W.search(window)
+		W.pill(window, config)
+		W.mode(window)
+
+		-- the Settings tab (made first, listed last); it is what shows until you make a tab
+		local settingsTab = W.newTab(window, { title = "Settings", icon = ICON_SETTINGS }, true)
+		window._settingsTab = settingsTab
+		W.buildSettings(window, settingsTab)
+		window:_select(settingsTab)
+
+		Library.Windows[#Library.Windows + 1] = window
+		window:_applyMode(false)
+		return window
+	end
+
+	-- notifications and toasts belong to the library, not to a window
+	function Library:Notify(props)
+		ensureInit()
+		N.notify(props)
+	end
+
+	function Library:Toast(props)
+		ensureInit()
+		N.toast(props)
+	end
+
+	return Library
+end)()
+
+----------------------------------------------------------------
+-- TEST
+-- Put your own asset ids in the icon fields (0 = no icon)
+----------------------------------------------------------------
+local window = Library:CreateWindow({
+	name = "Example",
+	subtitle = "Window",
+	icon = 0, -- the logo next to the title (0 = none, and the title moves left)
+})
+
+local main = window:CreateTab({ title = "Main", icon = 0 })
+
+main:CreateLeftRow()
+main:CreateSection({ name = "Toggles", icon = 0 })
+main:CreateToggle({
+	name = "Toggle",
+	haveKeybinds = true,
+	haveMB = true,
+	flag = "ToggleFlag",
+	value = false,
+	callback = function(v)
+		print("Toggle:", v)
+	end,
+})
+main:CreateToggle({
+	name = "Only keybinds",
+	haveKeybinds = true,
+	haveMB = false,
+	flag = "KeybindsOnlyFlag",
+	value = false,
+	callback = function(v)
+		print("Only keybinds:", v)
+	end,
+})
+main:CreateToggle({
+	name = "No 3 dots",
+	flag = "PlainFlag",
+	value = true,
+	callback = function(v)
+		print("No 3 dots:", v)
+	end,
+})
+main:CreateDivider({ text = "a divider between two components stays in the box" })
+main:CreateButton({
+	name = "Button",
+	haveKeybinds = true,
+	haveMB = true,
+	flag = "ButtonFlag",
+	callback = function()
+		print("button clicked")
+	end,
+})
+
+main:CreateSection({ name = "Values" })
+main:CreateSlider({
+	name = "Slider",
+	range = { 0, 120 },
+	increment = 0.01,
+	flag = "SliderFlag",
+	value = 10,
+	callback = function(value)
+		print("Slider:", value)
+	end,
+})
+main:CreateDropdown({
+	name = "DropDown",
+	multiSelect = false,
+	options = { "option 1", "option 2", "option 3" },
+	flag = "DropDownFlag",
+	value = "option 1",
+	callback = function(selected)
+		print("Dropdown:", selected)
+	end,
+})
+main:CreateDropdown({
+	name = "Multi Select",
+	multiSelect = true,
+	options = { "one", "two", "three", "four" },
+	flag = "MultiFlag",
+	value = { "two" },
+	callback = function(selected)
+		print("Multi:", table.concat(selected, ", "))
+	end,
+})
+main:CreateInput({
+	name = "Input",
+	value = "16",
+	placeholder = "Enter a number",
+	flag = "InputFlag",
+	callback = function(text)
+		print("Committed:", text)
+	end,
+})
+
+main:CreateRightRow()
+main:CreateSection({ name = "More components" })
+main:CreateKeybind({
+	name = "Keybind",
+	value = Enum.KeyCode.LeftShift,
+	flag = "KeybindFlag",
+	callback = function(key)
+		print("Pressed", key)
+	end,
+})
+main:CreateColorPicker({
+	name = "Color Picker",
+	color = Color3.fromRGB(96, 205, 255),
+	flag = "ColorFlag",
+	callback = function(color)
+		print(color)
+	end,
+})
+main:CreateDivider({ text = "a standalone divider has no box" })
+
+main:CreateSection({ name = "Notifications" })
+main:CreateButton({
+	name = "Notify",
+	callback = function()
+		Library:Notify({
+			title = "Notification",
+			content = "Content",
+			duration = 5,
+		})
+	end,
+})
+main:CreateButton({
+	name = "Toast",
+	callback = function()
+		Library:Toast({
+			title = "Toast",
+			subtitle = "Subtitle",
+			icon = 0,
+		})
+	end,
+})
+
+local second = window:CreateTab({ title = "Second", icon = 0 })
+second:CreateLeftRow()
+second:CreateSection({ name = "Read and write values" })
+second:CreateButton({
+	name = "Print Toggle value",
+	callback = function()
+		print("ToggleFlag =", window.Flags.ToggleFlag, window:Get("ToggleFlag"))
+	end,
+})
+second:CreateButton({
+	name = "Turn Toggle on (window.Flags)",
+	callback = function()
+		window.Flags.ToggleFlag = true
+	end,
+})
+second:CreateRightRow()
+second:CreateSection({ name = "Empty on purpose" })
+second:CreateDivider()
 
