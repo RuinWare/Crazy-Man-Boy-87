@@ -1,68 +1,11 @@
-local LayerLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/UI"))()
+local LayerLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/Layer%20Lib/UI"))()
 
 local window = LayerLib:CreateWindow({
 	title = "RuinWare",         -- the title in the top bar of the window.
-	icon = 0,      -- the icon for the title, if 0 no icon will show.
+	icon = 98691154054966,      -- the icon for the title, if 0 no icon will show.
 	CloseIcon = 105495420516711,       -- the minimize icon
 	TBOptionsIcon = 123906774409861,    -- the icon for the mobile buttons / keybinds
 })
 
 local tab = window:CreateTab({ name = "Main", icon = 123906774409861 })
 
-do
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-
-local SCSLIDERV = 16
-local speedEnabled = false
-
-local function getHumanoid()
-	local char = Players.LocalPlayer.Character
-	if not char then return nil end
-	return char:FindFirstChildOfClass("Humanoid")
-end
-
-local function applySpeed()
-	local hum = getHumanoid()
-	if hum then
-		hum.WalkSpeed = speedEnabled and SCSLIDERV or 16
-	end
-end
-
-tab:CreateToggle({
-	name = "Speed Changer",
-	haveKeybinds = true,
-	haveMB = true,
-	flag = "SCFLAG",
-	value = false,
-	callback = function(v)
-		speedEnabled = v
-		applySpeed()
-	end,
-})
-
-tab:CreateSlider({
-	name = "Speed:",
-	range = { 16, 500 },
-	increment = 1,
-	flag = "SpeedChangeSliderFlag",
-	value = 16,
-	callback = function(v)
-		SCSLIDERV = v
-	end,
-})
-
--- Heartbeat loop: re-applies WalkSpeed every frame while the toggle is on.
--- Handles the game resetting your speed, respawns, and slider changes mid-flight.
-RunService.Heartbeat:Connect(function()
-	if not speedEnabled then return end
-
-	local hum = getHumanoid()
-	if hum and hum.WalkSpeed ~= SCSLIDERV then
-		hum.WalkSpeed = SCSLIDERV
-      	end
-    end)
-end
-
-task.wait(5)
-LayerLib:Destroy()
