@@ -284,8 +284,7 @@ E     D     I     T     S
 ============================================================================
 ]]--
 tab:CreateSection({ name = "Emotes", icon = 121586615710226 })
-tab:CreateDivider({ line = false, spacing = 13 })
-
+tab:CreateLeftRow()
         tab:CreateDivider({ text = "Emote Changer" })
 
 	tab:CreateToggle({
@@ -301,8 +300,7 @@ tab:CreateDivider({ line = false, spacing = 13 })
 		placeholder = "e.g. Smug Dance",
 		callback = function(text)
 			local found = findEmote(text)
-			state.Current = found
-			window:Notify({
+			state.Current = Library:Notify({
 				title = "Emote Swapper",
 				content = found and ("Found: "..getDisplayName(found)) or ("Not found: "..text),
 				duration = 3,
@@ -317,7 +315,7 @@ tab:CreateDivider({ line = false, spacing = 13 })
 		callback = function(text)
 			local found = findEmote(text)
 			state.SuggestedText = found
-			window:Notify({
+			Library:Notify({
 				title = "Emote Swapper",
 				content = found and ("Found: "..getDisplayName(found)) or ("Not found: "..text),
 				duration = 3,
@@ -356,17 +354,17 @@ tab:CreateDivider({ line = false, spacing = 13 })
 		callback = function()
 			local target = state.Current
 			if not target then
-				window:Notify({ title = "Emote Swapper", content = "Current emote not found.", duration = 5 })
+				Library:Notify({ title = "Emote Swapper", content = "Current emote not found.", duration = 5 })
 				return
 			end
 			local source = state.UseTextbox and state.SuggestedText or state.Dropdown
 			if not source then
-				window:Notify({ title = "Emote Swapper", content = "Suggested emote not found.", duration = 5 })
+				Library:Notify({ title = "Emote Swapper", content = "Suggested emote not found.", duration = 5 })
 				return
 			end
 			if target == source then
 				local ok = resetItem(target)
-				window:Notify({
+				Library:Notify({
 					title = "Emote Swapper",
 					content = ok and ("Reset "..target.Name.." to default.") or "No snapshot available to reset.",
 					duration = 5,
@@ -381,7 +379,7 @@ tab:CreateDivider({ line = false, spacing = 13 })
 				if ok then n += 1 end
 			end
 			syncEmoteScript(target, source)
-			window:Notify({
+            Library:Notify({
 				title = "Emote Swapper",
 				content = ("Swapped %s -> %s (%d)"):format(target.Name, getDisplayName(source), n),
 				duration = 5,
@@ -683,9 +681,9 @@ local function buildCosmeticChanger(tab, window)
 E     D     I     T     S
 ============================================================================
 ]]--
+tab:CreateRightRow()
 tab:CreateSection({ name = "Cosmetics", icon = 85228918424110 })
-tab:CreateDivider({ line = false, spacing = 13 })
-
+	
         tab:CreateDivider({ text = "Cosmetic Changer" })
 	tab:CreateToggle({
 		name = "Use Textbox",
@@ -701,7 +699,7 @@ tab:CreateDivider({ line = false, spacing = 13 })
 		callback = function(text)
 			local found = findCosmetic(text)
 			state.Current = found
-			window:Notify({
+			Library:Notify({
 				title = "Cosmetic Swapper",
 				content = found and ("Found: "..getDisplayName(found)) or ("Not found: "..text),
 				duration = 3,
@@ -716,7 +714,7 @@ tab:CreateDivider({ line = false, spacing = 13 })
 		callback = function(text)
 			local found = findCosmetic(text)
 			state.SuggestedText = found
-			window:Notify({
+			Library:Notify({
 				title = "Cosmetic Swapper",
 				content = found and ("Found: "..getDisplayName(found)) or ("Not found: "..text),
 				duration = 3,
@@ -741,17 +739,17 @@ tab:CreateDivider({ line = false, spacing = 13 })
 		callback = function()
 			local target = state.Current
 			if not target then
-				window:Notify({ title = "Cosmetic Swapper", content = "Current cosmetic not found.", duration = 5 })
+				Library:Notify({ title = "Cosmetic Swapper", content = "Current cosmetic not found.", duration = 5 })
 				return
 			end
 			local source = state.UseTextbox and state.SuggestedText or state.Dropdown
 			if not source then
-				window:Notify({ title = "Cosmetic Swapper", content = "Suggested cosmetic not found.", duration = 5 })
+				Library:Notify({ title = "Cosmetic Swapper", content = "Suggested cosmetic not found.", duration = 5 })
 				return
 			end
 			if target == source then
 				local ok = resetItem(target)
-				window:Notify({
+				Library:Notify({
 					title = "Cosmetic Swapper",
 					content = ok and ("Reset "..target.Name.." to default.") or "No snapshot available to reset.",
 					duration = 5,
@@ -765,7 +763,7 @@ tab:CreateDivider({ line = false, spacing = 13 })
 				if ok then n += 1 end
 			end
 			syncCosmeticScript(target, source)
-			window:Notify({
+			Library:Notify({
 				title = "Cosmetic Swapper",
 				content = ("Swapped %s -> %s (%d)"):format(target.Name, getDisplayName(source), n),
 				duration = 5,
