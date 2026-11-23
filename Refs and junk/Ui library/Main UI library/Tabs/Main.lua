@@ -1,3 +1,7 @@
+tab:CreateLeftRow()
+
+tab:CreateSection({ name = "Movement" })
+
 --[[
 ============================================================================
 AUTO JUMP
@@ -142,30 +146,17 @@ RunService.PreSimulation:Connect(function()
     tryJump(hum, root)
 end)
 
-tab:CreateDivider({ line = false, spacing = 25 })
-
-local AutoJumpDivider = tab:CreateDivider({ text = "Auto Jump" })
-
 tab:CreateToggle({
-    name = "Enabled",
+    name = "Auto Jump",
     icon = 109475752270721,
+	haveMB = true,
+	haveKeybinds = true,
     value = false,
     flag = "AutoJump_Toggle",
-    callback = function(value)
-        autoJumpEnabled = value
-       if value then
-        AutoJumpDivider:Set("Auto Jump Enabled")
-         task.wait(3)
-         AutoJumpDivider:Set("Auto Jump")
-       else
-        AutoJumpDivider:Set("Auto Jump Disabled")
-         task.wait(3)
-         AutoJumpDivider:Set("Auto Jump")
-      end
-    end,
+    callback = function(v)
+        autoJumpEnabled = v
+      end,
 })
-
-_G.RWCallbacks["AutoJump"] = function(v) autoJumpEnabled = v end
 
 tab:CreateToggle({
     name = "Ramp Protection",
@@ -304,33 +295,24 @@ do
         end
     end)
 
-local LegitJumpDivider = tab:CreateDivider({ text = "Legit Jump" })
-
+    tab:CreateDivider()
+	
     tab:CreateToggle({
-        name = "Enabled",
+        name = "Legit Jump",
         icon = 109475752270721,
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "DelayJump_Toggle",
         callback = function(v) 
          djEnabled = v 
-       if v then
-        LegitJumpDivider:Set("Legit Jump Enabled")
-         task.wait(3)
-         LegitJumpDivider:Set("Legit Jump")
-       else
-        LegitJumpDivider:Set("Legit Jump Disabled")
-         task.wait(3)
-         LegitJumpDivider:Set("Legit Jump")
-              end
           end,
     })
-	
-_G.RWCallbacks["LegitJump"] = function(v) djEnabled = v end
 	
     tab:CreateToggle({
         name = "Legit Jump Ramp Protection",
         icon = 111308594268728,
-        currentValue = false,
+        value = false,
         flag = "DelayJump_Ramp_Toggle",
         callback = function(v) djRamp = v end,
     })
@@ -338,7 +320,7 @@ _G.RWCallbacks["LegitJump"] = function(v) djEnabled = v end
     tab:CreateToggle({
         name = "Legit Jump Only Look Down",
         icon = 128804949999663,
-        currentValue = false,
+        value = false,
         flag = "DelayJump_LookDown_Toggle",
         callback = function(v) djLookDown = v end,
     })
@@ -346,7 +328,7 @@ _G.RWCallbacks["LegitJump"] = function(v) djEnabled = v end
     tab:CreateToggle({
         name = "Legit Jump Only On Move",
         icon = 135743813499745,
-        currentValue = false,
+        value = false,
         flag = "DelayJump_MoveOnly_Toggle",
         callback = function(v) djMoveOnly = v end,
     })
@@ -357,7 +339,7 @@ _G.RWCallbacks["LegitJump"] = function(v) djEnabled = v end
         range = {0, 5},
         increment = 0.05,
         suffix = "s",
-        currentValue = 0,
+        value = 0,
         flag = "DelayJump_MoveHold",
         callback = function(v) djMoveHold = v end,
     })
@@ -472,33 +454,24 @@ do
         b.MouseLeave:Connect(function() hjHeld = false end)
     end)
 
-local HJumpDivider = tab:CreateDivider({ text = "Hold Jump" })
+    tab:CreateDivider()
 
     tab:CreateToggle({
-        name = "Enabled",
+        name = "Hold Jump",
         icon = 97668677854395,
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "HoldJump_Toggle",
         callback = function(v)
             hjEnabled = v
-       if v then
-        HJumpDivider:Set("Hold Jump Enabled")
-         task.wait(3)
-         HJumpDivider:Set("Hold Jump")
-       else
-        HJumpDivider:Set("Hold Jump Disabled")
-         task.wait(3)
-         HJumpDivider:Set("Hold Jump")
-      end
        end,
     })
-
-_G.RWCallbacks["HoldJump"] = function(v) hjEnabled = v end
 	
     tab:CreateToggle({
         name = "Hold Jump Ramp Protection",
         icon = 111308594268728,
-        currentValue = false,
+        value = false,
         flag = "HoldJump_Ramp_Toggle",
         callback = function(v) hjRamp = v end,
     })
@@ -506,7 +479,7 @@ _G.RWCallbacks["HoldJump"] = function(v) hjEnabled = v end
     tab:CreateToggle({
         name = "Hold Jump Only Look Down",
         icon = 128804949999663,
-        currentValue = false,
+        value = false,
         flag = "HoldJump_LookDown_Toggle",
         callback = function(v) hjLookDown = v end,
     })
@@ -514,7 +487,7 @@ _G.RWCallbacks["HoldJump"] = function(v) hjEnabled = v end
     tab:CreateToggle({
         name = "Hold Jump Only On Move",
         icon = 135743813499745,
-        currentValue = false,
+        value = false,
         flag = "HoldJump_MoveOnly_Toggle",
         callback = function(v) hjMoveOnly = v end,
     })
@@ -525,7 +498,7 @@ _G.RWCallbacks["HoldJump"] = function(v) hjEnabled = v end
         range = {0, 5},
         increment = 0.05,
         suffix = "s",
-        currentValue = 0,
+        value = 0,
         flag = "HoldJump_MoveHold",
         callback = function(v) hjMoveHold = v end,
     })
@@ -597,21 +570,12 @@ end)
 local EBJumpDivider = tab:CreateDivider({ text = "Easy Bounce" })
 
 tab:CreateToggle({
-    name = "Enabled",
+    name = "Easy Bounce",
     icon = 116414714090955,
-    currentValue = false,
+    value = false,
     flag = "EasyBounce_Toggle",
-    callback = function(value)
-        easyBounceEnabled = value
-       if value then
-        EBJumpDivider:Set("Easy Bounce Enabled")
-         task.wait(3)
-         EBJumpDivider:Set("Easy Bounce")
-       else
-        EBJumpDivider:Set("Easy Bounce Disabled")
-         task.wait(3)
-         EBJumpDivider:Set("Easy Bounce")
-      end
+    callback = function(v)
+        easyBounceEnabled = v
     end,
 })
 
@@ -623,7 +587,7 @@ tab:CreateSlider({
     range = {1.08, 3.00},
     increment = 0.01,
     suffix = "x",
-    currentValue = 1.5,
+    value = 1.5,
     flag = "EasyBounce_Multiplier",
     callback = function(value)
         bounceMultiplier = value
