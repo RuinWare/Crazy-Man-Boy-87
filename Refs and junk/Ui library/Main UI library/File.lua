@@ -798,6 +798,508 @@ tab:CreateLeftRow()
 
 tab:CreateSection({ name = "Movement" })
 
+--[[
+============================================================================
+AUTO JUMP
+============================================================================
+]]--
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local autoJumpEnabled = false
+local lookDownOnly = false
+local moveOnly = false
+local rampProtection = false
+
+local moveHoldThreshold = 0
+local moveAccum = 0
+local wasMovingCheck = false
+local wasGroundedCheck = true
+local airborneStartCheck = 0
+local groundStoppedAtCheck = 0
+local lastTickCheck = 0
+
+local STOP_GRACE = 0.6
+local AIR_GRACE = 5.0
+
+local LOOK_DOWN_THRESHOLD = -0.7
+
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function isGroundFlat(root)
+    if not rampProtection then return true end
+    local result = workspace:Raycast(root.Position, Vector3.new(0, -10, 0), rayParams)
+    if not result then return false end
+    local angle = math.deg(math.acos(result.Normal.Unit.Y))
+    return angle <= 8
+end
+
+local function isLookingDownEnough()
+    if not lookDownOnly then return true end
+    local cam = workspace.CurrentCamera
+    if not cam then return false end
+    return cam.CFrame.LookVector.Y <= LOOK_DOWN_THRESHOLD
+end
+
+local function isMoving(hum)
+    local moving = hum.MoveDirection.Magnitude > 0
+    local grounded = hum.FloorMaterial ~= Enum.Material.Air
+    local now = tick()
+
+    if lastTickCheck == 0 then lastTickCheck = now end
+    local dt = now - lastTickCheck
+    lastTickCheck = now
+    if dt < 0 or dt > 0.5 then dt = 0 end
+
+    if moving and grounded and wasMovingCheck then
+        moveAccum = moveAccum + dt
+    end
+
+    if not grounded and wasGroundedCheck then
+        if groundStoppedAtCheck > 0 and (now - groundStoppedAtCheck) >= STOP_GRACE then
+            moveAccum = 0
+        end
+        groundStoppedAtCheck = 0
+        airborneStartCheck = now
+    elseif grounded and not wasGroundedCheck then
+        local airtime = airborneStartCheck > 0 and (now - airborneStartCheck) or 0
+        airborneStartCheck = 0
+        if airtime >= AIR_GRACE then
+            moveAccum = 0
+        end
+        if not moving then
+            groundStoppedAtCheck = now
+        end
+    end
+    wasGroundedCheck = grounded
+
+    if not moving then
+        if wasMovingCheck and grounded then
+            groundStoppedAtCheck = now
+        end
+        wasMovingCheck = false
+    else
+        if not wasMovingCheck then
+            if groundStoppedAtCheck > 0 and grounded and (now - groundStoppedAtCheck) >= STOP_GRACE then
+                moveAccum = 0
+            end
+            wasMovingCheck = true
+        end
+        groundStoppedAtCheck = 0
+    end
+
+    if not moveOnly then return true end
+    if not moving then return false end
+    return moveAccum >= moveHoldThreshold
+end
+
+local function tryJump(hum, root)
+    if not autoJumpEnabled then return end
+    if hum.Health <= 0 then return end
+    if not isGroundFlat(root) then return end
+    if not isLookingDownEnough() then return end
+    if not isMoving(hum) then return end
+    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+end
+
+local stateConn
+
+local function attachToCharacter(char)
+    local hum = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    rayParams.FilterDescendantsInstances = {char}
+
+    if stateConn then stateConn:Disconnect() end
+    stateConn = hum.StateChanged:Connect(function(_, newState)
+        if newState == Enum.HumanoidStateType.Landed
+        or newState == Enum.HumanoidStateType.Running
+        or newState == Enum.HumanoidStateType.RunningNoPhysics then
+            tryJump(hum, root)
+        end
+    end)
+end
+
+if player.Character then
+    task.spawn(attachToCharacter, player.Character)
+end
+player.CharacterAdded:Connect(function(char)
+    task.spawn(attachToCharacter, char)
+end)
+
+RunService.PreSimulation:Connect(function()
+    if not autoJumpEnabled then return end
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return end
+    if hum.FloorMaterial == Enum.Material.Air then return end
+    tryJump(hum, root)
+end)
+
+tab:CreateToggle({
+    name = "Auto Jump",
+    icon = 109475752270721,
+	haveMB = true,
+	haveKeybinds = true,
+    value = false,
+    flag = "AutoJump_Toggle",
+    callback = function(v)
+        autoJumpEnabled = v
+      end,
+})
+
+tab:CreateToggle({
+    name = "Ramp Protection",
+    icon = 111308594268728,
+    value = false,
+    flag = "AutoJump_RampProtection_Toggle",
+    callback = function(value)
+        rampProtection = value
+    end,
+})
+
+tab:CreateToggle({
+    name = "Only Trigger On Look Down",
+    icon = 128804949999663,
+    value = false,
+    flag = "AutoJump_LookDown_Toggle",
+    callback = function(value)
+        lookDownOnly = value
+    end,
+})
+
+tab:CreateToggle({
+    name = "Only Trigger On Move",
+    icon = 135743813499745,
+    value = false,
+    flag = "AutoJump_MoveOnly_Toggle",
+    callback = function(value)
+        moveOnly = value
+    end,
+})
+
+tab:CreateSlider({
+    name = "Move Hold Time",
+    icon = 136077598178846,
+    range = {0, 5},
+    increment = 0.05,
+    suffix = "s",
+    value = 0,
+    flag = "AutoJump_MoveHold",
+    callback = function(value)
+        moveHoldThreshold = value
+    end,
+})
+
+--[[
+============================================================================
+LEGIT JUMP
+============================================================================
+]]--
+
+do
+    local djEnabled = false
+    local djRamp = false
+    local djLookDown = false
+    local djMoveOnly = false
+    local djMoveHold = 0
+
+    local djRay = RaycastParams.new()
+    djRay.FilterType = Enum.RaycastFilterType.Exclude
+
+    local djTickCount = 0
+    local djTargetTick = 0
+    local djLanded = false
+    local djMoveAccum = 0
+    local djWasMoving = false
+    local djLastTick = 0
+
+    local DJ_LOOK_THRESH = -0.7
+
+    local function djFlat(root)
+        if not djRamp then return true end
+        local r = workspace:Raycast(root.Position, Vector3.new(0, -10, 0), djRay)
+        if not r then return false end
+        return math.deg(math.acos(r.Normal.Unit.Y)) <= 8
+    end
+
+    local function djLookOK()
+        if not djLookDown then return true end
+        local cam = workspace.CurrentCamera
+        if not cam then return false end
+        return cam.CFrame.LookVector.Y <= DJ_LOOK_THRESH
+    end
+
+    local function djMoving(hum)
+        local moving = hum.MoveDirection.Magnitude > 0
+        local now = tick()
+        local dt = now - djLastTick
+        djLastTick = now
+        if dt < 0 or dt > 0.5 then dt = 0 end
+        if moving and djWasMoving then djMoveAccum = djMoveAccum + dt end
+        if not moving then djMoveAccum = 0 end
+        djWasMoving = moving
+        if not djMoveOnly then return true end
+        return moving and djMoveAccum >= djMoveHold
+    end
+
+    local djConn
+
+    local function djAttach(char)
+        local hum = char:WaitForChild("Humanoid")
+        local root = char:WaitForChild("HumanoidRootPart")
+        djRay.FilterDescendantsInstances = {char}
+        if djConn then djConn:Disconnect() end
+        djConn = hum.StateChanged:Connect(function(_, s)
+            if s == Enum.HumanoidStateType.Landed then
+                djTickCount = 0
+                djTargetTick = math.random(2, 6)
+                djLanded = true
+            end
+        end)
+    end
+
+    if player.Character then task.spawn(djAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(djAttach, c) end)
+
+    RunService.PreSimulation:Connect(function()
+        if not djEnabled then return end
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+        if hum.Health <= 0 then return end
+        if hum.FloorMaterial == Enum.Material.Air then
+            djLanded = false
+            return
+        end
+        if not djLanded then return end
+        if not djFlat(root) then return end
+        if not djLookOK() then return end
+        if not djMoving(hum) then return end
+        djTickCount = djTickCount + 1
+        if djTickCount >= djTargetTick then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            djLanded = false
+        end
+    end)
+
+    tab:CreateDivider()
+	
+    tab:CreateToggle({
+        name = "Legit Jump",
+        icon = 109475752270721,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
+        flag = "DelayJump_Toggle",
+        callback = function(v) 
+         djEnabled = v 
+          end,
+    })
+	
+    tab:CreateToggle({
+        name = "Legit Jump Ramp Protection",
+        icon = 111308594268728,
+        value = false,
+        flag = "DelayJump_Ramp_Toggle",
+        callback = function(v) djRamp = v end,
+    })
+
+    tab:CreateToggle({
+        name = "Legit Jump Only Look Down",
+        icon = 128804949999663,
+        value = false,
+        flag = "DelayJump_LookDown_Toggle",
+        callback = function(v) djLookDown = v end,
+    })
+
+    tab:CreateToggle({
+        name = "Legit Jump Only On Move",
+        icon = 135743813499745,
+        value = false,
+        flag = "DelayJump_MoveOnly_Toggle",
+        callback = function(v) djMoveOnly = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Legit Jump Move Hold",
+        icon = 136077598178846,
+        range = {0, 5},
+        increment = 0.05,
+        suffix = "s",
+        value = 0,
+        flag = "DelayJump_MoveHold",
+        callback = function(v) djMoveHold = v end,
+    })
+end
+
+--[[
+============================================================================
+HOLD JUMP
+============================================================================
+]]--
+
+do
+    local hjEnabled = false
+    local hjRamp = false
+    local hjLookDown = false
+    local hjMoveOnly = false
+    local hjMoveHold = 0
+
+    local hjRay = RaycastParams.new()
+    hjRay.FilterType = Enum.RaycastFilterType.Exclude
+
+    local hjHeld = false
+    local hjMoveAccum = 0
+    local hjWasMoving = false
+    local hjLastTick = 0
+
+    local HJ_LOOK_THRESH = -0.7
+
+    local function hjFlat(root)
+        if not hjRamp then return true end
+        local r = workspace:Raycast(root.Position, Vector3.new(0, -10, 0), hjRay)
+        if not r then return false end
+        return math.deg(math.acos(r.Normal.Unit.Y)) <= 8
+    end
+
+    local function hjLookOK()
+        if not hjLookDown then return true end
+        local cam = workspace.CurrentCamera
+        if not cam then return false end
+        return cam.CFrame.LookVector.Y <= HJ_LOOK_THRESH
+    end
+
+    local function hjMoving(hum)
+        local moving = hum.MoveDirection.Magnitude > 0
+        local now = tick()
+        local dt = now - hjLastTick
+        hjLastTick = now
+        if dt < 0 or dt > 0.5 then dt = 0 end
+        if moving and hjWasMoving then hjMoveAccum = hjMoveAccum + dt end
+        if not moving then hjMoveAccum = 0 end
+        hjWasMoving = moving
+        if not hjMoveOnly then return true end
+        return moving and hjMoveAccum >= hjMoveHold
+    end
+
+    local hjStateConn
+
+    local function hjAttach(char)
+        local hum = char:WaitForChild("Humanoid")
+        local root = char:WaitForChild("HumanoidRootPart")
+        hjRay.FilterDescendantsInstances = {char}
+        if hjStateConn then hjStateConn:Disconnect() end
+        hjStateConn = hum.StateChanged:Connect(function(_, s)
+            if not hjEnabled or not hjHeld then return end
+            if s ~= Enum.HumanoidStateType.Landed
+            and s ~= Enum.HumanoidStateType.Running
+            and s ~= Enum.HumanoidStateType.RunningNoPhysics then return end
+            if hum.Health <= 0 then return end
+            if not hjFlat(root) then return end
+            if not hjLookOK() then return end
+            if not hjMoving(hum) then return end
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end)
+    end
+
+    if player.Character then task.spawn(hjAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(hjAttach, c) end)
+
+    RunService.PreSimulation:Connect(function()
+        if not hjEnabled or not hjHeld then return end
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+        if hum.FloorMaterial == Enum.Material.Air then return end
+        if hum.Health <= 0 then return end
+        if not hjFlat(root) then return end
+        if not hjLookOK() then return end
+        if not hjMoving(hum) then return end
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+    end)
+
+    UserInputService.InputBegan:Connect(function(i, gp)
+        if gp then return end
+        if i.KeyCode == Enum.KeyCode.Space then hjHeld = true end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.KeyCode == Enum.KeyCode.Space then hjHeld = false end
+    end)
+
+    task.spawn(function()
+        local pg = player:WaitForChild("PlayerGui")
+        local tg = pg:WaitForChild("TouchGui", 30)
+        if not tg then return end
+        local f = tg:WaitForChild("TouchControlFrame", 10)
+        if not f then return end
+        local b = f:WaitForChild("JumpButton", 10)
+        if not b then return end
+        b.MouseButton1Down:Connect(function() hjHeld = true end)
+        b.MouseButton1Up:Connect(function() hjHeld = false end)
+        b.MouseLeave:Connect(function() hjHeld = false end)
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Hold Jump",
+        icon = 97668677854395,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
+        flag = "HoldJump_Toggle",
+        callback = function(v)
+            hjEnabled = v
+       end,
+    })
+	
+    tab:CreateToggle({
+        name = "Hold Jump Ramp Protection",
+        icon = 111308594268728,
+        value = false,
+        flag = "HoldJump_Ramp_Toggle",
+        callback = function(v) hjRamp = v end,
+    })
+
+    tab:CreateToggle({
+        name = "Hold Jump Only Look Down",
+        icon = 128804949999663,
+        value = false,
+        flag = "HoldJump_LookDown_Toggle",
+        callback = function(v) hjLookDown = v end,
+    })
+
+    tab:CreateToggle({
+        name = "Hold Jump Only On Move",
+        icon = 135743813499745,
+        value = false,
+        flag = "HoldJump_MoveOnly_Toggle",
+        callback = function(v) hjMoveOnly = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Hold Jump Move Hold",
+        icon = 136077598178846,
+        range = {0, 5},
+        increment = 0.05,
+        suffix = "s",
+        value = 0,
+        flag = "HoldJump_MoveHold",
+        callback = function(v) hjMoveHold = v end,
+    })
+end
+
 -- vis
 
 local VisTab = window:CreateTab({ name = "Visuals", icon = 126802044806598 })
