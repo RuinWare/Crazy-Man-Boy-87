@@ -10,6 +10,8 @@ local window = Library:CreateWindow({
 -- main
 local tab = window:CreateTab({ name = "Main", icon = 83935746771599 })
 
+tab:CreateLeftRow()
+
 tab:CreateSection({ name = "Movement" })
 
 -- vis
