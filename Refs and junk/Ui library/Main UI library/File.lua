@@ -294,19 +294,20 @@ tab:CreateLeftRow()
 		callback = function(v) state.UseTextbox = v end,
 	})
 
-	tab:CreateInput({
-		name = "Current Emote",
-                icon = 130515857256476,
-		placeholder = "e.g. Smug Dance",
-		callback = function(text)
-			local found = findEmote(text)
-			state.Current = Library:Notify({
-				title = "Emote Swapper",
-				content = found and ("Found: "..getDisplayName(found)) or ("Not found: "..text),
-				duration = 3,
-			})
-		end,
-	})
+tab:CreateInput({
+    name = "Current Emote",
+    icon = 130515857256476,
+    placeholder = "e.g. Smug Dance",
+    callback = function(text)
+        local found = findEmote(text)
+        state.Current = found
+        Library:Notify({
+            title = "Emote Swapper",
+            content = found and ("Found: "..getDisplayName(found)) or ("Not found: "..text),
+            duration = 3,
+        })
+    end,
+})
 
 	tab:CreateInput({
 		name = "Suggested Emote",
