@@ -7,5 +7,120 @@ local window = LayerLib:CreateWindow({
 	TBOptionsIcon = 123906774409861,    -- the icon for the mobile buttons / keybinds
 })
 
-local tab = window:CreateTab({ name = "Main", icon = 123906774409861 })
+local tab = window:CreateTab({ name = "Main", icon = 132476821768268 })
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local autoJumpEnabled = false
+local lookDownOnly = false
+local moveOnly = false
+local rampProtection = true
+
+local LOOK_DOWN_THRESHOLD = -0.7
+
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function isGroundFlat(root)
+    if not rampProtection then return true end
+    local result = workspace:Raycast(root.Position, Vector3.new(0, -10, 0), rayParams)
+    if not result then return false end
+    local angle = math.deg(math.acos(result.Normal.Unit.Y))
+    return angle <= 8
+end
+
+local function isLookingDownEnough()
+    if not lookDownOnly then return true end
+    local cam = workspace.CurrentCamera
+    if not cam then return false end
+    return cam.CFrame.LookVector.Y <= LOOK_DOWN_THRESHOLD
+end
+
+local function isMoving(hum)
+    if not moveOnly then return true end
+    return hum.MoveDirection.Magnitude > 0
+end
+
+local function tryJump(hum, root)
+    if not autoJumpEnabled then return end
+    if hum.Health <= 0 then return end
+    if not isGroundFlat(root) then return end
+    if not isLookingDownEnough() then return end
+    if not isMoving(hum) then return end
+    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+end
+
+local stateConn
+
+local function attachToCharacter(char)
+    local hum = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    rayParams.FilterDescendantsInstances = {char}
+
+    if stateConn then stateConn:Disconnect() end
+    stateConn = hum.StateChanged:Connect(function(_, newState)
+        if newState == Enum.HumanoidStateType.Landed
+        or newState == Enum.HumanoidStateType.Running
+        or newState == Enum.HumanoidStateType.RunningNoPhysics then
+            tryJump(hum, root)
+        end
+    end)
+end
+
+if player.Character then
+    task.spawn(attachToCharacter, player.Character)
+end
+player.CharacterAdded:Connect(function(char)
+    task.spawn(attachToCharacter, char)
+end)
+
+RunService.PreSimulation:Connect(function()
+    if not autoJumpEnabled then return end
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return end
+    if hum.FloorMaterial == Enum.Material.Air then return end
+    tryJump(hum, root)
+end)
+
+tab:CreateToggle({
+    name = "Auto Jump",
+    currentValue = false,
+    flag = "AutoJump_Toggle",
+    callback = function(value)
+        autoJumpEnabled = value
+    end,
+})
+
+tab:CreateToggle({
+    name = "Ramp Protection",
+    currentValue = true,
+    flag = "AutoJump_RampProtection_Toggle",
+    callback = function(value)
+        rampProtection = value
+    end,
+})
+
+tab:CreateToggle({
+    name = "Only Trigger On Look Down",
+    currentValue = false,
+    flag = "AutoJump_LookDown_Toggle",
+    callback = function(value)
+        lookDownOnly = value
+    end,
+})
+
+tab:CreateToggle({
+    name = "Only Trigger On Move",
+    currentValue = false,
+    flag = "AutoJump_MoveOnly_Toggle",
+    callback = function(value)
+        moveOnly = value
+    end,
+})
