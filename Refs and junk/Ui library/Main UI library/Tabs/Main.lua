@@ -1,6 +1,6 @@
 tab:CreateLeftRow()
 
-tab:CreateSection({ name = "Movement" })
+tab:CreateSection({ name = "Jumping" })
 
 --[[
 ============================================================================
@@ -504,6 +504,10 @@ do
     })
 end
 
+main:CreateRightRow()
+
+tab:CreateSection({ name = "Movement" })
+
 --[[
 ============================================================================
 EASY BOUNCE
@@ -567,19 +571,17 @@ RunService.Heartbeat:Connect(function()
     lastYVelocity = root.AssemblyLinearVelocity.Y
 end)
 
-local EBJumpDivider = tab:CreateDivider({ text = "Easy Bounce" })
-
 tab:CreateToggle({
     name = "Easy Bounce",
     icon = 116414714090955,
     value = false,
+	haveMB = true,
+	haveKeybinds = true,
     flag = "EasyBounce_Toggle",
     callback = function(v)
         easyBounceEnabled = v
     end,
 })
-
-_G.RWCallbacks["EasyBounce"] = function(v) easyBounceEnabled = v end
 
 tab:CreateSlider({
     name = "Easy Bounce Multiplier",
@@ -627,7 +629,7 @@ local function attachHardBounce(char)
         if hum.Health <= 0 then return end
         if not wasInAir then return end
         if (tick() - airStartTime) < 1 then return end
-        local bounceVel = math.abs(lastYVelocity) * hardBounceMultiplier
+        local bounceVel = math.abs(lastYVelocity) * bounceMultiplier
         if bounceVel < 10 then return end
         root.AssemblyLinearVelocity = Vector3.new(
             root.AssemblyLinearVelocity.X,
@@ -664,39 +666,17 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-HBDivider = tab:CreateDivider({ text = "Hard Bounce" })
+tab:CreateDivider()
 
 tab:CreateToggle({
     name = "Hard Bounce",
     icon = 116414714090955,
-    currentValue = false,
+    value = false,
+	haveMB = true,
+	haveKeybinds = true,
     flag = "HardBounce_Toggle",
     callback = function(value)
         hardBounceEnabled = value
-       if value then
-        HBDivider:Set("Hard Bounce Enabled")
-         task.wait(3)
-         HBDivider:Set("Hard Bounce")
-       else
-        HBDivider:Set("Hard Bounce Disabled")
-         task.wait(3)
-         HBDivider:Set("Hard Bounce")
-      end
-    end,
-})
-
-_G.RWCallbacks["HardBounce"] = function(v) hardBounceEnabled = v end
-
-tab:CreateSlider({
-    name = "Hard Bounce Multiplier",
-    icon = 120597962040224,
-    range = {1.08, 3.00},
-    increment = 0.01,
-    suffix = "x",
-    currentValue = 1.5,
-    flag = "HardBounce_Multiplier",
-    callback = function(value)
-        hardBounceMultiplier = value
     end,
 })
 
@@ -783,14 +763,14 @@ tab:CreateDivider()
 tab:CreateToggle({
     name = "Legit Bounce",
     icon = 116414714090955,
-    currentValue = false,
+    value = false,
+	haveMB = true,
+	haveKeybinds = true
     flag = "LegitBounce_Toggle",
     callback = function(value)
         legitBounceEnabled = value
     end,
 })
-
-_G.RWCallbacks["LegitBounce"] = function(v) legitBounceEnabled = v end
 
 --[[
 ===========================
@@ -855,19 +835,18 @@ do
         end
     end)
 
+    tab:CreateDivider()
+	
     tab:CreateToggle({
         name = "Emote Fling",
-        currentValue = false,
+        value = false,
+		haveMB = false,
+		haveKeybinds = false,
         flag = "EmoteFling_Toggle",
         callback = function(v)
             emoteFlingEnabled = v
         end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["EmoteFling"] = function(v)
-        emoteFlingEnabled = v
-    end
 end
 
 --[[
@@ -997,39 +976,26 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-local InfSlideDivider = tab:CreateDivider({ text = "Infinite Slide" })
+tab:CreateDivider()
 
 tab:CreateToggle({
     name = "Infinite Slide",
     icon = 84806424467602,
-    currentValue = false,
+    value = false,
+	haveMB = true,
+	haveKeybinds = true,
     flag = "InfSlide_Toggle",
     callback = function(v)
         infSlideEnabled = v
-        if not v then
-            sliding = false
-            fireFriction(5)
-        end
-       if v then
-        InfSlideDivider:Set("Infinite Slide Enabled")
-         task.wait(3)
-         InfSlideDivider:Set("Infinite Slide")
-       else
-        InfSlideDivider:Set("Infinite Slide Disabled")
-         task.wait(3)
-         InfSlideDivider:Set("Infinite Slide")
-      end
     end,
 })
-
-_G.RWCallbacks["InfSlide"] = function(v) infSlideEnabled = v; if not v then sliding = false; fireFriction(5) end end
 
 tab:CreateSlider({
     name = "Inf Slide Speed",
     icon = 79297485010070,
-    range = {1, 105},
+    range = {1, 90},
     increment = 1,
-    currentValue = 105,
+    value = 25,
     flag = "InfSlide_Speed",
     callback = function(v) infSlideSpeed = v end,
 })
@@ -1104,9 +1070,11 @@ end)
 tab:CreateDivider()
 
 tab:CreateToggle({
-    name = "Y Surf",
+    name = "Y Baseplate Surf",
     icon = 139863028132428,
-    currentValue = false,
+    value = false,
+	haveMB = true,
+	haveKeybinds = true,
     flag = "YLock_Toggle",
     callback = function(value)
         yLockEnabled = value
@@ -1114,7 +1082,57 @@ tab:CreateToggle({
     end,
 })
 
-_G.RWCallbacks["YLock"] = function(v) yLockEnabled = v; toggleYLock(v) end
+tab:CreateToggle({
+    name = "Y Lock Surf",
+    icon = 139863028132428,
+    value = false,
+	haveMB = true,
+	haveKeybinds = true,
+    flag = "YLock_Toggle",
+    callback = function(v)
+        if v then
+local player = game.Players.LocalPlayer
+local runService = game:GetService("RunService")
+
+if _G.RuinWareYLockConnection then
+    _G.RuinWareYLockConnection:Disconnect()
+end
+
+local lockedY = nil
+
+_G.RuinWareYLockConnection = runService.RenderStepped:Connect(function()
+    local character = player.Character
+    if not character then return end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    if not lockedY then
+        lockedY = hrp.Position.Y
+    end
+
+    local pos = hrp.Position
+    local look = hrp.CFrame.LookVector
+    local flatLook = Vector3.new(look.X, 0, look.Z)
+    
+    if flatLook.Magnitude < 0.01 then flatLook = Vector3.new(0, 0, -1) end
+    flatLook = flatLook.Unit
+
+    hrp.CFrame = CFrame.lookAt(Vector3.new(pos.X, lockedY, pos.Z), Vector3.new(pos.X, lockedY, pos.Z) + flatLook)
+
+    local vel = hrp.AssemblyLinearVelocity
+    if math.abs(vel.Y) > 0.1 then
+        hrp.AssemblyLinearVelocity = Vector3.new(vel.X, 0, vel.Z)
+    end
+end)
+			else
+				if _G.RuinWareYLockConnection then
+    _G.RuinWareYLockConnection:Disconnect()
+    _G.RuinWareYLockConnection = nil
+				end
+	    end
+	end,
+})
 
 --[[
 ============================================================================
@@ -1187,7 +1205,9 @@ end
     tab:CreateToggle({
         name = "Pixel Surf",
 		icon = 76201258239230,
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true
         flag = "PixelSurf_Toggle",
         callback = function(v)
             pixelSurfEnabled = v
@@ -1197,15 +1217,6 @@ end
             end
         end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["PixelSurf"] = function(v)
-        pixelSurfEnabled = v
-        if not v and pixelSurfActive then
-            pixelSurfActive = false
-            runURL(OFF_URL)
-        end
-    end
 end
 
 --[[
@@ -1345,7 +1356,7 @@ do
         anchorPart.CFrame = anchorPart.CFrame + dir * speed * dt
     end)
 
-local DownedDashDivider = tab:CreateDivider({ text = "Downed Dash" })
+	tab:CreateSection({ name = "Advanced" })
 
     tab:CreateToggle({
         name = "Overhaul Auto Downed Dash",
@@ -1357,15 +1368,6 @@ local DownedDashDivider = tab:CreateDivider({ text = "Downed Dash" })
                 downedDashActive = false
                 cleanup()
             end
-       if v then
-        DownedDashDivider:Set("Overhaul Auto Downed Dash Enabled")
-         task.wait(3)
-         DownedDashDivider:Set("Overhaul Auto Downed Dash")
-       else
-        DownedDashDivider:Set("Overhaul Auto Downed Dash Disabled")
-         task.wait(3)
-         DownedDashDivider:Set("Overhaul Auto Downed Dash")
-      end
         end,
     })
 
@@ -1374,7 +1376,7 @@ local DownedDashDivider = tab:CreateDivider({ text = "Downed Dash" })
         range = {33.3, 555.5},
         increment = 0.1,
         suffix = "",
-        currentValue = 55.5,
+        value = 55.5,
         flag = "DownedDash_Slider",
         callback = function(v) downedDashSpeed = v end,
     })
@@ -1479,7 +1481,7 @@ do
 
     RunService.Heartbeat:Connect(checkEdgeTrimp)
 
-local EasyEdgeDivider = tab:CreateDivider({ text = "Easy Edge Trimp" })
+tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Easy Edge Trimp",
@@ -1487,15 +1489,6 @@ local EasyEdgeDivider = tab:CreateDivider({ text = "Easy Edge Trimp" })
         flag = "EdgeTrimp_Toggle",
         callback = function(value) 
            edgeTrimpEnabled = value
-       if value then
-        EasyEdgeDivider:Set("Easy Edge Trimp Enabled")
-         task.wait(3)
-         EasyEdgeDivider:Set("Easy Edge Trimp")
-       else
-        EasyEdgeDivider:Set("Easy Edge Trimp Disabled")
-         task.wait(3)
-         EasyEdgeDivider:Set("Easy Edge Trimp")
-           end
        end,
     })
 
@@ -1508,9 +1501,6 @@ local EasyEdgeDivider = tab:CreateDivider({ text = "Easy Edge Trimp" })
         flag = "EdgeTrimp_Power",
         callback = function(v) edgeTrimpPower = v end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["EdgeTrimp"] = function(v) edgeTrimpEnabled = v end
 end
 
 --[[
@@ -1525,11 +1515,6 @@ do
     local superJumpXVelocity = 50
     local superJumpDecaying = false
     local superJumpDecayRate = 5
-
-    local mobileButtonEnabled = false
-    local MOBILE_BUTTON_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Button-body-bhtton" -- FILL THIS IN with your Button MB body URL
-    local mobileButtonFlag = "MB_SuperJump"
-
     local sjHum, sjRoot
 
     local function sjAttach(char)
@@ -1579,84 +1564,7 @@ do
         sjRoot.AssemblyLinearVelocity = Vector3.new(horizontal.X, vel.Y, horizontal.Z)
     end)
 
-    local function runSource(src)
-        if not src or not loadstring then return end
-        local ok, fn = pcall(loadstring, src)
-        if ok and fn then pcall(fn) end
-    end
-
-    local DELETE_BODY = [==[
-local Players = game:GetService("Players")
-local CollectionService = game:GetService("CollectionService")
-local TweenService = game:GetService("TweenService")
-local TAG = "DraggableBoxGui"
-local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-local function collectGuis()
-	local list, seen = {}, {}
-	local function add(inst)
-		if inst:IsA("ScreenGui") and not seen[inst] then
-			seen[inst] = true
-			list[#list + 1] = inst
-		end
-	end
-	for _, inst in ipairs(CollectionService:GetTagged(TAG)) do add(inst) end
-	local function scan(container)
-		if not container then return end
-		local ok, children = pcall(function() return container:GetChildren() end)
-		if not ok then return end
-		for _, child in ipairs(children) do
-			if child:IsA("ScreenGui") and child:GetAttribute(TAG) then add(child) end
-		end
-	end
-	scan(playerGui)
-	pcall(function() scan(game:GetService("CoreGui")) end)
-	if gethui then pcall(function() scan(gethui()) end) end
-	return list
-end
-local FADE_TIME = 0.12
-local SHRINK_TIME = 0.15
-local function fade(obj, time, props, style, direction)
-	TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out), props):Play()
-end
-local function remove(gui)
-	local scale = gui:FindFirstChild("PopScale", true)
-	if not scale then gui:Destroy() return end
-	fade(scale, SHRINK_TIME, { Scale = 0.75 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	for _, d in ipairs(gui:GetDescendants()) do
-		if d:IsA("UIStroke") then fade(d, FADE_TIME, { Transparency = 1 })
-		elseif d:IsA("GuiObject") then
-			fade(d, FADE_TIME, { BackgroundTransparency = 1 })
-			if d:IsA("TextLabel") or d:IsA("TextButton") then fade(d, FADE_TIME, { TextTransparency = 1 })
-			elseif d:IsA("ImageLabel") then fade(d, FADE_TIME, { ImageTransparency = 1 })
-			elseif d:IsA("CanvasGroup") then fade(d, FADE_TIME, { GroupTransparency = 1 }) end
-		end
-	end
-	task.delay(SHRINK_TIME + 0.02, function() if gui.Parent then gui:Destroy() end end)
-end
-for _, gui in ipairs(collectGuis()) do
-	if gui:GetAttribute("Flag") == FLAG then remove(gui) end
-end
-]==]
-
-    local function buildMobileButtonSource()
-        if not MOBILE_BUTTON_URL or MOBILE_BUTTON_URL == "" then return nil end
-        local ok, body = pcall(game.HttpGet, game, MOBILE_BUTTON_URL)
-        if not ok or type(body) ~= "string" then return nil end
-        local header = 'local TEXT = "Super Jump"\n'
-            .. 'local FLAG = ' .. string.format("%q", mobileButtonFlag) .. '\n'
-            .. 'local function RunCode()\n'
-            .. 'if _G.RWCallbacks and _G.RWCallbacks["SuperJumpTrigger"] then\n'
-            .. '_G.RWCallbacks["SuperJumpTrigger"]()\n'
-            .. 'end\n'
-            .. 'end\n'
-        return header .. body
-    end
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["SuperJumpTrigger"] = triggerSuperJump
-    _G.RWCallbacks["SuperJump"] = function(v) superJumpEnabled = v end
-
-local SJDivider = tab:CreateDivider({ text = "Super Jump" })
+tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Super Jump",
@@ -1666,16 +1574,6 @@ local SJDivider = tab:CreateDivider({ text = "Super Jump" })
            superJumpEnabled = v
 
        end,
-    })
-
-    tab:CreateKeybind({
-        name = "Super Jump Key",
-        currentKeybind = "Q",
-        holdToInteract = false,
-        flag = "SuperJump_Key",
-        callback = function()
-            triggerSuperJump()
-        end,
     })
 
     tab:CreateSlider({
@@ -1697,30 +1595,12 @@ local SJDivider = tab:CreateDivider({ text = "Super Jump" })
         flag = "SuperJump_XVelocity",
         callback = function(v) superJumpXVelocity = v end,
     })
-
-    tab:CreateToggle({
-        name = "Mobile Button",
-        currentValue = false,
-        flag = "SuperJump_MobileButton",
-        callback = function(v)
-            mobileButtonEnabled = v
-            if v then
-                local src = buildMobileButtonSource()
-                if src then runSource(src) end
-            else
-                local deleteSrc = 'local FLAG = ' .. string.format("%q", mobileButtonFlag) .. '\n' .. DELETE_BODY
-                runSource(deleteSrc)
-            end
-        end,
-    })
 end
-
 --[[
 ============================================================================
 F JUMP
-============================================================================
+===========================================================================
 ]]--
-
 do
     local frontalEnabled = false
     local frontalRamp = true
@@ -5015,3 +4895,4 @@ do
         end,
     })
 end
+]]--
