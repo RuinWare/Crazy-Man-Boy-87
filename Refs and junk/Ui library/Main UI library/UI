@@ -1,5 +1,19 @@
--- !strict
+-- Library (the main UI)
+--
+-- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
+-- search, a Settings tab that is always there, notifications and toasts.
+--
+-- The first part is the library body (it only declares things, nothing is built until CreateWindow is called).
+-- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
+-- file and end it with `return Library`.
+--
+-- Handles: every Create... call returns an empty handle. Read and write values through the window:
+--   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
+--   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
 
+----------------------------------------------------------------
+-- LIBRARY BODY
+----------------------------------------------------------------
 local Library = (function()
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
@@ -21,12 +35,12 @@ local Library = (function()
 
 	-- sizes (pixels)
 	local C = {
-		HEADER_H = 54,
-		SIDEBAR_W = 168,
+		HEADER_H = 50,
+		SIDEBAR_W = 160,
 		PANEL_PAD = 8,
-		TAB_H = 34,
-		ROW_H = 38,
-		PROFILE_H = 64,
+		TAB_H = 30,
+		ROW_H = 30,
+		PROFILE_H = 58,
 		PAGE_PAD = 12,
 		COL_GAP = 10,
 		START_SIZE = Vector2.new(680, 420),
@@ -54,9 +68,9 @@ local Library = (function()
 	-- colors (plain gray, no blue)
 	local T = {
 		base = Color3.fromRGB(17, 17, 17),
-		baseAlpha = 0.06,
+		baseAlpha = 0.02,
 		panel = Color3.fromRGB(24, 24, 24),
-		panelAlpha = 0.04,
+		panelAlpha = 0,
 		card = Color3.fromRGB(30, 30, 30),
 		line = Color3.fromRGB(46, 46, 46),
 		chip = Color3.fromRGB(42, 42, 42),
@@ -80,10 +94,11 @@ local Library = (function()
 		local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 		local rng = Random.new()
 
-		function U.tween(obj, time, props, style, direction)
+		-- every animation eases out on one smooth curve (no overshoot, never a hard snap), a little slower than asked
+		function U.tween(obj, time, props)
 			local t = TweenService:Create(
 				obj,
-				TweenInfo.new(time, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out),
+				TweenInfo.new(math.max(time * 1.3, 0.14), Enum.EasingStyle.Cubic, Enum.EasingDirection.Out),
 				props
 			)
 			t:Play()
@@ -117,7 +132,7 @@ local Library = (function()
 				BackgroundTransparency = 1,
 				Text = "",
 				TextColor3 = T.text,
-				TextSize = 13,
+				TextSize = 12,
 				Font = Enum.Font.GothamMedium,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextTruncate = Enum.TextTruncate.AtEnd,
@@ -146,10 +161,20 @@ local Library = (function()
 			return Vector2.new(input.Position.X, input.Position.Y)
 		end
 
-		-- screen coordinates that match AbsolutePosition (the GUIs here ignore the top bar inset)
-		function U.screenPos(input)
-			local inset = GuiService:GetGuiInset()
-			return Vector2.new(input.Position.X + inset.X, input.Position.Y + inset.Y)
+		-- Pointer height vs GUI height. Mouse positions come without the top bar inset, touch positions don't need it.
+		-- The first press settles it: the pointer has to be inside the thing that was pressed.
+		function U.insetMode(input, target)
+			local inset = GuiService:GetGuiInset().Y
+			local top, height = target.AbsolutePosition.Y, target.AbsoluteSize.Y
+			local function inside(y) return y >= top - 2 and y <= top + height + 2 end
+			local plain, shifted = inside(input.Position.Y), inside(input.Position.Y + inset)
+			if plain and not shifted then return false end
+			if shifted and not plain then return true end
+			return input.UserInputType ~= Enum.UserInputType.Touch
+		end
+
+		function U.pointerY(input, withInset)
+			return input.Position.Y + (withInset and GuiService:GetGuiInset().Y or 0)
 		end
 
 		function U.hasIcon(id)
@@ -457,10 +482,10 @@ local Library = (function()
 			wrapper.AutomaticSize = Enum.AutomaticSize.None
 			wrapper.Size = UDim2.new(1, 0, 0, height)
 			U.tween(card, 0.3, { Position = UDim2.new(card.Position.X.Scale, offX, 0, offY) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-			task.delay(0.3, function()
+			task.delay(0.42, function()
 				if not wrapper.Parent then return end
 				U.tween(wrapper, 0.25, { Size = UDim2.new(1, 0, 0, 0) }, Enum.EasingStyle.Quint)
-				task.delay(0.26, function() wrapper:Destroy() end)
+				task.delay(0.36, function() wrapper:Destroy() end)
 			end)
 		end
 
@@ -491,7 +516,7 @@ local Library = (function()
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundColor3 = T.card,
-				BackgroundTransparency = 0.04,
+				BackgroundTransparency = 0,
 			})
 			card.Parent = wrapper
 			U.corner(card, 10)
@@ -524,7 +549,7 @@ local Library = (function()
 				Size = UDim2.new(1, -titleX, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Text = tostring(props.title or "Notification"),
-				TextSize = 14,
+				TextSize = 13,
 				Font = Enum.Font.GothamBold,
 				TextWrapped = true,
 				TextTruncate = Enum.TextTruncate.None,
@@ -610,7 +635,7 @@ local Library = (function()
 				Size = UDim2.fromOffset(0, 0),
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundColor3 = T.card,
-				BackgroundTransparency = 0.04,
+				BackgroundTransparency = 0,
 			}, wrapper)
 			U.corner(pill, 22)
 			U.stroke(pill, T.white, 0.88)
@@ -710,7 +735,7 @@ local Library = (function()
 		local GLOW_BRIGHTNESS = 0.50
 		local GLOW_SLICE = 0.4
 		local SCREEN_MARGIN = 6
-		local TEXT_NUDGE_Y = 0
+		local TEXT_NUDGE_Y = -30
 		local BAR_DISTANCE = 5
 		local DRAG_FOLLOW_SPEED = 9
 		local RESIZE_FOLLOW_SPEED = 26
@@ -1672,29 +1697,45 @@ local Library = (function()
 			return U.button(frame, { Name = "Hit", Size = UDim2.new(1, 0, 0, height or ROW_H), ZIndex = 1 })
 		end
 
+		-- a soft highlight behind a row while the pointer is over it
+		local function makeHover(frame, hit, height)
+			local glow = U.make("Frame", {
+				Name = "Hover",
+				Position = UDim2.fromOffset(4, 2),
+				Size = UDim2.new(1, -8, 0, (height or ROW_H) - 4),
+				BackgroundColor3 = T.white,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ZIndex = 0,
+			}, frame)
+			U.corner(glow, 6)
+			hit.MouseEnter:Connect(function() U.tween(glow, 0.2, { BackgroundTransparency = 0.95 }) end)
+			hit.MouseLeave:Connect(function() U.tween(glow, 0.25, { BackgroundTransparency = 1 }) end)
+		end
+
 		local function makeSwitch(parent, position, anchor)
 			local track = U.make("Frame", {
 				AnchorPoint = anchor,
 				Position = position,
-				Size = UDim2.fromOffset(40, 22),
+				Size = UDim2.fromOffset(34, 18),
 				BackgroundColor3 = T.off,
 				BorderSizePixel = 0,
 				ZIndex = 2,
 			}, parent)
-			U.corner(track, 11)
+			U.corner(track, 9)
 			local knob = U.make("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 3, 0.5, 0),
-				Size = UDim2.fromOffset(16, 16),
+				Position = UDim2.new(0, 2, 0.5, 0),
+				Size = UDim2.fromOffset(14, 14),
 				BackgroundColor3 = T.knobOff,
 				BorderSizePixel = 0,
 				ZIndex = 3,
 			}, track)
-			U.corner(knob, 8)
+			U.corner(knob, 7)
 			local function set(on, instant)
 				local trackProps = { BackgroundColor3 = on and T.green or T.off }
 				local knobProps = {
-					Position = on and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
+					Position = on and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
 					BackgroundColor3 = on and T.white or T.knobOff,
 				}
 				if instant then
@@ -1729,7 +1770,7 @@ local Library = (function()
 				PlaceholderText = props.placeholder or "",
 				PlaceholderColor3 = T.sub,
 				TextColor3 = T.text,
-				TextSize = 12,
+				TextSize = 11,
 				Font = Enum.Font.GothamMedium,
 				TextXAlignment = props.align or Enum.TextXAlignment.Left,
 				ClipsDescendants = true,
@@ -1810,7 +1851,7 @@ local Library = (function()
 			if #rows == 0 then return end
 
 			local root = window._root
-			local MENU_W, ROW = 212, 36
+			local MENU_W, ROW = 200, 30
 			local menuH = #rows * ROW + (#rows - 1) * 4 + 12
 
 			local catcher = U.button(root, { Name = "MenuCatcher", Size = UDim2.fromScale(1, 1), ZIndex = 60 })
@@ -1847,7 +1888,7 @@ local Library = (function()
 				catcher:Destroy()
 				U.tween(menuScale, 0.15, { Scale = 0.85 }, Enum.EasingStyle.Quad)
 				U.tween(menu, 0.15, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
-				task.delay(0.16, function() menu:Destroy() end)
+				task.delay(0.22, function() menu:Destroy() end)
 			end
 			window._menu = { close = close }
 			catcher.Activated:Connect(close)
@@ -1872,12 +1913,12 @@ local Library = (function()
 					local keyButton = U.button(line, {
 						AnchorPoint = Vector2.new(1, 0.5),
 						Position = UDim2.new(1, -6, 0.5, 0),
-						Size = UDim2.fromOffset(84, 24),
+						Size = UDim2.fromOffset(78, 22),
 						BackgroundTransparency = 0,
 						BackgroundColor3 = T.off,
 						Text = K.label(el._key),
 						TextColor3 = T.text,
-						TextSize = 12,
+						TextSize = 11,
 						Font = Enum.Font.GothamMedium,
 						ZIndex = 63,
 					})
@@ -1940,15 +1981,15 @@ local Library = (function()
 				Name = "Options",
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -rightOffset, 0.5, 0),
-				Size = UDim2.fromOffset(26, 26),
+				Size = UDim2.fromOffset(22, 22),
 				BackgroundColor3 = T.white,
 				ZIndex = 3,
 			})
-			U.corner(dots, 13)
+			U.corner(dots, 11)
 			local icon = U.make("ImageLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(18, 18),
+				Size = UDim2.fromOffset(16, 16),
 				BackgroundTransparency = 1,
 				Image = U.assetUrl(ICON_DOTS),
 				ImageColor3 = T.sub,
@@ -1989,6 +2030,7 @@ local Library = (function()
 			}
 			local frame, sep = makeItem(row)
 			local hit = makeHit(frame)
+			makeHover(frame, hit)
 			local label = U.label(frame, {
 				Name = "Name",
 				Position = UDim2.fromOffset(12, 0),
@@ -1998,10 +2040,10 @@ local Library = (function()
 			})
 			local switch = makeSwitch(frame, UDim2.new(1, -12, 0.5, 0), Vector2.new(1, 0.5))
 			switch.set(el.value, true)
-			attachOptions(el, frame, 12 + 40 + 8)
+			attachOptions(el, frame, 12 + 34 + 6)
 
 			function el:_updateLabel()
-				local reserve = 12 + 40 + 12
+				local reserve = 12 + 34 + 12
 				if self._hasOptions then reserve += 30 end
 				label.Size = UDim2.new(1, -reserve, 1, 0)
 			end
@@ -2046,6 +2088,7 @@ local Library = (function()
 			}
 			local frame, sep = makeItem(row)
 			local hit = makeHit(frame)
+			makeHover(frame, hit)
 			local label = U.label(frame, {
 				Name = "Name",
 				Position = UDim2.fromOffset(12, 0),
@@ -2113,7 +2156,7 @@ local Library = (function()
 			})
 			local chip, valueBox = makeChipBox(frame, {
 				position = UDim2.new(1, -10, 0.5, 0),
-				size = UDim2.fromOffset(48, 24),
+				size = UDim2.fromOffset(42, 20),
 				text = "",
 				align = Enum.TextXAlignment.Center,
 			})
@@ -2123,34 +2166,34 @@ local Library = (function()
 			local track = U.make("Frame", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0.4, 0, 0.5, 0),
-				Size = UDim2.new(0.6, -(10 + 48 + 12), 0, 6),
+				Size = UDim2.new(0.6, -(10 + 42 + 12), 0, 4),
 				BackgroundColor3 = T.off,
 				BorderSizePixel = 0,
 				ZIndex = 2,
 			}, frame)
-			U.corner(track, 3)
+			U.corner(track, 2)
 			local fill = U.make("Frame", {
 				Size = UDim2.fromScale(0, 1),
 				BackgroundColor3 = T.green,
 				BorderSizePixel = 0,
 				ZIndex = 3,
 			}, track)
-			U.corner(fill, 3)
+			U.corner(fill, 2)
 			local knob = U.make("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0, 0.5),
-				Size = UDim2.fromOffset(12, 12),
+				Size = UDim2.fromOffset(10, 10),
 				BackgroundColor3 = T.white,
 				BorderSizePixel = 0,
 				ZIndex = 4,
 			}, track)
-			U.corner(knob, 6)
+			U.corner(knob, 5)
 
 			-- the grab area: the track, a little wider than it is, the full height of the row
 			local hit = U.button(frame, {
 				Name = "Hit",
 				Position = UDim2.new(0.4, -8, 0, 0),
-				Size = UDim2.new(0.6, -(10 + 48 + 6), 1, 0),
+				Size = UDim2.new(0.6, -(10 + 42 + 6), 1, 0),
 				ZIndex = 5,
 			})
 
@@ -2199,10 +2242,10 @@ local Library = (function()
 				local started = D.begin(input, function(moved)
 					fromX(U.p2(moved).X)
 				end, function()
-					U.tween(knob, 0.2, { Size = UDim2.fromOffset(12, 12) }, Enum.EasingStyle.Quad)
+					U.tween(knob, 0.2, { Size = UDim2.fromOffset(10, 10) })
 				end, row._tab._page)
 				if not started then return end
-				U.tween(knob, 0.15, { Size = UDim2.fromOffset(16, 16) }, Enum.EasingStyle.Back)
+				U.tween(knob, 0.15, { Size = UDim2.fromOffset(14, 14) })
 				fromX(U.p2(input).X)
 			end)
 
@@ -2219,7 +2262,7 @@ local Library = (function()
 		----------------------------------------------------------------
 		function E.dropdown(row, cfg)
 			local window = row._window
-			local OPTION_H = 30
+			local OPTION_H = 26
 			local el = {
 				kind = "dropdown",
 				_window = window,
@@ -2248,6 +2291,7 @@ local Library = (function()
 			local frame, sep = makeItem(row)
 			frame.ClipsDescendants = true
 			local hit = makeHit(frame)
+			makeHover(frame, hit)
 			U.label(frame, {
 				Name = "Name",
 				Position = UDim2.fromOffset(12, 0),
@@ -2258,8 +2302,8 @@ local Library = (function()
 
 			local chip = U.make("Frame", {
 				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -10, 0, (ROW_H - 24) / 2),
-				Size = UDim2.new(0.5, -14, 0, 24),
+				Position = UDim2.new(1, -10, 0, (ROW_H - 20) / 2),
+				Size = UDim2.new(0.5, -14, 0, 20),
 				BackgroundColor3 = T.chip,
 				BorderSizePixel = 0,
 				ZIndex = 2,
@@ -2269,14 +2313,14 @@ local Library = (function()
 				Position = UDim2.fromOffset(8, 0),
 				Size = UDim2.new(1, -28, 1, 0),
 				Text = "None",
-				TextSize = 12,
+				TextSize = 11,
 				TextColor3 = T.text,
 				ZIndex = 3,
 			})
 			local chevron = U.make("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -8, 0.5, 0),
-				Size = UDim2.fromOffset(12, 12),
+				Size = UDim2.fromOffset(10, 10),
 				BackgroundTransparency = 1,
 				ZIndex = 3,
 			}, chip)
@@ -2284,7 +2328,7 @@ local Library = (function()
 				local arm = U.make("Frame", {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Position = UDim2.new(0.5, spec[1], 0.5, 0),
-					Size = UDim2.fromOffset(7, 2),
+					Size = UDim2.fromOffset(6, 2),
 					Rotation = spec[2],
 					BackgroundColor3 = T.sub,
 					BorderSizePixel = 0,
@@ -2350,7 +2394,7 @@ local Library = (function()
 						Size = UDim2.new(1, 0, 0, OPTION_H),
 						Text = option,
 						TextColor3 = T.sub,
-						TextSize = 12,
+						TextSize = 11,
 						Font = Enum.Font.GothamMedium,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						ZIndex = 3,
@@ -2436,7 +2480,7 @@ local Library = (function()
 			})
 			local chip, box = makeChipBox(frame, {
 				position = UDim2.new(1, -10, 0.5, 0),
-				size = UDim2.new(0.6, -16, 0, 26),
+				size = UDim2.new(0.6, -16, 0, 22),
 				text = el.value,
 				placeholder = tostring(cfg.placeholder or ""),
 			})
@@ -2503,12 +2547,12 @@ local Library = (function()
 				Name = "Key",
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -10, 0.5, 0),
-				Size = UDim2.fromOffset(96, 24),
+				Size = UDim2.fromOffset(86, 20),
 				BackgroundTransparency = 0,
 				BackgroundColor3 = T.chip,
 				Text = K.label(el.value),
 				TextColor3 = T.text,
-				TextSize = 12,
+				TextSize = 11,
 				Font = Enum.Font.GothamMedium,
 				ZIndex = 3,
 			})
@@ -2576,9 +2620,12 @@ local Library = (function()
 		----------------------------------------------------------------
 		function E.colorpicker(row, cfg)
 			local window = row._window
-			local PICK_H = 112
-			local FIELDS_Y = ROW_H + 4 + PICK_H + 8
-			local OPEN_H = FIELDS_Y + 24 + 10
+			local PICK_H = 96
+			local AREA_PAD = 6
+			local FIELDS_Y = AREA_PAD + PICK_H + 8
+			local FIELD_H = 22
+			local AREA_H = FIELDS_Y + FIELD_H + 10
+			local OPEN_H = ROW_H + AREA_H
 
 			local function quantize(color)
 				local r, g, b = U.rgbOf(color)
@@ -2608,32 +2655,44 @@ local Library = (function()
 			local frame, sep = makeItem(row)
 			frame.ClipsDescendants = true
 			local hit = makeHit(frame)
+			makeHover(frame, hit)
 			U.label(frame, {
 				Name = "Name",
 				Position = UDim2.fromOffset(12, 0),
-				Size = UDim2.new(1, -90, 0, ROW_H),
+				Size = UDim2.new(1, -70, 0, ROW_H),
 				Text = el.name,
 				ZIndex = 2,
 			})
 			local swatch = U.make("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -12, 0, ROW_H / 2),
-				Size = UDim2.fromOffset(46, 22),
+				Size = UDim2.fromOffset(36, 16),
 				BackgroundColor3 = el.value,
 				BorderSizePixel = 0,
 				ZIndex = 2,
 			}, frame)
-			U.corner(swatch, 6)
+			U.corner(swatch, 5)
 			U.stroke(swatch, T.white, 0.8)
+
+			-- everything that opens lives in one clipped area under the row: while it is closed nothing of it shows
+			local area = U.make("Frame", {
+				Name = "Area",
+				Position = UDim2.fromOffset(0, ROW_H),
+				Size = UDim2.new(1, 0, 0, AREA_H),
+				BackgroundTransparency = 1,
+				ClipsDescendants = true,
+				Visible = false,
+				ZIndex = 2,
+			}, frame)
 
 			-- the map: saturation across, brightness down
 			local map = U.make("Frame", {
-				Position = UDim2.new(0, 12, 0, ROW_H + 4),
-				Size = UDim2.new(1, -50, 0, PICK_H),
+				Position = UDim2.new(0, 12, 0, AREA_PAD),
+				Size = UDim2.new(1, -46, 0, PICK_H),
 				BackgroundColor3 = Color3.fromHSV(hue, 1, 1),
 				BorderSizePixel = 0,
 				ZIndex = 2,
-			}, frame)
+			}, area)
 			U.corner(map, 6)
 			local whiteLayer = U.make("Frame", {
 				Size = UDim2.fromScale(1, 1),
@@ -2658,22 +2717,22 @@ local Library = (function()
 			}, blackLayer)
 			local mapCursor = U.make("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.fromOffset(12, 12),
+				Size = UDim2.fromOffset(10, 10),
 				BackgroundTransparency = 1,
 				ZIndex = 6,
 			}, map)
-			U.corner(mapCursor, 6)
+			U.corner(mapCursor, 5)
 			U.stroke(mapCursor, T.white, 0, 2)
 
 			-- the hue bar
 			local bar = U.make("Frame", {
 				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -12, 0, ROW_H + 4),
-				Size = UDim2.fromOffset(16, PICK_H),
+				Position = UDim2.new(1, -12, 0, AREA_PAD),
+				Size = UDim2.fromOffset(14, PICK_H),
 				BackgroundColor3 = T.white,
 				BorderSizePixel = 0,
 				ZIndex = 2,
-			}, frame)
+			}, area)
 			U.corner(bar, 6)
 			local keypoints = {}
 			for step = 0, 6 do
@@ -2682,7 +2741,7 @@ local Library = (function()
 			U.make("UIGradient", { Rotation = 90, Color = ColorSequence.new(keypoints) }, bar)
 			local barCursor = U.make("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.fromOffset(22, 4),
+				Size = UDim2.fromOffset(20, 4),
 				BackgroundColor3 = T.white,
 				BorderSizePixel = 0,
 				ZIndex = 6,
@@ -2693,10 +2752,10 @@ local Library = (function()
 			-- R G B and hex
 			local fields = U.make("Frame", {
 				Position = UDim2.new(0, 12, 0, FIELDS_Y),
-				Size = UDim2.new(1, -24, 0, 24),
+				Size = UDim2.new(1, -24, 0, FIELD_H),
 				BackgroundTransparency = 1,
 				ZIndex = 2,
-			}, frame)
+			}, area)
 			U.make("UIListLayout", {
 				FillDirection = Enum.FillDirection.Horizontal,
 				Padding = UDim.new(0, 6),
@@ -2712,7 +2771,7 @@ local Library = (function()
 					ZIndex = 2,
 				}, fields)
 				U.corner(chip, 6)
-				local box = U.make("TextBox", {
+				return U.make("TextBox", {
 					Size = UDim2.fromScale(1, 1),
 					BackgroundTransparency = 1,
 					ClearTextOnFocus = false,
@@ -2720,11 +2779,10 @@ local Library = (function()
 					PlaceholderText = placeholder,
 					PlaceholderColor3 = T.sub,
 					TextColor3 = T.text,
-					TextSize = 12,
+					TextSize = 11,
 					Font = Enum.Font.GothamMedium,
 					ZIndex = 3,
 				}, chip)
-				return box
 			end
 			boxes.r = field(1, UDim2.new(0.19, -5, 1, 0), "R")
 			boxes.g = field(2, UDim2.new(0.19, -5, 1, 0), "G")
@@ -2765,8 +2823,7 @@ local Library = (function()
 				local h, s, v = color:ToHSV()
 				if s > 0 and v > 0 then hue = h end
 				sat, val = s, v
-				el.value = quantize(Color3.fromHSV(hue, sat, val))
-				if el.value ~= color then el.value = color end
+				el.value = color
 				paint()
 				window._values[self.flag] = el.value
 				window:_changed()
@@ -2779,24 +2836,29 @@ local Library = (function()
 			end
 			function el:_fire() U.run(self.callback, self.value) end
 
-			local function dragMap(input)
-				local pos = U.screenPos(input)
-				sat = math.clamp((pos.X - map.AbsolutePosition.X) / math.max(1, map.AbsoluteSize.X), 0, 1)
-				val = 1 - math.clamp((pos.Y - map.AbsolutePosition.Y) / math.max(1, map.AbsoluteSize.Y), 0, 1)
+			-- the pointer is turned into a position inside the map / bar (see U.insetMode for the height)
+			local function place(input, withInset)
+				local y = U.pointerY(input, withInset)
+				sat = math.clamp((input.Position.X - map.AbsolutePosition.X) / math.max(1, map.AbsoluteSize.X), 0, 1)
+				val = 1 - math.clamp((y - map.AbsolutePosition.Y) / math.max(1, map.AbsoluteSize.Y), 0, 1)
 				commit(false)
 			end
-			local function dragBar(input)
-				local pos = U.screenPos(input)
-				hue = math.clamp((pos.Y - bar.AbsolutePosition.Y) / math.max(1, bar.AbsoluteSize.Y), 0, 0.9999)
+			local function placeHue(input, withInset)
+				local y = U.pointerY(input, withInset)
+				hue = math.clamp((y - bar.AbsolutePosition.Y) / math.max(1, bar.AbsoluteSize.Y), 0, 0.9999)
 				commit(false)
 			end
 			map.InputBegan:Connect(function(input)
 				if not U.isPress(input) then return end
-				if D.begin(input, dragMap, nil, row._tab._page) then dragMap(input) end
+				local withInset = U.insetMode(input, map)
+				local started = D.begin(input, function(moved) place(moved, withInset) end, nil, row._tab._page)
+				if started then place(input, withInset) end
 			end)
 			bar.InputBegan:Connect(function(input)
 				if not U.isPress(input) then return end
-				if D.begin(input, dragBar, nil, row._tab._page) then dragBar(input) end
+				local withInset = U.insetMode(input, bar)
+				local started = D.begin(input, function(moved) placeHue(moved, withInset) end, nil, row._tab._page)
+				if started then placeHue(input, withInset) end
 			end)
 
 			local function typed()
@@ -2822,9 +2884,18 @@ local Library = (function()
 			end)
 
 			local open = false
+			local token = 0
 			hit.Activated:Connect(function()
 				open = not open
-				U.tween(frame, 0.35, { Size = UDim2.new(1, 0, 0, open and OPEN_H or ROW_H) }, Enum.EasingStyle.Quint)
+				token += 1
+				local mine = token
+				if open then area.Visible = true end
+				U.tween(frame, 0.35, { Size = UDim2.new(1, 0, 0, open and OPEN_H or ROW_H) })
+				if not open then
+					task.delay(0.55, function()
+						if token == mine then area.Visible = false end
+					end)
+				end
 			end)
 
 			return finish(row, el, cfg, frame, sep)
@@ -2838,7 +2909,7 @@ local Library = (function()
 			local text = tostring(cfg.text or "")
 			local frame = U.make("Frame", {
 				Name = "Divider",
-				Size = UDim2.new(1, 0, 0, 26),
+				Size = UDim2.new(1, 0, 0, 22),
 				BackgroundTransparency = 1,
 			}, row._frame)
 			local left = U.make("Frame", { BackgroundColor3 = T.line, BorderSizePixel = 0 }, frame)
@@ -2848,7 +2919,7 @@ local Library = (function()
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromOffset(10, 16),
 				Text = text,
-				TextSize = 11,
+				TextSize = 10,
 				TextColor3 = T.sub,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextTruncate = Enum.TextTruncate.None,
@@ -2892,7 +2963,7 @@ local Library = (function()
 			local name = tostring(cfg.name or "Section")
 			local frame = U.make("Frame", {
 				Name = "Section",
-				Size = UDim2.new(1, 0, 0, 28),
+				Size = UDim2.new(1, 0, 0, 24),
 				BackgroundTransparency = 1,
 			}, row._frame)
 			local x = 6
@@ -2900,7 +2971,7 @@ local Library = (function()
 				U.make("ImageLabel", {
 					AnchorPoint = Vector2.new(0, 1),
 					Position = UDim2.new(0, 6, 1, -3),
-					Size = UDim2.fromOffset(14, 14),
+					Size = UDim2.fromOffset(12, 12),
 					BackgroundTransparency = 1,
 					Image = U.assetUrl(cfg.icon),
 					ImageColor3 = T.sub,
@@ -2913,7 +2984,7 @@ local Library = (function()
 				Position = UDim2.new(0, x, 1, -2),
 				Size = UDim2.new(1, -(x + 6), 0, 18),
 				Text = name,
-				TextSize = 12,
+				TextSize = 11,
 				TextColor3 = T.sub,
 			})
 			row._lastSection = name
@@ -2946,7 +3017,7 @@ local Library = (function()
 				BackgroundColor3 = T.card,
 				BorderSizePixel = 0,
 			}, parent)
-			U.corner(card, 10)
+			U.corner(card, 8)
 			U.stroke(card, T.white, 0.93)
 			U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, card)
 			return card
@@ -3077,7 +3148,7 @@ local Library = (function()
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 		}, tab._cols)
-		U.make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, frame)
+		U.make("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }, frame)
 		return setmetatable({
 			_tab = tab,
 			_window = tab._window,
@@ -3108,13 +3179,13 @@ local Library = (function()
 			tab._icon = U.make("ImageLabel", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0, 10, 0.5, 0),
-				Size = UDim2.fromOffset(18, 18),
+				Size = UDim2.fromOffset(16, 16),
 				BackgroundTransparency = 1,
 				Image = U.assetUrl(config.icon),
 				ImageColor3 = T.sub,
 				ScaleType = Enum.ScaleType.Fit,
 			}, button)
-			textX = 38
+			textX = 34
 		end
 		tab._label = U.label(button, {
 			Position = UDim2.fromOffset(textX, 0),
@@ -3147,15 +3218,23 @@ local Library = (function()
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			Visible = false,
 		}, window._content)
+		U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, page)
 		U.make("UIPadding", {
-			PaddingLeft = UDim.new(0, C.PAGE_PAD), PaddingRight = UDim.new(0, C.PAGE_PAD),
-			PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 28),
+			PaddingLeft = UDim.new(0, C.PAGE_PAD), PaddingRight = UDim.new(0, C.PAGE_PAD + 3),
+			PaddingTop = UDim.new(0, 6),
 		}, page)
 		tab._page = page
 		tab._cols = U.make("Frame", {
 			Name = "Columns",
+			LayoutOrder = 1,
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+		}, page)
+		U.make("Frame", {
+			Name = "EndSpace",
+			LayoutOrder = 2,
+			Size = UDim2.new(1, 0, 0, 44),
 			BackgroundTransparency = 1,
 		}, page)
 		U.make("UIListLayout", {
@@ -3429,7 +3508,7 @@ local Library = (function()
 			self:_pillHide()
 		else
 			U.tween(self._popScale, 0.2, { Scale = 0.9 }, Enum.EasingStyle.Quad)
-			task.delay(0.21, function()
+			task.delay(0.28, function()
 				if not self._open and mine == self._openToken and self._holder.Parent then
 					self._holder.Visible = false
 				end
@@ -3552,7 +3631,7 @@ local Library = (function()
 			token += 1
 			local mine = token
 			U.tween(pill, 0.25, { Position = UDim2.new(0.5, 0, 0, -60) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-			task.delay(0.26, function()
+			task.delay(0.34, function()
 				if token == mine then pill.Visible = false end
 			end)
 		end
@@ -3763,9 +3842,9 @@ local Library = (function()
 			window:_flush()
 		end
 
-		-- drag (the bar)
-		dragHit.InputBegan:Connect(function(input)
-			if not U.isPress(input) or dragging or resizing then return end
+		-- drag: from the bar below, or from the top bar (window._startDrag is used by the header)
+		local function startDrag(input)
+			if dragging or resizing then return end
 			local start, origin = U.p2(input), posTarget
 			local started = D.begin(input, function(moved)
 				posTarget = clampCenter(origin + (U.p2(moved) - start), sizeTarget)
@@ -3780,6 +3859,10 @@ local Library = (function()
 				BackgroundTransparency = 0.15,
 				Size = UDim2.fromOffset(C.BAR_SIZE_ACTIVE.X, C.BAR_SIZE_ACTIVE.Y),
 			})
+		end
+		window._startDrag = startDrag
+		dragHit.InputBegan:Connect(function(input)
+			if U.isPress(input) then startDrag(input) end
 		end)
 		dragHit.MouseEnter:Connect(function()
 			if not dragging then U.tween(bar, 0.2, { BackgroundTransparency = 0.3 }) end
@@ -3851,35 +3934,41 @@ local Library = (function()
 		}, root)
 		window._header = header
 
+		-- the top bar drags the window too (the buttons and the search box sit above this)
+		local dragArea = U.button(header, { Name = "DragArea", Size = UDim2.fromScale(1, 1), ZIndex = 1 })
+		dragArea.InputBegan:Connect(function(input)
+			if U.isPress(input) and window._startDrag then window._startDrag(input) end
+		end)
+
 		local titleX = 16
 		if U.hasIcon(config.icon) then
 			U.make("ImageLabel", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0, 14, 0.5, 0),
-				Size = UDim2.fromOffset(32, 32),
+				Size = UDim2.fromOffset(28, 28),
 				BackgroundTransparency = 1,
 				Image = U.assetUrl(config.icon),
 				ScaleType = Enum.ScaleType.Fit,
 				ZIndex = 6,
 			}, header)
-			titleX = 14 + 32 + 10
+			titleX = 14 + 28 + 9
 		end
 		local hasSubtitle = config.subtitle ~= nil and tostring(config.subtitle) ~= ""
 		local textWidth = C.SIDEBAR_W - titleX - 6
 		U.label(header, {
-			Position = UDim2.fromOffset(titleX, hasSubtitle and 9 or 0),
-			Size = UDim2.fromOffset(textWidth, hasSubtitle and 20 or HEADER_H),
+			Position = UDim2.fromOffset(titleX, hasSubtitle and 7 or 0),
+			Size = UDim2.fromOffset(textWidth, hasSubtitle and 18 or HEADER_H),
 			Text = window.Name,
-			TextSize = 15,
+			TextSize = 14,
 			Font = Enum.Font.GothamBold,
 			ZIndex = 6,
 		})
 		if hasSubtitle then
 			U.label(header, {
-				Position = UDim2.fromOffset(titleX, 28),
+				Position = UDim2.fromOffset(titleX, 25),
 				Size = UDim2.fromOffset(textWidth, 14),
 				Text = tostring(config.subtitle),
-				TextSize = 11,
+				TextSize = 10,
 				TextColor3 = T.sub,
 				ZIndex = 6,
 			})
@@ -3889,7 +3978,7 @@ local Library = (function()
 			local button = U.button(header, {
 				Name = name,
 				AnchorPoint = Vector2.new(1, 0.5),
-				Size = UDim2.fromOffset(30, 30),
+				Size = UDim2.fromOffset(28, 28),
 				BackgroundColor3 = T.white,
 				ZIndex = 6,
 			})
@@ -3897,7 +3986,7 @@ local Library = (function()
 			local image = U.make("ImageLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(20, 20),
+				Size = UDim2.fromOffset(18, 18),
 				BackgroundTransparency = 1,
 				Image = U.assetUrl(icon),
 				ImageColor3 = T.sub,
@@ -3934,6 +4023,7 @@ local Library = (function()
 			BackgroundColor3 = T.chip,
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
+			Active = true,
 			ZIndex = 6,
 		}, header)
 		U.corner(searchBox, 8)
@@ -3953,13 +4043,13 @@ local Library = (function()
 		}, searchBox)
 
 		-- where the buttons sit: the close button is only there on mobile, search takes its place on PC
-		local function searchRight() return window._mobile and (12 + 30 + 4) or 12 end
+		local function searchRight() return window._mobile and (12 + 28 + 4) or 12 end
 
 		function window:_layoutHeader(animate)
 			local mobile = self._mobile
 			local searchX = searchRight()
 			local boxProps = {
-				Position = UDim2.new(1, -(searchX + 30 + 6), 0.5, 0),
+				Position = UDim2.new(1, -(searchX + 28 + 6), 0.5, 0),
 				Size = UDim2.fromOffset(searchOpen and SEARCH_W or 0, 28),
 			}
 			local buttonProps = { Position = UDim2.new(1, -searchX, 0.5, 0) }
@@ -3980,7 +4070,7 @@ local Library = (function()
 				end
 			elseif animate then
 				U.tween(closeScale, 0.2, { Scale = 0 }, Enum.EasingStyle.Quad)
-				task.delay(0.21, function()
+				task.delay(0.28, function()
 					if not window._mobile then closeButton.Visible = false end
 				end)
 			else
@@ -4034,21 +4124,29 @@ local Library = (function()
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			Visible = false,
 		}, window._content)
+		U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, page)
 		U.make("UIPadding", {
-			PaddingLeft = UDim.new(0, C.PAGE_PAD), PaddingRight = UDim.new(0, C.PAGE_PAD),
-			PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 28),
+			PaddingLeft = UDim.new(0, C.PAGE_PAD), PaddingRight = UDim.new(0, C.PAGE_PAD + 3),
+			PaddingTop = UDim.new(0, 6),
 		}, page)
 		window._searchPage = page
 
 		local card = U.make("Frame", {
+			LayoutOrder = 1,
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundColor3 = T.card,
 			BorderSizePixel = 0,
 		}, page)
-		U.corner(card, 10)
+		U.corner(card, 8)
 		U.stroke(card, T.white, 0.93)
 		U.make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, card)
+		U.make("Frame", {
+			Name = "EndSpace",
+			LayoutOrder = 2,
+			Size = UDim2.new(1, 0, 0, 44),
+			BackgroundTransparency = 1,
+		}, page)
 
 		function window:_runSearch(text)
 			text = (text or ""):lower():match("^%s*(.-)%s*$")
@@ -4069,7 +4167,7 @@ local Library = (function()
 			for _, entry in ipairs(self._search) do
 				if entry.el.name:lower():find(text, 1, true) then
 					count += 1
-					local result = U.button(card, { LayoutOrder = count, Size = UDim2.new(1, 0, 0, 40), ZIndex = 1 })
+					local result = U.button(card, { LayoutOrder = count, Size = UDim2.new(1, 0, 0, 34), ZIndex = 1 })
 					U.label(result, {
 						Position = UDim2.fromOffset(12, 0),
 						Size = UDim2.new(0.55, -12, 1, 0),
@@ -4118,7 +4216,7 @@ local Library = (function()
 		function window:_goTo(entry)
 			self:_closeSearch()
 			self:_select(entry.tab)
-			task.delay(0.3, function()
+			task.delay(0.5, function()
 				local tabPage, frame = entry.tab._page, entry.el._frame
 				if not (tabPage.Parent and frame.Parent) then return end
 				local target = frame.AbsolutePosition.Y - tabPage.AbsolutePosition.Y + tabPage.CanvasPosition.Y - 24
@@ -4132,7 +4230,7 @@ local Library = (function()
 				}, frame)
 				U.corner(flash, 8)
 				U.tween(flash, 0.9, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad)
-				task.delay(0.95, function() flash:Destroy() end)
+				task.delay(1.25, function() flash:Destroy() end)
 			end)
 		end
 	end
@@ -4181,24 +4279,24 @@ local Library = (function()
 		local avatar = U.make("ImageLabel", {
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 14, 0.5, 1),
-			Size = UDim2.fromOffset(38, 38),
+			Size = UDim2.fromOffset(32, 32),
 			BackgroundColor3 = T.chip,
 			Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150", player.UserId),
 			ScaleType = Enum.ScaleType.Crop,
 		}, profile)
 		U.corner(avatar, UDim.new(1, 0))
 		U.label(profile, {
-			Position = UDim2.new(0, 62, 0.5, -17),
-			Size = UDim2.new(1, -70, 0, 18),
+			Position = UDim2.new(0, 56, 0.5, -15),
+			Size = UDim2.new(1, -64, 0, 16),
 			Text = player.DisplayName,
-			TextSize = 14,
+			TextSize = 13,
 			Font = Enum.Font.GothamBold,
 		})
 		U.label(profile, {
-			Position = UDim2.new(0, 62, 0.5, 1),
-			Size = UDim2.new(1, -70, 0, 16),
+			Position = UDim2.new(0, 56, 0.5, 1),
+			Size = UDim2.new(1, -64, 0, 14),
 			Text = player.Name,
-			TextSize = 11,
+			TextSize = 10,
 			TextColor3 = T.sub,
 		})
 	end
@@ -4433,6 +4531,6 @@ local Library = (function()
 		N.toast(props)
 	end
 
-                      	return Library
-                 end)()
+        	return Library
+     end)()
 return Library
