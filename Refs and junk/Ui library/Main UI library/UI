@@ -1,4 +1,3 @@
--- raw file load im try again make roblox hacks bro
 -- Library (the main UI)
 --
 -- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
@@ -11,6 +10,7 @@
 -- Handles: every Create... call returns an empty handle. Read and write values through the window:
 --   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
 --   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
+
 ----------------------------------------------------------------
 -- LIBRARY BODY
 ----------------------------------------------------------------
@@ -3571,7 +3571,8 @@ local Library = (function()
 			Visible = false,
 		}, gui)
 		U.corner(pill, 18)
-		U.stroke(pill, T.white, 0.88)
+		-- the outline belongs to the pill itself, not to its contents, so hiding has to fade it too
+		local pillStroke = U.stroke(pill, T.white, 0.88)
 		if hasLogo then
 			U.make("ImageLabel", {
 				AnchorPoint = Vector2.new(0, 0.5),
@@ -3612,11 +3613,15 @@ local Library = (function()
 
 		-- "Hide Mobile Pill": it stays there and stays clickable, you just can't see it
 		function window:_pillRefresh(animate)
-			local target = self._settings.hidePill and 0.995 or 0
+			local hidden = self._settings.hidePill
+			local target = hidden and 0.995 or 0
+			local strokeTarget = hidden and 1 or 0.88
 			if animate then
-				U.tween(pill, 0.3, { GroupTransparency = target }, Enum.EasingStyle.Quad)
+				U.tween(pill, 0.3, { GroupTransparency = target })
+				U.tween(pillStroke, 0.3, { Transparency = strokeTarget })
 			else
 				pill.GroupTransparency = target
+				pillStroke.Transparency = strokeTarget
 			end
 		end
 
@@ -4531,6 +4536,6 @@ local Library = (function()
 		N.toast(props)
 	end
 
-        	return Library
-     end)()
+                 	return Library
+               end)()
 return Library
