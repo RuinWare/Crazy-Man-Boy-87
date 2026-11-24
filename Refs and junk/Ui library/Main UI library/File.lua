@@ -1,4 +1,4 @@
---w
+-- w
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
