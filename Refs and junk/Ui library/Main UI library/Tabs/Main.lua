@@ -1497,6 +1497,37 @@ tab:CreateDivider()
         callback = function(v) edgeTrimpPower = v end,
     })
 end
+--[[
+============================================================================
+LAG SWITCH
+============================================================================
+]]--
+
+do
+    local lagDuration = 1
+
+    local function triggerLag()
+        local start = tick()
+        while tick() - start < lagDuration do end
+    end
+
+    tab:CreateButton({
+        name = "Lag Switch",
+		icon = 122975828478366,
+        callback = triggerLag,
+    })
+
+    tab:CreateSlider({
+        name = "Lag Duration",
+		icon = 136077598178846,
+        range = {0.1, 5},
+        increment = 0.1,
+        suffix = "s",
+        value = 1,
+        flag = "LagSwitch_Slider",
+        callback = function(v) lagDuration = v end,
+    })
+end
 
 --[[
 ===========================
@@ -2711,7 +2742,6 @@ do
 		modifiedEmotes = {}
 	end
 
-	tab:CreateRightRow
 	tab:CreateSection({ name = "Emote" })
 
 	tab:CreateToggle({
@@ -2734,7 +2764,7 @@ do
 		range = {0, 16.6},
 		increment = 0.1,
 		suffix = "",
-		currentValue = 16.6,
+		value = 16.6,
 		callback = function(v)
 			currentSpeedValue = v
 			if speedEnabled then
@@ -2828,7 +2858,7 @@ do
 	tab:CreateToggle({
 		name = "Unmovable Emote Bypass",
         icon = 102876083492144,
-		currentValue = false,
+		value = false,
 		callback = function(v)
 			bypassEnabled = v
 			if bypassEnabled then
@@ -3325,15 +3355,13 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs
     tab:CreateToggle({
         name = "Emote Run",
 		icon = 113713061701553,
-        currentValue = false,
+        value = false,
         flag = "EmoteShiftlock_Toggle",
         callback = function(v)
             enabled = v
             apply()
         end,
     })
-
-_G.RWCallbacks["EmoteRun"] = function(v) enabled = v; apply() end
 
     tab:CreateDropdown({
         name = "Direction",
@@ -3369,7 +3397,7 @@ tab:CreateDivider()
 tab:CreateToggle({
     name = "Auto E-Dash",
     flag = "AutoEdash",
-    currentValue = false,
+    value = false,
     callback = function(v)
         if v then
           loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Edashon"))()
@@ -3383,7 +3411,7 @@ tab:CreateSlider({
     name = "Smoothness",
     range = { 0, 100 },
     increment = 1,
-    currentValue = 30,
+    value = 30,
     suffix = "",
     callback = function(value)
         ESPEEDDASH = value
@@ -3394,7 +3422,7 @@ tab:CreateSlider({
     name = "Minimum Angle Required To Trigger",
     range = { 3, 70 },
     increment = 1,
-    currentValue = 8,
+    value = 8,
     suffix = "°",
     callback = function(value)
         ANGLEEDASH = value
@@ -3405,7 +3433,7 @@ tab:CreateSlider({
     name = "Range of Triggering",
     range = { 0, 5 },
     increment = 1,
-    currentValue = 2,
+    value = 2,
     suffix = "Studs",
     callback = function(value)
         EDASHSTUDS = value
@@ -3521,7 +3549,6 @@ do
 		hold = false,
 		onChanged = function(newKey) -- Use 'onChanged' to update the variable
 			currentKey = newKey
-			print("[QuickEmote] Keybind changed to:", newKey.Name)
 		end,
 	})
 
@@ -3533,7 +3560,6 @@ do
 		value = "1", -- Use 'value' for the default text
 		callback = function(text)
 			selectedSlotStr = tostring(text)
-			print("[QuickEmote] Input Slot set to:", selectedSlotStr)
 		end,
 	})
 
@@ -3620,12 +3646,14 @@ do
         spinAngle = 0
     end)
 
-    tab:CreateDivider({ text = "Player" })
+tab:CreateSection({ name = "Player" })
 
     tab:CreateToggle({
         name = "Character Spin",
 		icon = 105033161351299,
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "CharacterSpin_Toggle",
         callback = function(v)
             spinEnabled = v
@@ -3638,13 +3666,11 @@ do
         end,
     })
 
-_G.RWCallbacks["CharacterSpin"] = function(v) spinEnabled = v; if not v then spinAngle = 0; torsoRot = nil; baseC0 = nil; lastApplied = nil end end
-
     tab:CreateDropdown({
         name = "Rotation",
 		icon = 110016491347992,
         options = { "Clockwise", "Counterclockwise" },
-        currentOption = { "Clockwise" },
+        value = { "Clockwise" },
         multiSelect = false,
         callback = function(selected)
             local pick = type(selected) == "table" and selected[1] or selected
@@ -3658,7 +3684,7 @@ _G.RWCallbacks["CharacterSpin"] = function(v) spinEnabled = v; if not v then spi
         range = {0.1, 10},
         increment = 0.1,
         suffix = " RPS",
-        currentValue = 1,
+        value = 1,
         flag = "CharacterSpin_Slider",
         callback = function(v) spinRPS = v end,
     })
@@ -3777,7 +3803,7 @@ do
     tab:CreateToggle({
         name = "Player Rotation Changer",
 		icon = 99119903049132,
-        currentValue = false,
+        value = false,
         flag = "PlayerRotate_Toggle",
         callback = function(v)
             enabled = v
@@ -3785,15 +3811,13 @@ do
         end,
     })
 
-_G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else stopAll() end end
-
     tab:CreateSlider({
         name = "Pitch",
 		icon = 133687388764527,
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
-        currentValue = 0,
+        value = 0,
         flag = "PlayerRotate_Pitch",
         callback = function(v) pitch = v end,
     })
@@ -3804,7 +3828,7 @@ _G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
-        currentValue = 0,
+        value = 0,
         flag = "PlayerRotate_Yaw",
         callback = function(v) yaw = v end,
     })
@@ -3815,7 +3839,7 @@ _G.RWCallbacks["PlayerRotate"] = function(v) enabled = v; if v then start() else
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
-        currentValue = 0,
+        value = 0,
         flag = "PlayerRotate_Roll",
         callback = function(v) roll = v end,
     })
@@ -3876,13 +3900,13 @@ do
         flyRoot.CFrame = flyRoot.CFrame + horizontal + vertical
         flyRoot.AssemblyLinearVelocity = Vector3.zero
     end)
-
-    tab:CreateDivider({ text = "Fly" })
+    tab:CreateRightRow()
+    tab:CreateSection({ name = "Fly" })
 
     tab:CreateToggle({
         name = "Fly",
 		icon = 101627766519965,
-        currentValue = false,
+        value = false,
         flag = "Fly_Toggle",
         callback = function(v)
             flyEnabled = v
@@ -3892,15 +3916,13 @@ do
         end,
     })
 
-_G.RWCallbacks["Fly"] = function(v) flyEnabled = v; if flyHum then flyHum.WalkSpeed = v and 0 or 16 end end
-
     tab:CreateSlider({
         name = "Fly Speed",
 		icon = 79297485010070,
         range = {16.6, 500.5},
         increment = 0.1,
         suffix = " sps",
-        currentValue = 100,
+        value = 100,
         flag = "Fly_Slider",
         callback = function(v) flySpeed = v end,
     })
@@ -3955,7 +3977,7 @@ do
     tab:CreateToggle({
         name = "Down Fly",
 		icon = 109241289516213,
-        currentValue = false,
+        value = false,
         flag = "DownFly_Toggle",
         callback = function(v)
             downFlyEnabled = v
@@ -3965,55 +3987,16 @@ do
         end,
     })
 
-_G.RWCallbacks["DownFly"] = function(v) downFlyEnabled = v; if downFlyHum then downFlyHum.WalkSpeed = v and 0 or 16 end end
-
     tab:CreateSlider({
         name = "Down Fly Speed",
 		icon = 79297485010070,
         range = {16.6, 500.5},
         increment = 0.1,
         suffix = " sps",
-        currentValue = 50,
+        value = 50,
         flag = "DownFly_Slider",
         callback = function(v) downFlySpeed = v end,
     })
-end
-
---[[
-============================================================================
-LAG SWITCH
-============================================================================
-]]--
-
-do
-    local lagDuration = 1
-
-    local function triggerLag()
-        local start = tick()
-        while tick() - start < lagDuration do end
-    end
-
-    tab:CreateDivider({ text = "Trimping" })
-
-    tab:CreateButton({
-        name = "Lag Switch",
-		icon = 122975828478366,
-        callback = triggerLag,
-    })
-
-    tab:CreateSlider({
-        name = "Lag Duration",
-		icon = 136077598178846,
-        range = {0.1, 5},
-        increment = 0.1,
-        suffix = "s",
-        currentValue = 1,
-        flag = "LagSwitch_Slider",
-        callback = function(v) lagDuration = v end,
-    })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["LagSwitch"] = triggerLag
 end
 
 --[[
@@ -4028,7 +4011,7 @@ do
 
     -- EDIT THIS: script that runs after "Rejoin + Auto Load" teleports you
     local AUTO_LOAD_SCRIPT = [==[
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Auto%20join"))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/Main%20UI%20library/File.lua"))()
 ]==]
 
     local streakSaverEnabled = false
@@ -4073,7 +4056,7 @@ local function sendNotify()
 
     -- 1. Try Rayfield (Capitalized keys are required for Gen2)
     local success = pcall(function()
-        window:Notify(payload)
+        Library:Notify(payload)
     end)
 
     -- 2. If that fails (due to hook restrictions), use native Roblox notification
@@ -4129,7 +4112,7 @@ local function sendNotify()
         triggered = false
     end)
 
-    tab:CreateDivider({ text = "Streak" })
+tab:CreateSection({ name = "Streak" })
 
     tab:CreateToggle({
         name = "Auto Streak Saver",
@@ -4151,12 +4134,6 @@ local function sendNotify()
             if pick then streakMethod = pick end
         end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["StreakSaver"] = function(v)
-        streakSaverEnabled = v
-        if not v then triggered = false end
-    end
 end
 
 --[[
@@ -4222,7 +4199,7 @@ do
 
     tab:CreateToggle({
         name = "Turn Binds",
-        currentValue = false,
+        value = false,
         flag = "TurnBinds_Toggle",
         callback = function(v)
             bindEnabled = v
@@ -4238,7 +4215,7 @@ do
     tab:CreateDropdown({
         name = "Keys",
         options = { "A + D", "Arrow Keys", "F + H", "Q + E", "N + M", "1 + 2", "D + A", "Rev Arrow Keys" },
-        currentOption = { "A + D" },
+        value = { "A + D" },
         multiSelect = false,
         flag = "TurnBinds_Keys",
         callback = function(selected)
@@ -4254,7 +4231,7 @@ do
 
     tab:CreateToggle({
         name = "Mobile Turn Buttons",
-        currentValue = false,
+        value = false,
         flag = "TurnBinds_Mobile_Toggle",
         callback = function(v)
             if v then
@@ -4266,12 +4243,12 @@ do
             end
         end,
     })
-
+	
     tab:CreateSlider({
         name = "Speed",
         range = {1, 10},
         increment = 1,
-        currentValue = 5,
+        value = 5,
         flag = "TurnBinds_Speed",
         callback = function(v)
             getgenv().KTB = v
@@ -4317,7 +4294,9 @@ do
 
     tab:CreateToggle({
         name = "Auto Strafe",
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "AutoStrafe_Toggle",
         callback = function(v)
             autoStrafeEnabled = v
@@ -4329,21 +4308,11 @@ do
         end,
     })
 
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["AutoStrafe"] = function(v)
-        autoStrafeEnabled = v
-        if v then
-            runURL(ON_URL)
-        else
-            runURL(OFF_URL)
-        end
-    end
-
     tab:CreateSlider({
         name = "Speed",
         range = {1, 10},
         increment = 1,
-        currentValue = 5,
+        value = 5,
         flag = "AutoStrafe_Speed",
         callback = function(v)
             getgenv().KAS = v
@@ -4355,7 +4324,7 @@ do
         name = "Joystick Deadzone",
         range = {0, 1},
         increment = 0.1,
-        currentValue = 0.1,
+        value = 0.1,
         flag = "Joystickdz_as",
         callback = function(v)
             getgenv().JSDZ = v
@@ -4366,7 +4335,7 @@ do
 tab:CreateToggle({
     name = "Only Trigger In Air",
     flag = "OIAAS_AS",
-    currentValue = false,
+    value = false,
     callback = function(value)
 		getgenv().OIAAS = value
 		_G.OIAAS = value
@@ -4379,6 +4348,8 @@ end
 Cam offset changer
 ===========================
 ]]--
+
+tab:CreateLeftRow()
 
 do
     local enabled = false
@@ -4419,11 +4390,11 @@ do
         -- Camera auto-reverts next frame because the game overwrites cam.CFrame itself
     end
 
-    tab:CreateDivider({ Camara })
+    tab:CreateSection({ name = "Camara" })
 
     tab:CreateToggle({
         name = "Camera Offset Changer",
-        currentValue = false,
+        value = false,
         flag = "CamOffset_Toggle",
         callback = function(v)
             enabled = v
@@ -4436,7 +4407,7 @@ do
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
-        currentValue = 0,
+        value = 0,
         flag = "CamOffset_Pitch",
         callback = function(v) pitch = v end,
     })
@@ -4446,7 +4417,7 @@ do
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
-        currentValue = 0,
+        value = 0,
         flag = "CamOffset_Yaw",
         callback = function(v) yaw = v end,
     })
@@ -4456,16 +4427,10 @@ do
         range = {0, 359.9},
         increment = 0.1,
         suffix = "°",
-        currentValue = 0,
+        value = 0,
         flag = "CamOffset_Roll",
         callback = function(v) roll = v end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["CamOffset"] = function(v)
-        enabled = v
-        if v then start() else stop() end
-    end
 end
 
 -- pos
@@ -4509,7 +4474,7 @@ do
 
     tab:CreateToggle({
         name = "Camera Position Changer",
-        currentValue = false,
+        value = false,
         flag = "CamPos_Toggle",
         callback = function(v)
             enabled = v
@@ -4522,7 +4487,7 @@ do
         range = {-100, 100},
         increment = 0.1,
         suffix = "ms",
-        currentValue = 0,
+        value = 0,
         flag = "CamPos_X",
         callback = function(v) offsetX = v end,
     })
@@ -4532,7 +4497,7 @@ do
         range = {-100, 100},
         increment = 0.1,
         suffix = "ms",
-        currentValue = 0,
+        value = 0,
         flag = "CamPos_Y",
         callback = function(v) offsetY = v end,
     })
@@ -4542,16 +4507,10 @@ do
         range = {-100, 100},
         increment = 0.1,
         suffix = "ms",
-        currentValue = 0,
+        value = 0,
         flag = "CamPos_Z",
         callback = function(v) offsetZ = v end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["CamPos"] = function(v)
-        enabled = v
-        if v then start() else stop() end
-    end
 end
 
 --[[
@@ -4655,11 +4614,12 @@ do
 		end
 	end
 
-	-- UI Elements
-	tab:CreateDivider({ text = "Special Rounds" })
-
+tab:CreateSection({ name = "Special Rounds" })
+	
 	tab:CreateToggle({
 		name = "Disable Special Round Effects",
+		haveMB = true,
+		haveKeybinds = true,
 		value = false,
 		callback = function(v)
 			roundEnabled = v
@@ -4670,7 +4630,6 @@ do
 	tab:CreateDropdown({
 		name = "Special Rounds",
 		options = { "Speed", "No Jumping", "Moon Jump", "Fog", "Darkness" },
-		default = {},
 		multiSelect = true,
 		callback = function(selected)
 			selectedRounds = {}
@@ -4730,14 +4689,14 @@ do
         end)
     end
 
-    tab:CreateDivider({ text = "Gameplay" })
+tab:CreateSection({ name = "Gameplay" })
 
     tab:CreateSlider({
         name = "Lobby Music",
         range = {0, 100},
         increment = 1,
         suffix = "v",
-        currentValue = 100,
+        value = 100,
         flag = "Setting_LobbyMusic",
         callback = function(v) setSetting("LobbyMusicVolume", v) end,
     })
@@ -4747,7 +4706,7 @@ do
         range = {0, 100},
         increment = 1,
         suffix = "v",
-        currentValue = 100,
+        value = 100,
         flag = "Setting_GameMusic",
         callback = function(v) setSetting("GameMusicVolume", v) end,
     })
@@ -4757,7 +4716,7 @@ do
         range = {0, 100},
         increment = 1,
         suffix = "v",
-        currentValue = 100,
+        value = 100,
         flag = "Setting_NextbotVolume",
         callback = function(v) setSetting("NextbotVolume", v) end,
     })
@@ -4767,7 +4726,7 @@ do
         range = {0, 100},
         increment = 1,
         suffix = "v",
-        currentValue = 100,
+        value = 100,
         flag = "Setting_EmoteVolume",
         callback = function(v) setSetting("EmoteVolume", v) end,
     })
@@ -4777,7 +4736,7 @@ do
         range = {0, 100},
         increment = 1,
         suffix = "v",
-        currentValue = 100,
+        value = 100,
         flag = "Setting_CarryVolume",
         callback = function(v) setSetting("CarryVolume", v) end,
     })
@@ -4787,42 +4746,44 @@ do
         range = {0, 100},
         increment = 1,
         suffix = "v",
-        currentValue = 100,
+        value = 100,
         flag = "Setting_InterfaceVolume",
         callback = function(v) setSetting("InterfaceVolume", v) end,
     })
 
     tab:CreateToggle({
         name = "Viewbob",
-        currentValue = DEFAULT_VIEWBOB,
+        value = DEFAULT_VIEWBOB,
         flag = "Setting_Viewbob",
         callback = function(v) setSetting("Viewbob", v) end,
     })
 
     tab:CreateToggle({
         name = "Sprint Viewmodel",
-        currentValue = DEFAULT_SPRINT_VIEWMODEL,
+        value = DEFAULT_SPRINT_VIEWMODEL,
         flag = "Setting_SprintViewmodel",
         callback = function(v) setSetting("SprintViewmodel", v) end,
     })
 
     tab:CreateToggle({
         name = "Legacy Camera",
-        currentValue = DEFAULT_LEGACY_CAMERA,
+        value = DEFAULT_LEGACY_CAMERA,
         flag = "Setting_LegacyCamera",
         callback = function(v) setSetting("LegacyCamera", v) end,
     })
 
     tab:CreateToggle({
         name = "POV Scroll",
-        currentValue = DEFAULT_POV_SCROLL,
+        value = DEFAULT_POV_SCROLL,
         flag = "Setting_POVScroll",
         callback = function(v) setSetting("POVScroll", v) end,
     })
 
     tab:CreateToggle({
         name = "Mute Boomboxs",
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "Setting_MuteBoomboxs",
         callback = function(v)
             if v then
@@ -4854,7 +4815,7 @@ do
 
     tab:CreateToggle({
         name = "FPS Unlocker",
-        currentValue = false,
+        value = false,
         flag = "FPSUnlocker_Toggle",
         callback = function(v)
             fpsUnlockerEnabled = v
@@ -4878,4 +4839,3 @@ do
         end,
     })
 end
-]]--
