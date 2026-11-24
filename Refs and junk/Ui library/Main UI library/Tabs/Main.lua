@@ -156,15 +156,15 @@ tab:CreateToggle({
     callback = function(v)
         autoJumpEnabled = v
 			if v then
-				AJRP:Show
-				AJOTOLD:Show
-				AJOTOM:Show
-				AJOTOMS:Show
+				AJRP:Show()
+				AJOTOLD:Show()
+				AJOTOM:Show()
+				AJOTOMS:Show()
 			else	
-				AJRP:Hide
-				AJOTOLD:Hide
-				AJOTOM:Hide
-				AJOTOMS:Hide
+				AJRP:Hide()
+				AJOTOLD:Hide()
+				AJOTOM:Hide()
+				AJOTOMS:Hide()
 		end
 	end,
 })
@@ -212,10 +212,10 @@ local AJOTOMS = tab:CreateSlider({
     end,
 })
 	
-AJRP:Hide
-AJOTOLD:Hide	
-AJOTOM:Hide
-AJOTOMS:Hide
+AJRP:Hide()
+AJOTOLD:Hide()	
+AJOTOM:Hide()
+AJOTOMS:Hide()
 
 --[[
 ============================================================================
