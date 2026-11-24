@@ -5807,21 +5807,9 @@ end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/Main%20UI%20library/Test"))()
 
--- ex
-
-local ExTab = window:CreateTab({ name = "Extra", icon = 108740503011398 })
-
--- play
-
-local PlyrTab = window:CreateTab({ name = "Player", icon = 98364829449527 })
-
 -- tas
 
 local TasTab = window:CreateTab({ name = "TAS", icon = 106970371098897 })
-
--- af
-
-local AfTab = window:CreateTab({ name = "Auto Farm", icon = 96086831296475 })
 
 -- atmo
 
