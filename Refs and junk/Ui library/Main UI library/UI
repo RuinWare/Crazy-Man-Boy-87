@@ -2909,7 +2909,7 @@ local Library = (function()
 			local text = tostring(cfg.text or "")
 			local frame = U.make("Frame", {
 				Name = "Divider",
-				Size = UDim2.new(1, 0, 0, 22),
+				Size = UDim2.new(1, 0, 0, 11),
 				BackgroundTransparency = 1,
 			}, row._frame)
 			local left = U.make("Frame", { BackgroundColor3 = T.line, BorderSizePixel = 0 }, frame)
@@ -2917,7 +2917,7 @@ local Library = (function()
 			local label = U.label(frame, {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(10, 16),
+				Size = UDim2.fromOffset(10, 11),
 				Text = text,
 				TextSize = 10,
 				TextColor3 = T.sub,
@@ -2938,7 +2938,7 @@ local Library = (function()
 				right.Visible = true
 				local width = frame.AbsoluteSize.X
 				local textWidth = label.TextBounds.X
-				label.Size = UDim2.fromOffset(textWidth + 4, 16)
+				label.Size = UDim2.fromOffset(textWidth + 4, 11)
 				local side = math.max(0, (width - 24 - textWidth - 20) / 2)
 				left.AnchorPoint = Vector2.new(0, 0.5)
 				left.Position = UDim2.new(0, 12, 0.5, 0)
@@ -2951,8 +2951,9 @@ local Library = (function()
 			label:GetPropertyChangedSignal("TextBounds"):Connect(layout)
 			layout()
 
-			row:_add({ kind = "divider", frame = frame })
-			return {}
+			local item = { kind = "divider", frame = frame }
+			row:_add(item)
+			return row:_handle(item)
 		end
 
 		----------------------------------------------------------------
@@ -2988,8 +2989,9 @@ local Library = (function()
 				TextColor3 = T.sub,
 			})
 			row._lastSection = name
-			row:_add({ kind = "section", frame = frame })
-			return {}
+			local item = { kind = "section", frame = frame }
+			row:_add(item)
+			return row:_handle(item)
 		end
 	end
 
@@ -3038,7 +3040,16 @@ local Library = (function()
 		end
 
 		function Row:_layout()
-			local items = self._items
+			-- items that finished hiding sit out of the boxes (parked on the row, invisible)
+			local items = {}
+			for _, item in ipairs(self._items) do
+				if item.gone then
+					item.frame.Parent = self._frame
+					item.frame.LayoutOrder = 0
+				else
+					items[#items + 1] = item
+				end
+			end
 			local count = #items
 			local blocks = {}
 
@@ -3091,18 +3102,92 @@ local Library = (function()
 					card.LayoutOrder = order
 					for index, item in ipairs(block.items) do
 						item.frame.Parent = card
-						item.frame.LayoutOrder = index
-						local following = block.items[index + 1]
-						if item.sep then
-							item.sep.Visible = following ~= nil and following.kind == "component" and item.kind == "component"
-						end
-					end
+						item.frame.LayoutOrder = index					end
 				end
 			end
 			for k = cardIndex + 1, #self._cards do
 				self._cards[k]:Destroy()
 				self._cards[k] = nil
 			end
+		end
+
+		-- What every Create... call returns: handle:Hide() collapses the component away, handle:Show() brings it back.
+		-- (a soft cover fades over it while it folds, and the box around it closes up)
+		function Row:_handle(item, el)
+			local row = self
+			local hidden = false
+			local token = 0
+			local handle = {}
+
+			local function cover()
+				local c = item.frame:FindFirstChild("Cover")
+				if not c then
+					c = U.make("Frame", {
+						Name = "Cover",
+						Position = UDim2.fromOffset(4, 2),
+						Size = UDim2.new(1, -8, 1, -4),
+						BackgroundTransparency = 1,
+						BorderSizePixel = 0,
+						ZIndex = 50,
+					}, item.frame)
+					U.corner(c, 6)
+				end
+				c.BackgroundColor3 = item.frame.Parent == row._frame and T.panel or T.card
+				return c
+			end
+
+			function handle:Hide()
+				if hidden then return end
+				hidden = true
+				token += 1
+				local mine = token
+				local frame = item.frame
+				if el then
+					el._hidden = true
+					if el._window._menu then el._window._menu.close() end
+				end
+				if not item._busy then item.height = frame.Size.Y.Offset end
+				item._busy = true
+				if item._clip == nil then item._clip = frame.ClipsDescendants end
+				frame.ClipsDescendants = true
+				local c = cover()
+				c.Visible = true
+				U.tween(c, 0.25, { BackgroundTransparency = 0 })
+				U.tween(frame, 0.35, { Size = UDim2.new(1, 0, 0, 0) })
+				task.delay(0.5, function()
+					if token ~= mine or not frame.Parent then return end
+					item._busy = false
+					frame.Visible = false
+					item.gone = true
+					row:_queueLayout()
+				end)
+			end
+
+			function handle:Show()
+				if not hidden then return end
+				hidden = false
+				token += 1
+				local mine = token
+				local frame = item.frame
+				if el then el._hidden = false end
+				item._busy = true
+				item.gone = false
+				frame.Visible = true
+				row:_layout() -- back into its box right away
+				local c = cover()
+				c.Visible = true
+				U.tween(frame, 0.35, { Size = UDim2.new(1, 0, 0, item.height or C.ROW_H) })
+				U.tween(c, 0.3, { BackgroundTransparency = 1 })
+				task.delay(0.5, function()
+					if token ~= mine or not frame.Parent then return end
+					item._busy = false
+					c.Visible = false
+					if item._clip ~= nil then frame.ClipsDescendants = item._clip end
+					item._clip = nil
+				end)
+			end
+
+			return handle
 		end
 
 		function Row:CreateSection(cfg) return E.section(self, cfg or {}) end
@@ -3312,12 +3397,13 @@ local Library = (function()
 		if el._serialize then
 			if cfg.default ~= nil then el._default = cfg.default else el._default = el:_serialize() end
 		end
-		row:_add({ kind = "component", frame = frame, sep = sep, el = el })
+		local item = { kind = "component", frame = frame, sep = sep, el = el }
+		row:_add(item)
 		self._search[#self._search + 1] = { el = el, tab = tab, section = row._lastSection or "" }
 
 		if el._internal then
 			if cfg.setting then self._settingEls[#self._settingEls + 1] = el end
-			return {}
+			return row:_handle(item, el)
 		end
 
 		self._all[el.flag] = el
@@ -3331,7 +3417,7 @@ local Library = (function()
 			local extras = self._store.last.extras[el.flag]
 			if type(extras) == "table" then self:_applyExtras(el, extras) end
 		end
-		return {}
+		return row:_handle(item, el)
 	end
 
 	-- applies saved data to a component and runs its callback (on the next frame, so your script has finished)
@@ -4170,7 +4256,7 @@ local Library = (function()
 
 			local count = 0
 			for _, entry in ipairs(self._search) do
-				if entry.el.name:lower():find(text, 1, true) then
+				if not entry.el._hidden and entry.el.name:lower():find(text, 1, true) then
 					count += 1
 					local result = U.button(card, { LayoutOrder = count, Size = UDim2.new(1, 0, 0, 34), ZIndex = 1 })
 					U.label(result, {
@@ -4536,6 +4622,172 @@ local Library = (function()
 		N.toast(props)
 	end
 
-                 	return Library
-               end)()
-return Library
+	return Library
+end)()
+
+----------------------------------------------------------------
+-- TEST
+-- Put your own asset ids in the icon fields (0 = no icon)
+----------------------------------------------------------------
+local window = Library:CreateWindow({
+	name = "Example",
+	subtitle = "Window",
+	icon = 0, -- the logo next to the title (0 = none, and the title moves left)
+})
+
+local main = window:CreateTab({ title = "Main", icon = 0 })
+
+main:CreateLeftRow()
+main:CreateSection({ name = "Toggles", icon = 0 })
+local Toggle = main:CreateToggle({
+	name = "Toggle",
+	haveKeybinds = true,
+	haveMB = true,
+	flag = "ToggleFlag",
+	value = false,
+	callback = function(v)
+		print("Toggle:", v)
+	end,
+})
+main:CreateToggle({
+	name = "Only keybinds",
+	haveKeybinds = true,
+	haveMB = false,
+	flag = "KeybindsOnlyFlag",
+	value = false,
+	callback = function(v)
+		print("Only keybinds:", v)
+	end,
+})
+main:CreateToggle({
+	name = "No 3 dots",
+	flag = "PlainFlag",
+	value = true,
+	callback = function(v)
+		print("No 3 dots:", v)
+	end,
+})
+main:CreateDivider({ text = "a divider between two components stays in the box" })
+main:CreateButton({
+	name = "Button",
+	haveKeybinds = true,
+	haveMB = true,
+	flag = "ButtonFlag",
+	callback = function()
+		print("button clicked")
+	end,
+})
+
+main:CreateSection({ name = "Values" })
+main:CreateSlider({
+	name = "Slider",
+	range = { 0, 120 },
+	increment = 0.01,
+	flag = "SliderFlag",
+	value = 10,
+	callback = function(value)
+		print("Slider:", value)
+	end,
+})
+main:CreateDropdown({
+	name = "DropDown",
+	multiSelect = false,
+	options = { "option 1", "option 2", "option 3" },
+	flag = "DropDownFlag",
+	value = "option 1",
+	callback = function(selected)
+		print("Dropdown:", selected)
+	end,
+})
+main:CreateDropdown({
+	name = "Multi Select",
+	multiSelect = true,
+	options = { "one", "two", "three", "four" },
+	flag = "MultiFlag",
+	value = { "two" },
+	callback = function(selected)
+		print("Multi:", table.concat(selected, ", "))
+	end,
+})
+main:CreateInput({
+	name = "Input",
+	value = "16",
+	placeholder = "Enter a number",
+	flag = "InputFlag",
+	callback = function(text)
+		print("Committed:", text)
+	end,
+})
+
+main:CreateRightRow()
+main:CreateSection({ name = "More components" })
+main:CreateKeybind({
+	name = "Keybind",
+	value = Enum.KeyCode.LeftShift,
+	flag = "KeybindFlag",
+	callback = function(key)
+		print("Pressed", key)
+	end,
+})
+main:CreateColorPicker({
+	name = "Color Picker",
+	color = Color3.fromRGB(96, 205, 255),
+	flag = "ColorFlag",
+	callback = function(color)
+		print(color)
+	end,
+})
+main:CreateDivider({ text = "a standalone divider has no box" })
+
+main:CreateSection({ name = "Notifications" })
+main:CreateButton({
+	name = "Notify",
+	callback = function()
+		Library:Notify({
+			title = "Notification",
+			content = "Content",
+			duration = 5,
+		})
+	end,
+})
+main:CreateButton({
+	name = "Toast",
+	callback = function()
+		Library:Toast({
+			title = "Toast",
+			subtitle = "Subtitle",
+			icon = 0,
+		})
+	end,
+})
+
+local second = window:CreateTab({ title = "Second", icon = 0 })
+second:CreateLeftRow()
+second:CreateSection({ name = "Read and write values" })
+second:CreateButton({
+	name = "Print Toggle value",
+	callback = function()
+		print("ToggleFlag =", window.Flags.ToggleFlag, window:Get("ToggleFlag"))
+	end,
+})
+second:CreateButton({
+	name = "Turn Toggle on (window.Flags)",
+	callback = function()
+		window.Flags.ToggleFlag = true
+	end,
+})
+second:CreateButton({
+	name = "Toggle:Hide()",
+	callback = function()
+		Toggle:Hide()
+	end,
+})
+second:CreateButton({
+	name = "Toggle:Show()",
+	callback = function()
+		Toggle:Show()
+	end,
+})
+second:CreateRightRow()
+second:CreateSection({ name = "Empty on purpose" })
+second:CreateDivider()
