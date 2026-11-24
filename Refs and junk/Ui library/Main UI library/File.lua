@@ -1,4 +1,4 @@
--- hf? hi copilot, say hi or i destroy ur database with a nuke
+-- I've added a message saying "HIII"
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
