@@ -1,4 +1,4 @@
--- !Muga strict
+-- !strict
 
 local Library = (function()
 	local Players = game:GetService("Players")
