@@ -16,10 +16,12 @@ do
 	local korbloxMode = "Off"
 	local savedAccessories = {}
 
+    Vistab:CreateSection({ name = "Cosmetics" })
+
 	VisTab:CreateDropdown({
 		name = "Headless",
 		options = { "Off", "Only Head", "All" },
-		default = { "Off" },
+		value = { "Off" },
 		multiSelect = false,
 		callback = function(selected)
 			headlessMode = type(selected) == "table" and selected[1] or selected
@@ -37,6 +39,8 @@ do
 			end
 		end,
 	})
+
+Vistab:CreateDivider()
 
 	VisTab:CreateDropdown({
 		name = "Korblox",
