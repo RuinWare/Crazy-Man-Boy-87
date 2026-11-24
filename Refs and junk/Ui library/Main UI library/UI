@@ -1,19 +1,3 @@
--- Library (the main UI)
---
--- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
--- search, a Settings tab that is always there, notifications and toasts.
---
--- The first part is the library body (it only declares things, nothing is built until CreateWindow is called).
--- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
--- file and end it with `return Library`.
---
--- Handles: every Create... call returns an empty handle. Read and write values through the window:
---   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
---   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
-
-----------------------------------------------------------------
--- LIBRARY BODY
-----------------------------------------------------------------
 local Library = (function()
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
@@ -49,8 +33,8 @@ local Library = (function()
 		SCREEN_MARGIN = 6,
 		-- drag bar + resize corner (same as the mobile buttons)
 		BAR_DISTANCE = 5,
-		BAR_SIZE = Vector2.new(51, 3),
-		BAR_SIZE_ACTIVE = Vector2.new(61, 4),
+		BAR_SIZE = Vector2.new(130, 3),
+		BAR_SIZE_ACTIVE = Vector2.new(142, 4),
 		BAR_HIT = Vector2.new(72, 22),
 		DRAG_FOLLOW_SPEED = 9,
 		RESIZE_FOLLOW_SPEED = 26,
