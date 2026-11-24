@@ -1562,7 +1562,7 @@ tab:CreateToggle({
     icon = 116414714090955,
     value = false,
 	haveMB = true,
-	haveKeybinds = true
+	haveKeybinds = true,
     flag = "LegitBounce_Toggle",
     callback = function(value)
         legitBounceEnabled = value
@@ -2004,7 +2004,7 @@ end
 		icon = 76201258239230,
         value = false,
 		haveMB = true,
-		haveKeybinds = true
+		haveKeybinds = true,
         flag = "PixelSurf_Toggle",
         callback = function(v)
             pixelSurfEnabled = v
