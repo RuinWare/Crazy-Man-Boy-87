@@ -5146,7 +5146,7 @@ Cam offset changer
 ===========================
 ]]--
 
-tab:CreateLeftRow()
+tab:CreateRightRow()
 
 do
     local enabled = false
@@ -5453,6 +5453,8 @@ end
 GAMEPLAY
 ===========================
 ]]--
+
+tab:CreateLeftRow()
 
 do
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
