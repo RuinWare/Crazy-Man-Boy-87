@@ -1356,6 +1356,8 @@ do
         anchorPart.CFrame = anchorPart.CFrame + dir * speed * dt
     end)
 
+    tab:CreateLeftRow()
+	
 	tab:CreateSection({ name = "Advanced" })
 
     tab:CreateToggle({
@@ -1380,15 +1382,6 @@ do
         flag = "DownedDash_Slider",
         callback = function(v) downedDashSpeed = v end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["DownedDash"] = function(v)
-        downedDashEnabled = v
-        if not v then
-            downedDashActive = false
-            cleanup()
-        end
-    end
 end
 
 --[[
@@ -1485,8 +1478,10 @@ tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Easy Edge Trimp",
-        currentValue = false,
+        value = false,
         flag = "EdgeTrimp_Toggle",
+		haveMB = true,
+		haveKeybinds = true,
         callback = function(value) 
            edgeTrimpEnabled = value
        end,
@@ -1497,7 +1492,7 @@ tab:CreateDivider()
         range = {10, 500},
         increment = 1,
         suffix = "",
-        currentValue = 100,
+        value = 100,
         flag = "EdgeTrimp_Power",
         callback = function(v) edgeTrimpPower = v end,
     })
@@ -1568,7 +1563,9 @@ tab:CreateDivider()
 
     tab:CreateToggle({
         name = "Super Jump",
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "SuperJump_Toggle",
         callback = function(v)
            superJumpEnabled = v
@@ -1581,7 +1578,7 @@ tab:CreateDivider()
         range = {10, 500},
         increment = 1,
         suffix = "",
-        currentValue = 100,
+        value = 100,
         flag = "SuperJump_YVelocity",
         callback = function(v) superJumpYVelocity = v end,
     })
@@ -1591,7 +1588,7 @@ tab:CreateDivider()
         range = {0, 500},
         increment = 1,
         suffix = "",
-        currentValue = 50,
+        value = 50,
         flag = "SuperJump_XVelocity",
         callback = function(v) superJumpXVelocity = v end,
     })
@@ -1654,25 +1651,23 @@ do
         end
     end)
 
-    tab:CreateDivider()
+    tab:CreateSection({ name = "Pushing" })
 
     tab:CreateToggle({
         name = "Frontal Jump",
         icon = 89569262948298,
-        currentValue = false,
+        value = false,
         flag = "FrontalJump_Toggle",
         callback = function(v)
             frontalEnabled = v
             if fHum then fHum.WalkSpeed = v and 0 or 16 end
         end,
     })
-
-_G.RWCallbacks["FrontalJump"] = function(v) frontalEnabled = v; if fHum then fHum.WalkSpeed = v and 0 or 16 end end
 	
     tab:CreateToggle({
         name = "Frontal Jump Ramp Protection",
         icon = 111308594268728,
-        currentValue = false,
+        value = false,
         flag = "FrontalJump_Ramp_Toggle",
         callback = function(v) frontalRamp = v end,
     })
@@ -1683,7 +1678,7 @@ _G.RWCallbacks["FrontalJump"] = function(v) frontalEnabled = v; if fHum then fHu
         range = {33.3, 555.5},
         increment = 0.1,
         suffix = "",
-        currentValue = 55.5,
+        value = 55.5,
         flag = "FrontalJump_Slider",
         callback = function(v) frontalSlider = v end,
     })
