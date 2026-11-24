@@ -1,4 +1,4 @@
--- \ RAW.ADD.raw.github/update/refresh/raw
+-- \ RAW.ADD.raw.github/update/refresh/raw/cmd.refresh.raw.file
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
