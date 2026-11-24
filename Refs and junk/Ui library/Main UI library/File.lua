@@ -942,8 +942,6 @@ RunService.PreSimulation:Connect(function()
     tryJump(hum, root)
 end)
 
-getgenv().AJRP, AJOTOLD, AJOTOM, AJOTOMS
-
 tab:CreateToggle({
     name = "Auto Jump",
     icon = 109475752270721,
