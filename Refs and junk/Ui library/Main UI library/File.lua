@@ -781,8 +781,7 @@ tab:CreateSection({ name = "Cosmetics", icon = 85228918424110 })
 end
 
 -- window
-
-local window = Library:CreateWindow({
+getgenv().window = Library:CreateWindow({
     name = "RuinWare Client",
     icon = 98691154054966,
     subtitle = "Evade",
