@@ -1,5 +1,3 @@
--- test
-
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
@@ -793,18 +791,6 @@ local window = Library:CreateWindow({
 -- tabs
 -- main
 local tab = window:CreateTab({ name = "Main", icon = 83935746771599 })
-
-tab:CreateLeftRow()
-
-tab:CreateSection({ name = "Movement" })
-
-tab:CreateRightRow()
-
-tab:CreateSection({ name = "Movemesmwjdwjdnt" })
-
-tab:CreateLeftRow()
-
-tab:CreateSection({ name = "Movement test" })
 
 -- vis
 
