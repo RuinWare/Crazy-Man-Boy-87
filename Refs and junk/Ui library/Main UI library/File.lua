@@ -52,7 +52,7 @@ local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","RelicEmotesVaulted","Emotes"},
 }
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/Main%20UI%20library/UI"))()
+getgenv().Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/Main%20UI%20library/UI"))()
 
 -- Logic cos
 
