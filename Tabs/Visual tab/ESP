@@ -555,7 +555,9 @@ do
 
     VisTab:CreateToggle({
         name = "ESP",
-        currentValue = false,
+        value = false,
+        haveMB = true,
+        haveKeybinds = true,
         flag = "ESP_Toggle",
         callback = function(v) espEnabled = v end,
     })
@@ -598,24 +600,24 @@ do
         end,
     })
 
-    VisTab:CreateSlider({ name = "Box Size", range = {0.5, 2.0}, increment = 0.05, suffix = "x", currentValue = 1, flag = "ESP_BoxSize", callback = function(v) boxSize = v end })
+    VisTab:CreateSlider({ name = "Box Size", range = {0.5, 2.0}, increment = 0.05, suffix = "x", value = 1, flag = "ESP_BoxSize", callback = function(v) boxSize = v end })
     VisTab:CreateDropdown({ name = "Box Type", options = { "Full", "Corners" }, currentOption = { "Full" }, multiSelect = false, flag = "ESP_BoxType", callback = function(sel) local p = type(sel) == "table" and sel[1] or sel; if p then boxType = p end end })
     VisTab:CreateColorPicker({ name = "Box Outline Color", color = Color3.fromRGB(255, 255, 255), flag = "ESP_BoxColor", callback = function(c) boxOutlineColor = c end })
-    VisTab:CreateToggle({ name = "Fill Box", currentValue = false, flag = "ESP_FillBox", callback = function(v) fillBox = v end })
+    VisTab:CreateToggle({ name = "Fill Box", value = false, flag = "ESP_FillBox", callback = function(v) fillBox = v end })
     VisTab:CreateColorPicker({ name = "Fill Color", color = Color3.fromRGB(255, 255, 255), flag = "ESP_FillColor", callback = function(c) fillColor = c end })
     VisTab:CreateInput({ name = "Box Fill Asset ID (Optional)", placeholder = "e.g. 1234", flag = "ESP_FillAsset", callback = function(text) fillAssetId = text or "" end })
-    VisTab:CreateSlider({ name = "Box Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_BoxTransparency", callback = function(v) boxTransparency = v end })
-    VisTab:CreateSlider({ name = "Box Fill Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0.5, flag = "ESP_BoxFillTransparency", callback = function(v) boxFillTransparency = v end })
+    VisTab:CreateSlider({ name = "Box Transparency", range = {0, 1}, increment = 0.01, suffix = "", value = 0, flag = "ESP_BoxTransparency", callback = function(v) boxTransparency = v end })
+    VisTab:CreateSlider({ name = "Box Fill Transparency", range = {0, 1}, increment = 0.01, suffix = "", value = 0.5, flag = "ESP_BoxFillTransparency", callback = function(v) boxFillTransparency = v end })
     VisTab:CreateColorPicker({ name = "Chams Color", color = Color3.fromRGB(255, 0, 0), flag = "ESP_ChamsColor", callback = function(c) chamsColor = c end })
-    VisTab:CreateSlider({ name = "Chams Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0.5, flag = "ESP_ChamsTransparency", callback = function(v) chamsTransparency = v end })
+    VisTab:CreateSlider({ name = "Chams Transparency", range = {0, 1}, increment = 0.01, suffix = "", value = 0.5, flag = "ESP_ChamsTransparency", callback = function(v) chamsTransparency = v end })
     VisTab:CreateColorPicker({ name = "Name Color Players", color = Color3.fromRGB(255, 255, 255), flag = "ESP_NameColorPlayers", callback = function(c) nameColorPlayers = c end })
     VisTab:CreateColorPicker({ name = "Name Color Nextbots", color = Color3.fromRGB(255, 100, 100), flag = "ESP_NameColorNextbots", callback = function(c) nameColorNextbots = c end })
-    VisTab:CreateSlider({ name = "Name Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_NameTransparency", callback = function(v) nameTransparency = v end })
+    VisTab:CreateSlider({ name = "Name Transparency", range = {0, 1}, increment = 0.01, suffix = "", value = 0, flag = "ESP_NameTransparency", callback = function(v) nameTransparency = v end })
     VisTab:CreateColorPicker({ name = "Distance Color Players", color = Color3.fromRGB(200, 200, 200), flag = "ESP_DistColorPlayers", callback = function(c) distanceColorPlayers = c end })
     VisTab:CreateColorPicker({ name = "Distance Color Nextbots", color = Color3.fromRGB(255, 150, 150), flag = "ESP_DistColorNextbots", callback = function(c) distanceColorNextbots = c end })
-    VisTab:CreateSlider({ name = "Distance Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_DistTransparency", callback = function(v) distanceTransparency = v end })
+    VisTab:CreateSlider({ name = "Distance Transparency", range = {0, 1}, increment = 0.01, suffix = "", value = 0, flag = "ESP_DistTransparency", callback = function(v) distanceTransparency = v end })
     VisTab:CreateColorPicker({ name = "Tracers Color Players", color = Color3.fromRGB(255, 255, 255), flag = "ESP_TracerColorPlayers", callback = function(c) tracerColorPlayers = c end })
     VisTab:CreateColorPicker({ name = "Tracers Color Nextbots", color = Color3.fromRGB(255, 100, 100), flag = "ESP_TracerColorNextbots", callback = function(c) tracerColorNextbots = c end })
     VisTab:CreateDropdown({ name = "Tracers Part:", options = { "Bottom", "Center", "Top" }, currentOption = { "Bottom" }, multiSelect = false, flag = "ESP_TracerPart", callback = function(sel) local p = type(sel) == "table" and sel[1] or sel; if p then tracerPart = p end end })
-    VisTab:CreateSlider({ name = "Tracers Transparency", range = {0, 1}, increment = 0.01, suffix = "", currentValue = 0, flag = "ESP_TracerTransparency", callback = function(v) tracerTransparency = v end })
+    VisTab:CreateSlider({ name = "Tracers Transparency", range = {0, 1}, increment = 0.01, suffix = "", value = 0, flag = "ESP_TracerTransparency", callback = function(v) tracerTransparency = v end })
 end
