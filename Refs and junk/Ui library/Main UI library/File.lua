@@ -5644,6 +5644,8 @@ end
 
 local VisTab = window:CreateTab({ name = "Visuals", icon = 126802044806598 })
 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Korbloxandheadless"))()
+
 -- ex
 
 local ExTab = window:CreateTab({ name = "Extra", icon = 108740503011398 })
