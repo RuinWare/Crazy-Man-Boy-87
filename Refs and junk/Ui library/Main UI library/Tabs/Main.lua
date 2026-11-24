@@ -1660,6 +1660,8 @@ do
         name = "Frontal Jump",
         icon = 89569262948298,
         value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "FrontalJump_Toggle",
         callback = function(v)
             frontalEnabled = v
@@ -1751,20 +1753,20 @@ do
     tab:CreateToggle({
         name = "Backward Jump",
         icon = 89569262948298,
-        currentValue = false,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "BackwardJump_Toggle",
         callback = function(v)
             backwardEnabled = v
             if bHum then bHum.WalkSpeed = v and 0 or 16 end
         end,
     })
-
-_G.RWCallbacks["BackwardJump"] = function(v) backwardEnabled = v; if bHum then bHum.WalkSpeed = v and 0 or 16 end end
 	
     tab:CreateToggle({
         name = "Backward Jump Ramp Protection",
         icon = 111308594268728,
-        currentValue = false,
+        value = false,
         flag = "BackwardJump_Ramp_Toggle",
         callback = function(v) backwardRamp = v end,
     })
@@ -1775,7 +1777,7 @@ _G.RWCallbacks["BackwardJump"] = function(v) backwardEnabled = v; if bHum then b
         range = {33.3, 555.5},
         increment = 0.1,
         suffix = "",
-        currentValue = 55.5,
+        value = 55.5,
         flag = "BackwardJump_Slider",
         callback = function(v) backwardSlider = v end,
     })
@@ -1866,7 +1868,7 @@ tab:CreateSection({ name = "Speed" })
     tab:CreateToggle({
         name = "Speed Changer",
 		icon = 103917802962919,
-        currentValue = false,
+        value = false,
         flag = "SpeedChanger_Toggle",
         callback = function(v)
             speedChangerEnabled = v
@@ -1875,8 +1877,6 @@ tab:CreateSection({ name = "Speed" })
             end
         end,
     })
-
-_G.RWCallbacks["SpeedChanger"] = function(v) speedChangerEnabled = v; if not v then fireSpeed(1500) end end
 	
     tab:CreateInput({
         name = "Speed Amount",
@@ -1937,7 +1937,7 @@ do
     tab:CreateToggle({
         name = "TP Walk",
         icon = 104227978260927,
-        currentValue = false,
+        value = false,
         flag = "TPWalk_Toggle",
         callback = function(v)
             tpWalkEnabled = v
@@ -1945,15 +1945,13 @@ do
         end,
     })
 
-	_G.RWCallbacks["TPWalk"] = function(v) tpWalkEnabled = v; if tpHum then tpHum.WalkSpeed = v and 0 or 16 end end
-
 	tab:CreateSlider({
         name = "TP Walk Speed",
         icon = 79297485010070,
-        range = {1500, 10000},
+        range = {1500, 8000},
         increment = 1,
         suffix = "",
-        currentValue = 1500,
+        value = 1500,
         flag = "TPWalk_Slider",
         callback = function(v)
             tpWalkSlider = v
@@ -1966,7 +1964,7 @@ end
 IA
 ============================================================================
 ]]--
-
+do
 local instantAccelEnabled = false
 
 local IA_SPEED = 16.6
@@ -2015,7 +2013,7 @@ end)
 tab:CreateToggle({
     name = "Instant Acceleration",
     icon = 99352190313338,
-    currentValue = false,
+    value = false,
     flag = "InstantAccel_Toggle",
     callback = function(value)
         instantAccelEnabled = value
@@ -2024,9 +2022,7 @@ tab:CreateToggle({
         end
     end,
 })
-
-_G.RWCallbacks["InstantAccel"] = function(v) instantAccelEnabled = v; if iaHum then iaHum.WalkSpeed = v and 0 or 16 end end
-
+end
 --[[
 ============================================================================
 FRICTION
