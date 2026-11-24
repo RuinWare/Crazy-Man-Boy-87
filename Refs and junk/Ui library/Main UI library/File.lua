@@ -2294,6 +2294,37 @@ tab:CreateDivider()
         callback = function(v) edgeTrimpPower = v end,
     })
 end
+--[[
+============================================================================
+LAG SWITCH
+============================================================================
+]]--
+
+do
+    local lagDuration = 1
+
+    local function triggerLag()
+        local start = tick()
+        while tick() - start < lagDuration do end
+    end
+
+    tab:CreateButton({
+        name = "Lag Switch",
+		icon = 122975828478366,
+        callback = triggerLag,
+    })
+
+    tab:CreateSlider({
+        name = "Lag Duration",
+		icon = 136077598178846,
+        range = {0.1, 5},
+        increment = 0.1,
+        suffix = "s",
+        value = 1,
+        flag = "LagSwitch_Slider",
+        callback = function(v) lagDuration = v end,
+    })
+end
 
 --[[
 ===========================
@@ -3423,6 +3454,2189 @@ do
 		end
 	end)
 end
+
+--[[
+============================================================================
+ESC
+============================================================================
+]]--
+
+do
+	local speedEnabled = false
+	local currentSpeedValue = 16.6
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
+
+	local EMOTE_PATHS = SHARED_PATHS
+
+	local function resolvePath(keys)
+		local ok, result = pcall(function()
+			local obj = ReplicatedStorage
+			for _, k in ipairs(keys) do obj = obj[k] end
+			return obj
+		end)
+		if ok and typeof(result) == "Instance" then return result end
+		return nil
+	end
+
+	local function getItemScript(item)
+		if item:IsA("ModuleScript") then return item end
+		for _, c in ipairs(item:GetChildren()) do
+			if c:IsA("ModuleScript") then return c end
+		end
+		return nil
+	end
+
+	local function applySpeed()
+		local targetMult = currentSpeedValue / 16.6 -- Maps 0-16.6 to 0-1
+		
+		for _, path in ipairs(EMOTE_PATHS) do
+			local folder = resolvePath(path)
+			if folder then
+				for _, child in ipairs(folder:GetChildren()) do
+					-- Handle expanded folders like Battlepass/DailyShop
+					if child:IsA("Folder") and (child.Name:lower() == "battlepass" or child.Name:lower() == "dailyshop") then
+						for _, inner in ipairs(child:GetChildren()) do
+							local script = getItemScript(inner)
+							if script then
+								local ok, data = pcall(require, script)
+								if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+									if not modifiedEmotes[inner] then
+										modifiedEmotes[inner] = data.EmoteInfo.SpeedMult
+									end
+									data.EmoteInfo.SpeedMult = targetMult
+								end
+							end
+						end
+					else
+						local script = getItemScript(child)
+						if script then
+							local ok, data = pcall(require, script)
+							if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+								if not modifiedEmotes[child] then
+									modifiedEmotes[child] = data.EmoteInfo.SpeedMult
+								end
+								data.EmoteInfo.SpeedMult = targetMult
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local function revertSpeed()
+		for item, originalSpeed in pairs(modifiedEmotes) do
+			local script = getItemScript(item)
+			if script then
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" and data.EmoteInfo then
+					-- Restores to the saved original
+					data.EmoteInfo.SpeedMult = originalSpeed
+				end
+			end
+		end
+		modifiedEmotes = {}
+	end
+
+	tab:CreateSection({ name = "Emote" })
+
+	tab:CreateToggle({
+		name = "Change Emote Speed",
+        icon = 121586615710226,
+		value = false,
+		callback = function(v)
+			speedEnabled = v
+			if speedEnabled then
+				applySpeed()
+			else
+				revertSpeed()
+			end
+		end,
+	})
+
+	tab:CreateSlider({
+		name = "Speed",
+        icon = 120597962040224,
+		range = {0, 16.6},
+		increment = 0.1,
+		suffix = "",
+		value = 16.6,
+		callback = function(v)
+			currentSpeedValue = v
+			if speedEnabled then
+				applySpeed() -- Updates live while the toggle is on
+			end
+		end,
+	})
+end
+
+--[[
+============================================================================
+BP UNME
+============================================================================
+]]--
+
+do
+	local bypassEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
+
+	local EMOTE_PATHS = SHARED_PATHS
+
+	local function resolvePath(keys)
+		local ok, result = pcall(function()
+			local obj = ReplicatedStorage
+			for _, k in ipairs(keys) do obj = obj[k] end
+			return obj
+		end)
+		if ok and typeof(result) == "Instance" then return result end
+		return nil
+	end
+
+	local function getItemScript(item)
+		if item:IsA("ModuleScript") then return item end
+		for _, c in ipairs(item:GetChildren()) do
+			if c:IsA("ModuleScript") then return c end
+		end
+		return nil
+	end
+
+	local function applyBypass()
+		for _, path in ipairs(EMOTE_PATHS) do
+			local folder = resolvePath(path)
+			if folder then
+				for _, child in ipairs(folder:GetChildren()) do
+					-- Handle expanded folders like Battlepass/DailyShop
+					if child:IsA("Folder") and (child.Name:lower() == "battlepass" or child.Name:lower() == "dailyshop") then
+						for _, inner in ipairs(child:GetChildren()) do
+							local script = getItemScript(inner)
+							if script then
+								local ok, data = pcall(require, script)
+								if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+									if not modifiedEmotes[inner] then
+										modifiedEmotes[inner] = data.EmoteInfo.SpeedMult
+									end
+									data.EmoteInfo.SpeedMult = 0.3
+								end
+							end
+						end
+					else
+						local script = getItemScript(child)
+						if script then
+							local ok, data = pcall(require, script)
+							if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+								if not modifiedEmotes[child] then
+									modifiedEmotes[child] = data.EmoteInfo.SpeedMult
+								end
+								data.EmoteInfo.SpeedMult = 0.3
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local function revertBypass()
+		for item, originalSpeed in pairs(modifiedEmotes) do
+			local script = getItemScript(item)
+			if script then
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" and data.EmoteInfo then
+					-- Restores to the saved original (which is 0 for unmovable emotes)
+					data.EmoteInfo.SpeedMult = originalSpeed
+				end
+			end
+		end
+		modifiedEmotes = {}
+	end
+
+	tab:CreateToggle({
+		name = "Unmovable Emote Bypass",
+        icon = 102876083492144,
+		value = false,
+		callback = function(v)
+			bypassEnabled = v
+			if bypassEnabled then
+				applyBypass()
+			else
+				revertBypass()
+			end
+		end,
+	})
+end
+
+--[[
+============================================================================
+EW
+============================================================================
+]]--
+
+do
+	local walkEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local modifiedEmotes = {} -- Saves original speeds to restore them when turned off
+
+	local EMOTE_PATHS = SHARED_PATHS
+
+	local function resolvePath(keys)
+		local ok, result = pcall(function()
+			local obj = ReplicatedStorage
+			for _, k in ipairs(keys) do obj = obj[k] end
+			return obj
+		end)
+		if ok and typeof(result) == "Instance" then return result end
+		return nil
+	end
+
+	local function getItemScript(item)
+		if item:IsA("ModuleScript") then return item end
+		for _, c in ipairs(item:GetChildren()) do
+			if c:IsA("ModuleScript") then return c end
+		end
+		return nil
+	end
+
+	local function applyWalk()
+		for _, path in ipairs(EMOTE_PATHS) do
+			local folder = resolvePath(path)
+			if folder then
+				for _, child in ipairs(folder:GetChildren()) do
+					if child:IsA("Folder") and (child.Name:lower() == "battlepass" or child.Name:lower() == "dailyshop") then
+						for _, inner in ipairs(child:GetChildren()) do
+							local script = getItemScript(inner)
+							if script then
+								local ok, data = pcall(require, script)
+								if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+									if not modifiedEmotes[inner] then
+										modifiedEmotes[inner] = data.EmoteInfo.SpeedMult
+									end
+									data.EmoteInfo.SpeedMult = 2
+								end
+							end
+						end
+					else
+						local script = getItemScript(child)
+						if script then
+							local ok, data = pcall(require, script)
+							if ok and type(data) == "table" and data.EmoteInfo and data.EmoteInfo.SpeedMult then
+								if not modifiedEmotes[child] then
+									modifiedEmotes[child] = data.EmoteInfo.SpeedMult
+								end
+								data.EmoteInfo.SpeedMult = 2
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local function revertWalk()
+		for item, originalSpeed in pairs(modifiedEmotes) do
+			local script = getItemScript(item)
+			if script then
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" and data.EmoteInfo then
+					data.EmoteInfo.SpeedMult = originalSpeed
+				end
+			end
+		end
+		modifiedEmotes = {}
+	end
+
+	tab:CreateToggle({
+		name = "Emote Walk",
+        icon = 104227978260927,
+		value = false,
+		callback = function(v)
+			walkEnabled = v
+			if walkEnabled then
+				applyWalk()
+			else
+				revertWalk()
+			end
+		end,
+	})
+end
+
+--[[
+============================================================================
+EMOTE RUN
+============================================================================
+]]--
+
+do
+    local SRC_FWD_ON = [==[
+-- LocalScript: ShiftlockOn  (detection system, FORWARD)
+-- Watches the game's CharacterTask event:
+--   FireServer("Emote", <any number except 0>)  -> shiftlock ON
+--   FireServer("Emote", 0)                      -> shiftlock OFF
+--   Respawning (new character)                  -> shiftlock OFF
+-- While ON, the player faces the SAME direction as the camera and wins
+-- any fight with the game (runs last every frame, every physics step, and
+-- instantly when something changes the rotation).
+-- Requires an executor with hookmetamethod / newcclosure / getnamecallmethod.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+assert(hookmetamethod and newcclosure and getnamecallmethod,
+	"ShiftlockOn needs an executor with hookmetamethod support")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlock"         -- shiftlock is currently active
+local SYSTEM = "CustomShiftlockSystem" -- detection system is running
+
+if player:GetAttribute(SYSTEM) then return end -- already running
+
+local Event = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
+
+local systemOn = true
+local active = false
+local loopConnections = {}
+local hookConnections = {}
+local hookedChar
+
+player:SetAttribute(SYSTEM, true)
+player:GetAttributeChangedSignal(SYSTEM):Connect(function()
+	systemOn = player:GetAttribute(SYSTEM) == true
+end)
+
+local function stop()
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	for _, c in ipairs(loopConnections) do c:Disconnect() end
+	for _, c in ipairs(hookConnections) do c:Disconnect() end
+	table.clear(loopConnections)
+	table.clear(hookConnections)
+	hookedChar = nil
+	active = false
+end
+
+local function face()
+	if not player:GetAttribute(NAME) then
+		stop()
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not camera or not hum or not root then return end
+
+	if char ~= hookedChar then
+		hookedChar = char
+		for _, c in ipairs(hookConnections) do c:Disconnect() end
+		table.clear(hookConnections)
+		table.insert(hookConnections, root:GetPropertyChangedSignal("CFrame"):Connect(face))
+		table.insert(hookConnections, hum:GetPropertyChangedSignal("AutoRotate"):Connect(face))
+	end
+
+	hum.AutoRotate = false
+
+	local align = root:FindFirstChild(NAME)
+	if not align then
+		local att = Instance.new("Attachment")
+		att.Name = NAME .. "Attachment"
+		att.Parent = root
+
+		align = Instance.new("AlignOrientation")
+		align.Name = NAME
+		align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		align.Attachment0 = att
+		align.RigidityEnabled = true
+		align.CFrame = root.CFrame
+		align.Parent = root
+	end
+
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 0.001 then return end
+	flat = flat.Unit
+
+	align.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+
+	if root.CFrame.LookVector:Dot(flat) < 0.99999 then
+		root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+local function enable()
+	if active or not systemOn then return end
+	active = true
+	player:SetAttribute(NAME, true)
+
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	RunService:BindToRenderStep(NAME, Enum.RenderPriority.Last.Value, face)
+	table.insert(loopConnections, RunService.Stepped:Connect(face))
+	table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+end
+
+local function disable()
+	player:SetAttribute(NAME, false)
+	stop()
+
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if root then
+		local align = root:FindFirstChild(NAME)
+		if align then align:Destroy() end
+		local att = root:FindFirstChild(NAME .. "Attachment")
+		if att then att:Destroy() end
+	end
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.AutoRotate = true
+	end
+end
+
+player.CharacterAdded:Connect(function()
+	if systemOn then
+		disable()
+	end
+end)
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+	local method = getnamecallmethod()
+
+	if systemOn and self == Event and method == "FireServer" then
+		local action, value = ...
+		if action == "Emote" and type(value) == "number" then
+			if value == 0 then
+				task.defer(disable)
+			else
+				task.defer(enable)
+			end
+		end
+	end
+
+	return oldNamecall(self, ...)
+end))
+]==]
+
+    local SRC_FWD_OFF = [==[
+-- LocalScript: ShiftlockOff
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlock"
+local SYSTEM = "CustomShiftlockSystem"
+
+player:SetAttribute(SYSTEM, false)
+player:SetAttribute(NAME, false)
+pcall(function()
+	RunService:UnbindFromRenderStep(NAME)
+end)
+
+local char = player.Character
+if not char then return end
+
+local root = char:FindFirstChild("HumanoidRootPart")
+if root then
+	local align = root:FindFirstChild(NAME)
+	if align then align:Destroy() end
+	local att = root:FindFirstChild(NAME .. "Attachment")
+	if att then att:Destroy() end
+end
+
+local hum = char:FindFirstChildOfClass("Humanoid")
+if hum then
+	hum.AutoRotate = true
+end
+]==]
+
+    local SRC_BWD_ON = [==[
+-- LocalScript: ShiftlockBackOn  (detection system)
+-- Watches the game's CharacterTask event:
+--   FireServer("Emote", <any number except 0>)  -> backwards shiftlock ON
+--   FireServer("Emote", 0)                      -> backwards shiftlock OFF
+--   Respawning (new character)                  -> backwards shiftlock OFF
+-- While ON, the player faces the OPPOSITE direction of the camera and wins
+-- any fight with the game.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+assert(hookmetamethod and newcclosure and getnamecallmethod,
+	"ShiftlockBackOn needs an executor with hookmetamethod support")
+
+local player = Players.LocalPlayer
+local NAME = "CustomShiftlockBack"
+local SYSTEM = "CustomShiftlockBackSystem"
+
+if player:GetAttribute(SYSTEM) then return end
+
+local Event = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
+
+local systemOn = true
+local active = false
+local loopConnections = {}
+local hookConnections = {}
+local hookedChar
+
+player:SetAttribute(SYSTEM, true)
+player:GetAttributeChangedSignal(SYSTEM):Connect(function()
+	systemOn = player:GetAttribute(SYSTEM) == true
+end)
+
+local function stop()
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	for _, c in ipairs(loopConnections) do c:Disconnect() end
+	for _, c in ipairs(hookConnections) do c:Disconnect() end
+	table.clear(loopConnections)
+	table.clear(hookConnections)
+	hookedChar = nil
+	active = false
+end
+
+local function face()
+	if not player:GetAttribute(NAME) then
+		stop()
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not camera or not hum or not root then return end
+
+	if char ~= hookedChar then
+		hookedChar = char
+		for _, c in ipairs(hookConnections) do c:Disconnect() end
+		table.clear(hookConnections)
+		table.insert(hookConnections, root:GetPropertyChangedSignal("CFrame"):Connect(face))
+		table.insert(hookConnections, hum:GetPropertyChangedSignal("AutoRotate"):Connect(face))
+	end
+
+	hum.AutoRotate = false
+
+	local align = root:FindFirstChild(NAME)
+	if not align then
+		local att = Instance.new("Attachment")
+		att.Name = NAME .. "Attachment"
+		att.Parent = root
+
+		align = Instance.new("AlignOrientation")
+		align.Name = NAME
+		align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		align.Attachment0 = att
+		align.RigidityEnabled = true
+		align.CFrame = root.CFrame
+		align.Parent = root
+	end
+
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 0.001 then return end
+	flat = -flat.Unit
+
+	align.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+
+	if root.CFrame.LookVector:Dot(flat) < 0.99999 then
+		root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+local function enable()
+	if active or not systemOn then return end
+	active = true
+	player:SetAttribute(NAME, true)
+
+	pcall(function()
+		RunService:UnbindFromRenderStep(NAME)
+	end)
+	RunService:BindToRenderStep(NAME, Enum.RenderPriority.Last.Value, face)
+	table.insert(loopConnections, RunService.Stepped:Connect(face))
+	table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+end
+
+local function disable()
+	player:SetAttribute(NAME, false)
+	stop()
+
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if root then
+		local align = root:FindFirstChild(NAME)
+		if align then align:Destroy() end
+		local att = root:FindFirstChild(NAME .. "Attachment")
+		if att then att:Destroy() end
+	end
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.AutoRotate = true
+	end
+end
+
+player.CharacterAdded:Connect(function()
+	if systemOn then
+		disable()
+	end
+end)
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+	local method = getnamecallmethod()
+
+	if systemOn and self == Event and method == "FireServer" then
+		local action, value = ...
+		if action == "Emote" and type(value) == "number" then
+			if value == 0 then
+				task.defer(disable)
+			else
+				task.defer(enable)
+			end
+		end
+	end
+
+	return oldNamecall(self, ...)
+end))
+]==]
+
+    local SRC_BWD_OFF = [==[
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Bw_off"))()
+]==]
+
+    local function runSource(src)
+        if loadstring then
+            local ok, fn = pcall(loadstring, src)
+            if ok and fn then pcall(fn) end
+        elseif getgenv and getgenv().loadstring then
+            local ok, fn = pcall(getgenv().loadstring, src)
+            if ok and fn then pcall(fn) end
+        end
+    end
+
+    local enabled = false
+    local mode = "Forward"
+    local currentActive = nil
+
+    local function apply()
+        if currentActive == "forward" then
+            runSource(SRC_FWD_OFF)
+            currentActive = nil
+        elseif currentActive == "backward" then
+            runSource(SRC_BWD_OFF)
+            currentActive = nil
+        end
+
+        if enabled then
+            if mode == "Forward" then
+                runSource(SRC_FWD_ON)
+                currentActive = "forward"
+            else
+                runSource(SRC_BWD_ON)
+                currentActive = "backward"
+            end
+        end
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Emote Run",
+		icon = 113713061701553,
+        value = false,
+        flag = "EmoteShiftlock_Toggle",
+        callback = function(v)
+            enabled = v
+            apply()
+        end,
+    })
+
+    tab:CreateDropdown({
+        name = "Direction",
+		icon = 110016491347992,
+        options = { "Forward", "Backward" },
+        currentOption = { "Forward" },
+        multiSelect = false,
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if pick and pick ~= mode then
+                mode = pick
+                apply()
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
+auto edash
+============================================================================
+]]--
+
+_G.EDASHSTUDS = 2
+getgenv().EDASHSTUDS = 2
+_G.ESPEEDDASH = 30
+getgenv().ESPEEDDASH = 30
+_G.ANGLEEDASH = 8
+getgenv().ANGLEEDASH = 8
+
+tab:CreateDivider()
+
+tab:CreateToggle({
+    name = "Auto E-Dash",
+    flag = "AutoEdash",
+    value = false,
+    callback = function(v)
+        if v then
+          loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Edashon"))()
+        else
+          loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Edashoff"))()
+       end
+    end,
+})
+
+tab:CreateSlider({
+    name = "Smoothness",
+    range = { 0, 100 },
+    increment = 1,
+    value = 30,
+    suffix = "",
+    callback = function(value)
+        ESPEEDDASH = value
+    end,
+})
+
+tab:CreateSlider({
+    name = "Minimum Angle Required To Trigger",
+    range = { 3, 70 },
+    increment = 1,
+    value = 8,
+    suffix = "°",
+    callback = function(value)
+        ANGLEEDASH = value
+    end,
+})
+
+tab:CreateSlider({
+    name = "Range of Triggering",
+    range = { 0, 5 },
+    increment = 1,
+    value = 2,
+    suffix = "Studs",
+    callback = function(value)
+        EDASHSTUDS = value
+    end,
+})
+
+--[[
+===========================
+QES
+===========================
+]]--
+
+do
+	local quickEmoteEnabled = false
+	local currentKey = Enum.KeyCode.Q -- Store as Enum instead of string
+	local selectedSlotStr = "1"
+	
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local UserInputService = game:GetService("UserInputService")
+	
+	local LOADSTRING_ON = "-- put your ON loadstring here"
+	local LOADSTRING_OFF = "-- put your OFF loadstring here"
+
+	local function getEvent()
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		if not remotes then return nil end
+		local char = remotes:FindFirstChild("Character")
+		if not char then return nil end
+		return char:FindFirstChild("CharacterTask")
+	end
+
+	local function getCharacterService()
+		local services = ReplicatedStorage:FindFirstChild("Services")
+		if not services then return nil end
+		local asset = services:FindFirstChild("Asset")
+		if not asset then return nil end
+		local charService = asset:FindFirstChild("CharacterService")
+		if not charService then return nil end
+		
+		if charService:IsA("ModuleScript") then
+			return charService
+		else
+			return charService:FindFirstChildWhichIsA("ModuleScript")
+		end
+	end
+
+	local function triggerEmote()
+		if not quickEmoteEnabled then return end
+		
+		-- Extract ONLY the number from the input
+		local cleanSlot = tostring(selectedSlotStr):match("%d+") or "1"
+		local currentMap = {}
+		
+		local cs = getCharacterService()
+		if cs then
+			local ok, data = pcall(require, cs)
+			if ok and type(data) == "table" then
+				local function scanAllEmotes(tbl, visited)
+					visited = visited or {}
+					if type(tbl) ~= "table" or visited[tbl] then return end
+					visited[tbl] = true
+					
+					for k, v in pairs(tbl) do
+						if k == "Emotes" and type(v) == "table" then
+							for _, entry in pairs(v) do
+								if type(entry) == "table" and #entry >= 2 then
+									local slot = tonumber(entry[1])
+									local emoteId = entry[2]
+									if slot and slot >= 1 and slot <= 12 and emoteId then
+										currentMap[tostring(slot)] = emoteId
+									end
+								end
+							end
+						elseif type(v) == "table" then
+							scanAllEmotes(v, visited)
+						end
+					end
+				end
+				scanAllEmotes(data)
+			end
+		end
+		
+		local emoteId = currentMap[cleanSlot]
+		
+		if emoteId then
+			local Event = getEvent()
+			if Event then
+				Event:FireServer("Emote", emoteId)
+				print("[QuickEmote] SUCCESS: Fired Emote ID", emoteId, "for Slot", cleanSlot)
+			end
+		else
+			local keys = {}
+			for k in pairs(currentMap) do table.insert(keys, k) end
+			table.sort(keys)
+			warn("[QuickEmote] FAILED! You typed Slot " .. cleanSlot .. ", but the game only has these loaded: " .. table.concat(keys, ", "))
+		end
+	end
+
+	tab:CreateDivider()
+
+	tab:CreateToggle({
+		name = "Quick Emote Selection",
+		value = false,
+		callback = function(v)
+			quickEmoteEnabled = v
+		end,
+	})
+
+	-- FIXED KEYBIND (Gen 2 API)
+	tab:CreateKeybind({
+		name = "Emote Keybind",
+		value = Enum.KeyCode.Q, -- Use 'value' not 'currentKeybind'
+		hold = false,
+		onChanged = function(newKey) -- Use 'onChanged' to update the variable
+			currentKey = newKey
+		end,
+	})
+
+	-- FIXED INPUT (Gen 2 API)
+	tab:CreateInput({
+		name = "Emote Slot (1-12)",
+		placeholder = "1",
+		numeric = true, -- Forces the input to only accept numbers
+		value = "1", -- Use 'value' for the default text
+		callback = function(text)
+			selectedSlotStr = tostring(text)
+		end,
+	})
+
+	tab:CreateToggle({
+		name = "Run Custom Loadstrings",
+		value = false,
+		callback = function(v)
+			if v then
+				pcall(function() loadstring(LOADSTRING_ON)() end)
+			else
+				pcall(function() loadstring(LOADSTRING_OFF)() end)
+			end
+		end,
+	})
+
+	-- Listen for the key press
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		-- If the player is typing in the chat or Rayfield UI, don't fire
+		if gameProcessed then return end
+		if not quickEmoteEnabled then return end
+		
+		-- Compare the actual Enum values directly
+		if input.KeyCode == currentKey then
+			pcall(triggerEmote)
+		end
+	end)
+end
+
+--[[
+============================================================================
+cs
+============================================================================
+]]--
+
+do
+    local spinEnabled = false
+    local spinDirection = "Clockwise"
+    local spinRPS = 1
+    local spinAngle = 0
+    local torsoRot = nil
+    local baseC0 = nil
+    local lastApplied = nil
+
+    local function findTorsoRot()
+        local rigs = workspace:FindFirstChild("Rigs")
+        if not rigs then return nil end
+        local rig = rigs:FindFirstChild(player.Name)
+        if not rig then return nil end
+        local joints = rig:FindFirstChild("Joints")
+        if not joints then return nil end
+        return joints:FindFirstChild("TorsoRot")
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not spinEnabled then return end
+        if not torsoRot or not torsoRot.Parent then
+            torsoRot = findTorsoRot()
+            baseC0 = nil
+            lastApplied = nil
+            return
+        end
+        local current = torsoRot.C0
+        if lastApplied and current == lastApplied then
+            return
+        end
+        baseC0 = current
+    end)
+
+    RunService.RenderStepped:Connect(function(dt)
+        if not spinEnabled then return end
+        if not torsoRot or not torsoRot.Parent then return end
+        if not baseC0 then return end
+        local dir = (spinDirection == "Clockwise") and -1 or 1
+        spinAngle = (spinAngle + spinRPS * dir * 2 * math.pi * dt) % (2 * math.pi)
+        local newC0 = baseC0 * CFrame.Angles(0, spinAngle, 0)
+        torsoRot.C0 = newC0
+        lastApplied = newC0
+    end)
+
+    player.CharacterAdded:Connect(function()
+        torsoRot = nil
+        baseC0 = nil
+        lastApplied = nil
+        spinAngle = 0
+    end)
+
+tab:CreateSection({ name = "Player" })
+
+    tab:CreateToggle({
+        name = "Character Spin",
+		icon = 105033161351299,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
+        flag = "CharacterSpin_Toggle",
+        callback = function(v)
+            spinEnabled = v
+            if not v then
+                spinAngle = 0
+                torsoRot = nil
+                baseC0 = nil
+                lastApplied = nil
+            end
+        end,
+    })
+
+    tab:CreateDropdown({
+        name = "Rotation",
+		icon = 110016491347992,
+        options = { "Clockwise", "Counterclockwise" },
+        value = { "Clockwise" },
+        multiSelect = false,
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if pick then spinDirection = pick end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Spin Speed",
+		icon = 79297485010070,
+        range = {0.1, 10},
+        increment = 0.1,
+        suffix = " RPS",
+        value = 1,
+        flag = "CharacterSpin_Slider",
+        callback = function(v) spinRPS = v end,
+    })
+end
+
+--[[
+============================================================================
+PLAYER ROTATE
+============================================================================
+]]--
+
+do
+    local enabled = false
+    local pitch = 0
+    local yaw = 0
+    local roll = 0
+
+    local NAME = "CustomShiftlockRotate"
+    local bindName = NAME
+    local bound = false
+    local loopConnections = {}
+    local hookConnections = {}
+    local hookedChar
+
+    local function cleanup()
+        for _, c in ipairs(loopConnections) do c:Disconnect() end
+        for _, c in ipairs(hookConnections) do c:Disconnect() end
+        table.clear(loopConnections)
+        table.clear(hookConnections)
+        hookedChar = nil
+    end
+
+    local function face()
+        if not enabled then return end
+
+        local camera = workspace.CurrentCamera
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not camera or not hum or not root then return end
+
+        if char ~= hookedChar then
+            hookedChar = char
+            for _, c in ipairs(hookConnections) do c:Disconnect() end
+            table.clear(hookConnections)
+            table.insert(hookConnections, root:GetPropertyChangedSignal("CFrame"):Connect(face))
+            table.insert(hookConnections, hum:GetPropertyChangedSignal("AutoRotate"):Connect(face))
+        end
+
+        hum.AutoRotate = false
+
+        local align = root:FindFirstChild(NAME)
+        if not align then
+            local att = Instance.new("Attachment")
+            att.Name = NAME .. "Attachment"
+            att.Parent = root
+
+            align = Instance.new("AlignOrientation")
+            align.Name = NAME
+            align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+            align.Attachment0 = att
+            align.RigidityEnabled = true
+            align.CFrame = root.CFrame
+            align.Parent = root
+        end
+
+        local look = camera.CFrame.LookVector
+        local flat = Vector3.new(look.X, 0, look.Z)
+        if flat.Magnitude < 0.001 then return end
+
+        local rotation = CFrame.fromEulerAnglesYXZ(
+            math.rad(pitch),
+            math.rad(yaw),
+            math.rad(roll)
+        )
+
+        local target = CFrame.lookAt(root.Position, root.Position + flat.Unit) * rotation
+        align.CFrame = target
+
+        local cur = root.CFrame
+        if cur.LookVector:Dot(target.LookVector) < 0.99999
+            or cur.UpVector:Dot(target.UpVector) < 0.99999 then
+            root.CFrame = target
+            root.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+
+    local function start()
+        if bound then return end
+        bound = true
+        RunService:BindToRenderStep(bindName, Enum.RenderPriority.Last.Value, face)
+        table.insert(loopConnections, RunService.Stepped:Connect(face))
+        table.insert(loopConnections, RunService.Heartbeat:Connect(face))
+    end
+
+    local function stopAll()
+        cleanup()
+        if bound then
+            pcall(function() RunService:UnbindFromRenderStep(bindName) end)
+            bound = false
+        end
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local align = root:FindFirstChild(NAME)
+            if align then align:Destroy() end
+            local att = root:FindFirstChild(NAME .. "Attachment")
+            if att then att:Destroy() end
+        end
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.AutoRotate = true end
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Player Rotation Changer",
+		icon = 99119903049132,
+        value = false,
+        flag = "PlayerRotate_Toggle",
+        callback = function(v)
+            enabled = v
+            if v then start() else stopAll() end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Pitch",
+		icon = 133687388764527,
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        value = 0,
+        flag = "PlayerRotate_Pitch",
+        callback = function(v) pitch = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Yaw",
+		icon = 90577927197495,
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        value = 0,
+        flag = "PlayerRotate_Yaw",
+        callback = function(v) yaw = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Roll",
+		icon = 129301968670639,
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        value = 0,
+        flag = "PlayerRotate_Roll",
+        callback = function(v) roll = v end,
+    })
+end
+
+--[[
+============================================================================
+Fly
+============================================================================
+]]--
+
+do
+    local flyEnabled = false
+    local flySpeed = 100
+    local flyHum, flyRoot
+
+    local function flyAttach(char)
+        flyHum = char:WaitForChild("Humanoid")
+        flyRoot = char:WaitForChild("HumanoidRootPart")
+        if flyEnabled then flyHum.WalkSpeed = 0 end
+    end
+
+    if player.Character then task.spawn(flyAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(flyAttach, c) end)
+
+    RunService.Heartbeat:Connect(function(dt)
+        if not flyEnabled then return end
+        if not flyHum or not flyRoot or not flyRoot.Parent then return end
+        if flyHum.Health <= 0 then return end
+
+        flyHum.WalkSpeed = 0
+
+        local moveDir = flyHum.MoveDirection
+        local moveFlat = Vector3.new(moveDir.X, 0, moveDir.Z)
+
+        if moveFlat.Magnitude < 0.001 then
+            flyRoot.AssemblyLinearVelocity = Vector3.zero
+            return
+        end
+        moveFlat = moveFlat.Unit
+
+        local cam = workspace.CurrentCamera
+        local camLook = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
+        local camFlat = Vector3.new(camLook.X, 0, camLook.Z)
+
+        local verticalComponent = 0
+        if camFlat.Magnitude > 0.01 then
+            camFlat = camFlat.Unit
+            local forwardness = camFlat:Dot(moveFlat)
+            verticalComponent = forwardness * camLook.Y * flySpeed * 0.55
+        else
+            verticalComponent = camLook.Y * flySpeed * 0.55
+        end
+
+        local horizontal = moveFlat * flySpeed * dt
+        local vertical = Vector3.new(0, verticalComponent * dt, 0)
+
+        flyRoot.CFrame = flyRoot.CFrame + horizontal + vertical
+        flyRoot.AssemblyLinearVelocity = Vector3.zero
+    end)
+    tab:CreateRightRow()
+    tab:CreateSection({ name = "Fly" })
+
+    tab:CreateToggle({
+        name = "Fly",
+		icon = 101627766519965,
+        value = false,
+        flag = "Fly_Toggle",
+        callback = function(v)
+            flyEnabled = v
+            if flyHum then
+                flyHum.WalkSpeed = v and 0 or 16
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Fly Speed",
+		icon = 79297485010070,
+        range = {16.6, 500.5},
+        increment = 0.1,
+        suffix = " sps",
+        value = 100,
+        flag = "Fly_Slider",
+        callback = function(v) flySpeed = v end,
+    })
+end
+
+--[[
+============================================================================
+DOWN FLY
+============================================================================
+]]--
+
+do
+    local downFlyEnabled = false
+    local downFlySpeed = 50
+    local downFlyHum, downFlyRoot
+
+    local LOOK_DOWN_THRESHOLD = -0.7
+
+    local function downFlyAttach(char)
+        downFlyHum = char:WaitForChild("Humanoid")
+        downFlyRoot = char:WaitForChild("HumanoidRootPart")
+        if downFlyEnabled then downFlyHum.WalkSpeed = 0 end
+    end
+
+    if player.Character then task.spawn(downFlyAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(downFlyAttach, c) end)
+
+    RunService.Heartbeat:Connect(function(dt)
+        if not downFlyEnabled then return end
+        if not downFlyHum or not downFlyRoot or not downFlyRoot.Parent then return end
+        if downFlyHum.Health <= 0 then return end
+
+        downFlyHum.WalkSpeed = 0
+
+        local cam = workspace.CurrentCamera
+        if not cam then
+            downFlyRoot.AssemblyLinearVelocity = Vector3.zero
+            return
+        end
+
+        local lookingDown = cam.CFrame.LookVector.Y <= LOOK_DOWN_THRESHOLD
+
+        if lookingDown then
+            downFlyRoot.CFrame = downFlyRoot.CFrame + Vector3.new(0, downFlySpeed * dt, 0)
+        end
+
+        downFlyRoot.AssemblyLinearVelocity = Vector3.zero
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Down Fly",
+		icon = 109241289516213,
+        value = false,
+        flag = "DownFly_Toggle",
+        callback = function(v)
+            downFlyEnabled = v
+            if downFlyHum then
+                downFlyHum.WalkSpeed = v and 0 or 16
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Down Fly Speed",
+		icon = 79297485010070,
+        range = {16.6, 500.5},
+        increment = 0.1,
+        suffix = " sps",
+        value = 50,
+        flag = "DownFly_Slider",
+        callback = function(v) downFlySpeed = v end,
+    })
+end
+
+--[[
+============================================================================
+STREAK SAVER
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local TeleportService = game:GetService("TeleportService")
+
+    -- EDIT THIS: script that runs after "Rejoin + Auto Load" teleports you
+    local AUTO_LOAD_SCRIPT = [==[
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/Main%20UI%20library/File.lua"))()
+]==]
+
+    local streakSaverEnabled = false
+    local streakMethod = "Notify"
+    local triggered = false
+
+    local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Registry"):WaitForChild("UpdateCharacterDataRegistry")
+	
+    local function fireQueue(src)
+        if queue_on_teleport then
+            if pcall(queue_on_teleport, src) then return true end
+        end
+        if queueonteleport then
+            if pcall(queueonteleport, src) then return true end
+        end
+        if syn and syn.queue_on_teleport then
+            if pcall(syn.queue_on_teleport, src) then return true end
+        end
+        return false
+    end
+
+    local function doTeleport()
+        local ok = false
+        if game.JobId and game.JobId ~= "" then
+            ok = pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+            end)
+        end
+        if not ok then
+            pcall(function()
+                TeleportService:Teleport(game.PlaceId, player)
+            end)
+        end
+    end
+
+local function sendNotify()
+    local payload = {
+        Title = "STREAK AT RISK!",
+        Content = "You have been downed, leave the game to save your streak.",
+        Duration = 8,
+    }
+
+    -- 1. Try Rayfield (Capitalized keys are required for Gen2)
+    local success = pcall(function()
+        Library:Notify(payload)
+    end)
+
+    -- 2. If that fails (due to hook restrictions), use native Roblox notification
+    if not success then
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = payload.Title,
+                Text = payload.Content,
+                Duration = payload.Duration,
+            })
+            end)
+        end
+	end
+
+    local function triggerStreakSaver()
+        if triggered then return end
+        triggered = true
+
+        if streakMethod == "Notify" then
+            sendNotify()
+        elseif streakMethod == "Kick" then
+            player:Kick("Streak Saver Ran")
+        elseif streakMethod == "Rejoin" then
+            doTeleport()
+        elseif streakMethod == "Rejoin + Auto Load" then
+            fireQueue(AUTO_LOAD_SCRIPT)
+            task.wait(0.1)
+            doTeleport()
+        end
+    end
+
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        if getnamecallmethod() == "FireServer" and self == UpdateCharacterDataRegistry then
+            if streakSaverEnabled then
+                local args = {...}
+                for _, a in ipairs(args) do
+                    if type(a) == "table" then
+                        for _, v in pairs(a) do
+                            if type(v) == "string" and v == "Downed" then
+                                task.defer(triggerStreakSaver)
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+
+    player.CharacterAdded:Connect(function()
+        triggered = false
+    end)
+
+tab:CreateSection({ name = "Streak" })
+
+    tab:CreateToggle({
+        name = "Auto Streak Saver",
+        currentValue = false,
+        flag = "StreakSaver_Toggle",
+        callback = function(v)
+            streakSaverEnabled = v
+            if not v then triggered = false end
+        end,
+    })
+
+    tab:CreateDropdown({
+        name = "Method",
+        options = { "Notify", "Kick", "Rejoin", "Rejoin + Auto Load" },
+        currentOption = { "Notify" },
+        multiSelect = false,
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if pick then streakMethod = pick end
+        end,
+    })
+end
+
+--[[
+============================================================================
+TB
+============================================================================
+]]--
+
+do
+    -- ============================================
+    -- EDIT THESE URLS
+    -- ============================================
+    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Delete-TB-pc"  -- runs when Turn Binds toggle turns OFF
+
+    -- One URL per dropdown option. Leave empty ("") to disable that option.
+    local OPTION_URLS = {
+        ["A + D"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-AD",
+        ["Arrow Keys"]     = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-ARROWKEYS",
+        ["F + H"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-FH",
+        ["Q + E"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-QE",
+        ["N + M"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-NM",
+        ["1 + 2"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-12",
+        ["D + A"]          = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-DA",
+        ["Rev Arrow Keys"] = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/TB-RARROWKEYS",
+    }
+    -- ============================================
+
+	getgenv().KTB = 5
+	_G.KTB = 5
+
+    local bindEnabled = false
+    local currentOption = "A + D"
+    local runningOption = nil
+
+    local function runUrl(url)
+        if not url or url == "" then return end
+        if not loadstring then return end
+        local ok, src = pcall(function() return game:HttpGet(url) end)
+        if not ok or not src then return end
+        local fn = loadstring(src)
+        if fn then pcall(fn) end
+    end
+
+    local function stopCurrent()
+        if runningOption then
+            runUrl(OFF_URL)
+            runningOption = nil
+        end
+    end
+
+    local function startCurrent()
+        if not bindEnabled then return end
+        if runningOption == currentOption then return end
+        stopCurrent()
+        local url = OPTION_URLS[currentOption]
+        if url and url ~= "" then
+            runUrl(url)
+            runningOption = currentOption
+        end
+    end
+
+    tab:CreateDivider({ text = "Turn Binds" })
+
+    tab:CreateToggle({
+        name = "Turn Binds",
+        value = false,
+        flag = "TurnBinds_Toggle",
+        callback = function(v)
+            bindEnabled = v
+            if v then
+                startCurrent()
+            else
+                stopCurrent()
+                runUrl(OFF_URL)
+            end
+        end,
+    })
+
+    tab:CreateDropdown({
+        name = "Keys",
+        options = { "A + D", "Arrow Keys", "F + H", "Q + E", "N + M", "1 + 2", "D + A", "Rev Arrow Keys" },
+        value = { "A + D" },
+        multiSelect = false,
+        flag = "TurnBinds_Keys",
+        callback = function(selected)
+            local pick = type(selected) == "table" and selected[1] or selected
+            if not pick or pick == currentOption then return end
+            currentOption = pick
+            if bindEnabled then
+                stopCurrent()
+                startCurrent()
+            end
+        end,
+    })
+
+    tab:CreateToggle({
+        name = "Mobile Turn Buttons",
+        value = false,
+        flag = "TurnBinds_Mobile_Toggle",
+        callback = function(v)
+            if v then
+                runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Left-Turn-Binds-Mobile")
+                task.wait(0.1)
+                runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Right-Turn-Binds-Mobile")
+            else
+                runUrl("https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Delete-Turn-Binds-Mobile")
+            end
+        end,
+    })
+	
+    tab:CreateSlider({
+        name = "Speed",
+        range = {1, 10},
+        increment = 1,
+        value = 5,
+        flag = "TurnBinds_Speed",
+        callback = function(v)
+            getgenv().KTB = v
+            _G.KTB = v
+        end,
+    })
+end
+
+--[[
+============================================================================
+AUTO STRAFE
+============================================================================
+]]--
+
+do
+    -- ========================================
+    -- EDIT THESE URLs
+    -- ========================================
+    local ON_URL  = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Auto-strafe-on"
+    local OFF_URL = "https://raw.githubusercontent.com/RuinWare/ExtraRW/refs/heads/main/Auto-strafe-off"
+    -- ========================================
+
+	getgenv().KAS = 5
+	_G.KAS = 5
+	getgenv().JSDZ = 0.1
+	_G.JSDZ = 0.1
+    local autoStrafeEnabled = false
+
+    local function runURL(url)
+        if not url or url == "" then return end
+        local ok = pcall(function()
+            local src = game:HttpGet(url)
+            if loadstring then
+                loadstring(src)()
+            elseif getgenv and getgenv().loadstring then
+                getgenv().loadstring(src)()
+            end
+        end)
+        return ok
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Auto Strafe",
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
+        flag = "AutoStrafe_Toggle",
+        callback = function(v)
+            autoStrafeEnabled = v
+            if v then
+                runURL(ON_URL)
+            else
+                runURL(OFF_URL)
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Speed",
+        range = {1, 10},
+        increment = 1,
+        value = 5,
+        flag = "AutoStrafe_Speed",
+        callback = function(v)
+            getgenv().KAS = v
+            _G.KAS = v
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Joystick Deadzone",
+        range = {0, 1},
+        increment = 0.1,
+        value = 0.1,
+        flag = "Joystickdz_as",
+        callback = function(v)
+            getgenv().JSDZ = v
+            _G.JSDZ = v
+		end,
+    })
+
+tab:CreateToggle({
+    name = "Only Trigger In Air",
+    flag = "OIAAS_AS",
+    value = false,
+    callback = function(value)
+		getgenv().OIAAS = value
+		_G.OIAAS = value
+      end,
+    })
+end
+
+--[[
+===========================
+Cam offset changer
+===========================
+]]--
+
+tab:CreateLeftRow()
+
+do
+    local enabled = false
+    local pitch = 0
+    local yaw = 0
+    local roll = 0
+    local bindName = "CameraOffsetChanger"
+    local bound = false
+
+    local function offsetCamera()
+        if not enabled then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        local offset = CFrame.fromEulerAnglesYXZ(
+            math.rad(pitch),
+            math.rad(yaw),
+            math.rad(roll)
+        )
+
+        -- Keep the position, add rotation on top of whatever the game set this frame
+        local base = cam.CFrame
+        cam.CFrame = CFrame.new(base.Position) * base.Rotation * offset
+    end
+
+    local function start()
+        if bound then return end
+        bound = true
+        -- Camera priority + 1 runs AFTER the game's camera update, BEFORE render
+        RunService:BindToRenderStep(bindName, Enum.RenderPriority.Camera.Value + 1, offsetCamera)
+    end
+
+    local function stop()
+        if bound then
+            pcall(function() RunService:UnbindFromRenderStep(bindName) end)
+            bound = false
+        end
+        -- Camera auto-reverts next frame because the game overwrites cam.CFrame itself
+    end
+
+    tab:CreateSection({ name = "Camara" })
+
+    tab:CreateToggle({
+        name = "Camera Offset Changer",
+        value = false,
+        flag = "CamOffset_Toggle",
+        callback = function(v)
+            enabled = v
+            if v then start() else stop() end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Pitch",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        value = 0,
+        flag = "CamOffset_Pitch",
+        callback = function(v) pitch = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Yaw",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        value = 0,
+        flag = "CamOffset_Yaw",
+        callback = function(v) yaw = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Roll",
+        range = {0, 359.9},
+        increment = 0.1,
+        suffix = "°",
+        value = 0,
+        flag = "CamOffset_Roll",
+        callback = function(v) roll = v end,
+    })
+end
+
+-- pos
+
+do
+    local enabled = false
+    local offsetX = 0
+    local offsetY = 0
+    local offsetZ = 0
+    local bindName = "CameraPositionChanger"
+    local bound = false
+
+    local function applyPosition()
+        if not enabled then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        -- 1 slider unit = 0.1 studs
+        local sx = offsetX * 0.1
+        local sy = offsetY * 0.1
+        local sz = offsetZ * 0.1
+
+        -- Local-space offset: X = camera right, Y = camera up, Z = camera forward
+        cam.CFrame = cam.CFrame * CFrame.new(sx, sy, sz)
+    end
+
+    local function start()
+        if bound then return end
+        bound = true
+        RunService:BindToRenderStep(bindName, Enum.RenderPriority.Camera.Value + 1, applyPosition)
+    end
+
+    local function stop()
+        if bound then
+            pcall(function() RunService:UnbindFromRenderStep(bindName) end)
+            bound = false
+        end
+    end
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Camera Position Changer",
+        value = false,
+        flag = "CamPos_Toggle",
+        callback = function(v)
+            enabled = v
+            if v then start() else stop() end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "X",
+        range = {-100, 100},
+        increment = 0.1,
+        suffix = "ms",
+        value = 0,
+        flag = "CamPos_X",
+        callback = function(v) offsetX = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Y",
+        range = {-100, 100},
+        increment = 0.1,
+        suffix = "ms",
+        value = 0,
+        flag = "CamPos_Y",
+        callback = function(v) offsetY = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Z",
+        range = {-100, 100},
+        increment = 0.1,
+        suffix = "ms",
+        value = 0,
+        flag = "CamPos_Z",
+        callback = function(v) offsetZ = v end,
+    })
+end
+
+--[[
+===========================
+SPC ROUNDS REMOVER
+===========================
+]]--
+
+do
+	local roundEnabled = false
+	local selectedRounds = {}
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	-- Cache to store the original tables so we can restore them later
+	local originalData = {} 
+
+	local PATHS = {
+		["Speed"] = {"Info", "SpecialRounds", "Speed"},
+		["No Jumping"] = {"Info", "SpecialRounds", "No Jumping"},
+		["Moon Jump"] = {"Info", "SpecialRounds", "Moon Jump"},
+		["Fog"] = {"Info", "SpecialRounds", "Fog"},
+		["Darkness"] = {"Info", "SpecialRounds", "Darkness"},
+	}
+
+	-- Helper to resolve the path safely
+	local function getRoundScript(roundName)
+		local current = ReplicatedStorage
+		local path = PATHS[roundName]
+		if not path then return nil end
+		
+		for _, key in ipairs(path) do
+			current = current:FindFirstChild(key)
+			if not current then return nil end
+		end
+		return current
+	end
+
+	-- Main logic to apply or revert effects
+	local function applyEffects()
+		-- 1. If disabled, restore all originals and clear cache
+		if not roundEnabled then
+			for script, saved in pairs(originalData) do
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" then
+					if data.Shared and data.Shared.Character then
+						data.Shared.Character.Teams = saved.teams
+					end
+					data.Client = saved.client
+				end
+			end
+			originalData = {}
+			return
+		end
+
+		-- 2. Apply effects to currently selected rounds
+		for roundName, isSelected in pairs(selectedRounds) do
+			if isSelected then
+				local script = getRoundScript(roundName)
+				if script then
+					local ok, data = pcall(require, script)
+					if ok and type(data) == "table" then
+						-- Save original tables if we haven't already
+						if not originalData[script] then
+							originalData[script] = {
+								teams = data.Shared and data.Shared.Character and data.Shared.Character.Teams,
+								client = data.Client
+							}
+						end
+						
+						-- Strip the movement modifiers (Speed, Jump, etc.)
+						if data.Shared and data.Shared.Character then
+							data.Shared.Character.Teams = {}
+						end
+						-- Strip the lighting/client functions (Fog, Darkness, etc.)
+						data.Client = {}
+					end
+				end
+			end
+		end
+
+		-- 3. Revert any scripts that were previously modified but are no longer selected
+		for script, saved in pairs(originalData) do
+			local stillSelected = false
+			for roundName, isSelected in pairs(selectedRounds) do
+				if isSelected and getRoundScript(roundName) == script then
+					stillSelected = true
+					break
+				end
+			end
+			
+			if not stillSelected then
+				local ok, data = pcall(require, script)
+				if ok and type(data) == "table" then
+					if data.Shared and data.Shared.Character then
+						data.Shared.Character.Teams = saved.teams
+					end
+					data.Client = saved.client
+				end
+				originalData[script] = nil
+			end
+		end
+	end
+
+tab:CreateSection({ name = "Special Rounds" })
+	
+	tab:CreateToggle({
+		name = "Disable Special Round Effects",
+		haveMB = true,
+		haveKeybinds = true,
+		value = false,
+		callback = function(v)
+			roundEnabled = v
+			applyEffects()
+		end,
+	})
+
+	tab:CreateDropdown({
+		name = "Special Rounds",
+		options = { "Speed", "No Jumping", "Moon Jump", "Fog", "Darkness" },
+		multiSelect = true,
+		callback = function(selected)
+			selectedRounds = {}
+			for _, v in ipairs(selected) do
+				selectedRounds[v] = true
+			end
+			applyEffects()
+		end,
+	})
+
+	-- Enforcement Loop (ensures the game doesn't override the tables)
+	task.spawn(function()
+		while true do
+			if roundEnabled and next(selectedRounds) then
+				applyEffects()
+			end
+			task.wait(0.5)
+		end
+	end)
+end
+
+--[[
+===========================
+GAMEPLAY
+===========================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    -- ========================================
+    -- EDIT THESE DEFAULTS IF THE "OFF" STATE
+    -- DOESN'T MATCH WHAT THE GAME EXPECTS
+    -- ========================================
+    local DEFAULT_VIEWBOB          = nil
+    local DEFAULT_SPRINT_VIEWMODEL = nil
+    local DEFAULT_LEGACY_CAMERA    = nil
+    local DEFAULT_POV_SCROLL       = nil
+    local DEFAULT_BOOMBOX_VOLUME   = 100
+    -- ========================================
+
+    local function getSetSetting()
+        local shared = ReplicatedStorage:FindFirstChild("Shared")
+        if not shared then return nil end
+        local ud = shared:FindFirstChild("UserData")
+        if not ud then return nil end
+        local remotes = ud:FindFirstChild("Remotes")
+        if not remotes then return nil end
+        return remotes:FindFirstChild("SetSetting")
+    end
+
+    local function setSetting(key, value)
+        local remote = getSetSetting()
+        if not remote then return end
+        pcall(function()
+            remote:FireServer(key, value)
+        end)
+    end
+
+tab:CreateSection({ name = "Gameplay" })
+
+    tab:CreateSlider({
+        name = "Lobby Music",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        value = 100,
+        flag = "Setting_LobbyMusic",
+        callback = function(v) setSetting("LobbyMusicVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Game Music",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        value = 100,
+        flag = "Setting_GameMusic",
+        callback = function(v) setSetting("GameMusicVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Nextbot Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        value = 100,
+        flag = "Setting_NextbotVolume",
+        callback = function(v) setSetting("NextbotVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Emote Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        value = 100,
+        flag = "Setting_EmoteVolume",
+        callback = function(v) setSetting("EmoteVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Carry Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        value = 100,
+        flag = "Setting_CarryVolume",
+        callback = function(v) setSetting("CarryVolume", v) end,
+    })
+
+    tab:CreateSlider({
+        name = "Click Volume",
+        range = {0, 100},
+        increment = 1,
+        suffix = "v",
+        value = 100,
+        flag = "Setting_InterfaceVolume",
+        callback = function(v) setSetting("InterfaceVolume", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Viewbob",
+        value = DEFAULT_VIEWBOB,
+        flag = "Setting_Viewbob",
+        callback = function(v) setSetting("Viewbob", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Sprint Viewmodel",
+        value = DEFAULT_SPRINT_VIEWMODEL,
+        flag = "Setting_SprintViewmodel",
+        callback = function(v) setSetting("SprintViewmodel", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Legacy Camera",
+        value = DEFAULT_LEGACY_CAMERA,
+        flag = "Setting_LegacyCamera",
+        callback = function(v) setSetting("LegacyCamera", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "POV Scroll",
+        value = DEFAULT_POV_SCROLL,
+        flag = "Setting_POVScroll",
+        callback = function(v) setSetting("POVScroll", v) end,
+    })
+
+    tab:CreateToggle({
+        name = "Mute Boomboxs",
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
+        flag = "Setting_MuteBoomboxs",
+        callback = function(v)
+            if v then
+                setSetting("BoomboxVolume", 0)
+            else
+                setSetting("BoomboxVolume", DEFAULT_BOOMBOX_VOLUME)
+            end
+        end,
+    })
+end
+
+do
+    local fpsUnlockerEnabled = false
+    local maxFPS = 240
+
+    local function applyFPS()
+        if not setfpscap then return end
+        local cap = tonumber(maxFPS) or 60
+        local target = cap > 999 and 0 or cap
+        pcall(setfpscap, target)
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not fpsUnlockerEnabled then return end
+        applyFPS()
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "FPS Unlocker",
+        value = false,
+        flag = "FPSUnlocker_Toggle",
+        callback = function(v)
+            fpsUnlockerEnabled = v
+            if v then
+                applyFPS()
+            else
+                if setfpscap then pcall(setfpscap, 60) end
+            end
+        end,
+    })
+
+    tab:CreateInput({
+        name = "Max FPS:",
+        placeholder = "e.g. 240",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                maxFPS = n
+                if fpsUnlockerEnabled then applyFPS() end
+            end
+        end,
+    })
+end
+
 
 -- vis
 
