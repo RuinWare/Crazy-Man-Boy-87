@@ -1,4 +1,3 @@
--- update
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
@@ -5643,7 +5642,7 @@ end
 
 -- vis
 
-local VisTab = window:CreateTab({ name = "Visuals", icon = 126802044806598 })
+getgenv().VisTab = window:CreateTab({ name = "Visuals", icon = 126802044806598 })
 
 -- hk
 
