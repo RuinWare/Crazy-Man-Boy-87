@@ -1,1 +1,1748 @@
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+    local fovEnabled = false
+    local fovValue = 90
+
+    local function getSetSetting()
+        local shared = ReplicatedStorage:FindFirstChild("Shared")
+        if not shared then return nil end
+        local ud = shared:FindFirstChild("UserData")
+        if not ud then return nil end
+        local remotes = ud:FindFirstChild("Remotes")
+        if not remotes then return nil end
+        return remotes:FindFirstChild("SetSetting")
+    end
+
+    local function fireFOV(value)
+        local remote = getSetSetting()
+        if not remote then return end
+        pcall(function()
+            remote:FireServer("FOV", value)
+        end)
+    end
+
+    VisTab:CreateDivider({ text = "Field of View" })
+
+    VisTab:CreateToggle({
+        name = "FOV Changer",
+        icon = 97562574851729,
+        currentValue = false,
+        flag = "FOVChanger_Toggle",
+        callback = function(v)
+            fovEnabled = v
+            if v then
+                fireFOV(fovValue)
+            else
+                fireFOV(90)
+            end
+        end,
+    })
+
+    VisTab:CreateInput({
+        name = "FOV Value",
+        icon = 80363621811850,
+        placeholder = "e.g. 120",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                fovValue = n
+                if fovEnabled then
+                    fireFOV(fovValue)
+                end
+            end
+        end,
+    })
+end
+
+do
+VisTab:CreateDivider()
+
+VisTab:CreateToggle({
+    name = "Fix 90+ FOV bug",
+    flag = "F9FOVB",
+    CurrentValue = false,
+    callback = function(v)
+        local RunService = game:GetService("RunService")
+        if v then
+            RunService:BindToRenderStep("ForceFOV", Enum.RenderPriority.Camera.Value - 1, function()
+                local cam = workspace.CurrentCamera
+                if cam then
+                    cam.FieldOfView = 90
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("ForceFOV")
+        end
+    end,
+})
+end
+
+--[[
+===========================
+ESP
+===========================
+]]--
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual%20tab/ESP"))()
+
+--[[
+===========================
+REMOVE BREACHER LAG
+===========================
+]]--
+do
+VisTab:CreateDivider({ "Game" })
+
+VisTab:CreateToggle({
+    name = "Remove Breacher Lag",
+    flag = "RBLREMOVEBREACHERLAG",
+    currentValue = false,
+    callback = function(v)
+        if v then
+   _G.RuinWarePortalLag = true
+
+if _G.RuinWarePortalLagThread then
+    task.cancel(_G.RuinWarePortalLagThread)
+end
+
+_G.RuinWarePortalLagThread = task.spawn(function()
+    while _G.RuinWarePortalLag do
+        task.wait(1)
+        
+        local effects = workspace:FindFirstChild("Effects")
+        if effects then
+            local portals = effects:FindFirstChild("Portals")
+            if portals then
+                for _, portal in ipairs(portals:GetChildren()) do
+                    if portal.Name == "PortalYellow" or portal.Name == "PortalBlue" then
+                        for _, attName in ipairs({"Attachment1", "Attachment3"}) do
+                            local att = portal:FindFirstChild(attName)
+                            if att then
+                                for _, child in ipairs(att:GetChildren()) do
+                                    if child.Name == "Left" or child.Name == "Right" or child.Name == "Vortex" then
+                                        pcall(function() child:Destroy() end)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+window:Notify({
+    title = "RuinWare",
+    content = "Breacher Effects Removed",
+    duration = 5,
+})
+       else
+_G.RuinWarePortalLag = false
+
+if _G.RuinWarePortalLagThread then
+    task.cancel(_G.RuinWarePortalLagThread)
+    _G.RuinWarePortalLagThread = nil
+   end
+end
+    end,
+})
+end
+
+--[[
+===========================
+HIDE NVV
+===========================
+]]--
+
+do
+	local hideVignetteEnabled = false
+	local savedVignette = nil
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	-- Helper to safely get the NightVision folder
+	local function getNightVisionFolder()
+		local playerGui = LP:FindFirstChild("PlayerGui")
+		if not playerGui then return nil end
+		
+		local gameGui = playerGui:FindFirstChild("Game")
+		if not gameGui then return nil end
+		
+		local hud = gameGui:FindFirstChild("HUD")
+		if not hud then return nil end
+		
+		return hud:FindFirstChild("NightVision")
+	end
+
+	VisTab:CreateToggle({
+		name = "Remove Night Vision Vignette",
+		value = false,
+		callback = function(v)
+			hideVignetteEnabled = v
+			
+			if v then
+				-- Save the original and delete it
+				local nv = getNightVisionFolder()
+				local vignette = nv and nv:FindFirstChild("Vignette")
+				
+				if vignette and not savedVignette then
+					savedVignette = vignette:Clone()
+					vignette:Destroy()
+				end
+			else
+				-- Restore the original
+				if savedVignette then
+					local nv = getNightVisionFolder()
+					if nv and not nv:FindFirstChild("Vignette") then
+						savedVignette:Clone().Parent = nv
+					end
+					savedVignette = nil
+				end
+			end
+		end,
+	})
+
+	-- Enforce deletion every frame to prevent the game from recreating it
+	RunService.Heartbeat:Connect(function()
+		if hideVignetteEnabled then
+			local nv = getNightVisionFolder()
+			if nv then
+				local vignette = nv:FindFirstChild("Vignette")
+				if vignette then
+					-- If we haven't saved it yet, save it now before destroying
+					if not savedVignette then
+						savedVignette = vignette:Clone()
+					end
+					vignette:Destroy()
+				end
+			end
+		end
+	end)
+end
+
+--[[
+===========================
+ROUND TIMER
+===========================
+]]--
+
+do
+	local roundTimerEnabled = false
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	-- Helper to safely traverse the long UI path and get the IngameRoundTimer
+	local function getIngameTimer()
+		local playerGui = LP:FindFirstChild("PlayerGui")
+		if not playerGui then return nil end
+		
+		local gameGui = playerGui:FindFirstChild("Game")
+		if not gameGui then return nil end
+		
+		local hud = gameGui:FindFirstChild("HUD")
+		if not hud then return nil end
+		
+		local overlay = hud:FindFirstChild("Overlay")
+		if not overlay then return nil end
+		
+		local roundOverlay = overlay:FindFirstChild("RoundOverlay")
+		if not roundOverlay then return nil end
+		
+		local roundTimer = roundOverlay:FindFirstChild("RoundTimer")
+		if not roundTimer then return nil end
+		
+		return roundTimer:FindFirstChild("IngameRoundTimer")
+	end
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Round Timer",
+		value = false,
+		callback = function(v)
+			roundTimerEnabled = v
+			
+			if not v then
+				-- Turn both invisible once and stop
+				local ingameTimer = getIngameTimer()
+				if ingameTimer then
+					ingameTimer.Visible = false
+					local timerText = ingameTimer:FindFirstChild("Timer")
+					if timerText then timerText.Visible = false end
+				end
+			end
+		end,
+	})
+
+	-- Loop only runs when toggle is on
+	RunService.RenderStepped:Connect(function()
+		if not roundTimerEnabled then return end
+		
+		local ingameTimer = getIngameTimer()
+		if ingameTimer then
+			ingameTimer.Visible = true
+			local timerText = ingameTimer:FindFirstChild("Timer")
+			if timerText then timerText.Visible = true end
+		end
+	end)
+end
+
+--[[
+===========================
+RES STRECHER
+===========================
+]]--
+do
+-- declare
+local RunService = game:GetService("RunService")
+
+local BIND_RESTORE = "StretchResolutionRestore"
+local BIND_STRETCH = "StretchResolutionStretch"
+local currentAmount = nil
+local originalCFrame = nil
+local stretchEnabled = true
+local RESAMOUNT1 = 1
+
+local function stopStretch()
+	if currentAmount ~= nil then
+		RunService:UnbindFromRenderStep(BIND_RESTORE)
+		RunService:UnbindFromRenderStep(BIND_STRETCH)
+		local cam = workspace.CurrentCamera
+		if originalCFrame and cam then
+			cam.CFrame = originalCFrame
+		end
+		originalCFrame = nil
+	end
+	currentAmount = nil
+end
+
+local function setStretch(amount)
+	if amount == nil then return end
+	if amount == currentAmount then return end
+
+	stopStretch()
+
+	if amount == 1 then
+		currentAmount = 1
+		return
+	end
+
+	currentAmount = amount
+
+	RunService:BindToRenderStep(
+		BIND_RESTORE,
+		Enum.RenderPriority.Camera.Value - 1,
+		function()
+			local cam = workspace.CurrentCamera
+			if cam and originalCFrame then
+				cam.CFrame = originalCFrame
+			end
+		end
+	)
+
+	RunService:BindToRenderStep(
+		BIND_STRETCH,
+		Enum.RenderPriority.Camera.Value + 1,
+		function()
+			local cam = workspace.CurrentCamera
+			if not cam then return end
+			originalCFrame = cam.CFrame
+			cam.CFrame = cam.CFrame
+				* CFrame.new(0, 0, 0, 1, 0, 0, 0, amount, 0, 0, 0, 1)
+		end
+	)
+end
+
+-- per-tick update of the stretch from RESAMOUNT1
+RunService.Heartbeat:Connect(function()
+	if not stretchEnabled then
+		stopStretch()
+		return
+	end
+	setStretch(tonumber(RESAMOUNT1) or 1)
+end)
+
+VisTab:CreateDivider({ text = "Camera" })
+
+VisTab:CreateToggle({
+	name = "Resolution Stretcher",
+	flag = "resstrecheromgggg",
+	value = false,
+	callback = function(value)
+		stretchEnabled = value
+	end,
+})
+
+VisTab:CreateInput({
+	name = "Amount:",
+	value = "",
+	placeholder = "0.00",
+	callback = function(text)
+		RESAMOUNT1 = tonumber(text) or 1
+	end,
+})
+end
+
+--[[
+===========================
+3RD PERSON
+===========================
+]]--
+
+do
+    local thirdPersonEnabled = false
+    local zoomDistance = 10
+    local bindName = "ThirdPersonZoom"
+    local bound = false
+
+    local function applyZoom()
+        if not thirdPersonEnabled then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+        -- Positive Z in camera-local space = backward = zoom out
+        cam.CFrame = cam.CFrame * CFrame.new(0, 0, zoomDistance)
+    end
+
+    local function start()
+        if bound then return end
+        bound = true
+        RunService:BindToRenderStep(bindName, Enum.RenderPriority.Camera.Value + 1, applyZoom)
+    end
+
+    local function stop()
+        if bound then
+            pcall(function() RunService:UnbindFromRenderStep(bindName) end)
+            bound = false
+        end
+        -- Game camera rebuilds CFrame next frame automatically, snaps back
+    end
+
+    VisTab:CreateDivider()
+
+    VisTab:CreateToggle({
+        name = "3rd Person",
+        currentValue = false,
+        flag = "ThirdPerson_Toggle",
+        callback = function(v)
+            thirdPersonEnabled = v
+            if v then start() else stop() end
+        end,
+    })
+
+    VisTab:CreateSlider({
+        name = "Zoom Distance",
+        range = {1, 50},
+        increment = 0.5,
+        suffix = "s",
+        currentValue = 10,
+        flag = "ThirdPerson_Distance",
+        callback = function(v) zoomDistance = v end,
+    })
+
+    _G.RWCallbacks = _G.RWCallbacks or {}
+    _G.RWCallbacks["ThirdPerson"] = function(v)
+        thirdPersonEnabled = v
+        if v then start() else stop() end
+    end
+end
+
+--[[
+===========================
+SPOOFING
+===========================
+]]--
+
+do
+    local Plr = game.Players.LocalPlayer
+    getgenv().spoofState = getgenv().spoofState or {}
+
+    local function escPattern(s) return s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0") end
+    local function escRepl(s)    return s:gsub("%%", "%%%%") end
+
+    local function makeSpoofer(flag, getOriginal)
+        local api = { active = false, name = getOriginal() }
+        local function getState() return getgenv().spoofState[flag] end
+
+        local function render(label)
+            local state = getState()
+            if not state then return end
+            local real = state.originals[label]
+            if real == nil then return end
+            local desired = real:gsub(state.escName, state.nameRepl)
+            if label.Text ~= desired then
+                state.lastSet[label] = desired
+                label.Text = desired
+            end
+        end
+
+        local function renderAll()
+            local state = getState()
+            if not state then return end
+            for label in pairs(state.hooked) do pcall(render, label) end
+        end
+
+        local function attach(label)
+            local state = getState()
+            if not state then return end
+            if state.originals[label] == nil then
+                if not label.Text:find(getOriginal(), 1, true) then return end
+                state.originals[label] = label.Text
+            end
+            render(label)
+            if state.hooked[label] then return end
+            state.hooked[label] = true
+            table.insert(state.hooks, label:GetPropertyChangedSignal("Text"):Connect(function()
+                local st = getState()
+                if not st then return end
+                local cur = label.Text
+                if cur == st.lastSet[label] then return end
+                st.originals[label] = cur
+                render(label)
+            end))
+        end
+
+        function api.setName(newName)
+            if not newName or newName == "" then return end
+            api.name = newName
+            local state = getState()
+            if state then
+                state.nameRepl = escRepl(newName)
+                renderAll()
+            end
+        end
+
+        function api.on()
+            local prev = getgenv().spoofState[flag]
+            if prev then
+                for _, c in ipairs(prev.hooks) do c:Disconnect() end
+            end
+            local state = {
+                originals = (prev and prev.originals) or setmetatable({}, {__mode="k"}),
+                hooked    = (prev and prev.hooked)    or setmetatable({}, {__mode="k"}),
+                lastSet   = (prev and prev.lastSet)   or setmetatable({}, {__mode="k"}),
+                hooks = {},
+                escName  = escPattern(getOriginal()),
+                nameRepl = escRepl(api.name),
+            }
+            getgenv().spoofState[flag] = state
+            for _, v in next, game:GetDescendants() do
+                if v.ClassName == "TextLabel" then attach(v) end
+            end
+            table.insert(state.hooks, game.DescendantAdded:Connect(function(v)
+                if v.ClassName == "TextLabel" then attach(v) end
+            end))
+            api.active = true
+        end
+
+        function api.off()
+            local state = getState()
+            if not state then return end
+            for _, c in ipairs(state.hooks) do c:Disconnect() end
+            for label, real in pairs(state.originals) do
+                if label.Parent then pcall(function() label.Text = real end) end
+            end
+            getgenv().spoofState[flag] = nil
+            api.active = false
+        end
+
+        return api
+    end
+
+    local usernameSpoofer = makeSpoofer("username",    function() return Plr.Name        end)
+    local displaySpoofer  = makeSpoofer("displayName", function() return Plr.DisplayName end)
+
+    VisTab:CreateDivider({ text = "Spoofing" })
+
+    VisTab:CreateToggle({
+        name = "Local Spoof Username",
+        flag = "SpoofUsername",
+        value = false,
+        callback = function(v)
+            if v then usernameSpoofer.on() else usernameSpoofer.off() end
+        end,
+    })
+
+    VisTab:CreateInput({
+        name = "Username:",
+        value = Plr.Name,
+        placeholder = "New username",
+        callback = function(text)
+            if text ~= "" then usernameSpoofer.setName(text) end
+        end,
+    })
+
+    VisTab:CreateToggle({
+        name = "Local Spoof Display Name",
+        flag = "SpoofDisplayName",
+        value = false,
+        callback = function(v)
+            if v then displaySpoofer.on() else displaySpoofer.off() end
+        end,
+    })
+
+    VisTab:CreateInput({
+        name = "Display Name:",
+        value = Plr.DisplayName,
+        placeholder = "New display name",
+        callback = function(text)
+            if text ~= "" then displaySpoofer.setName(text) end
+        end,
+    })
+end
+
+-- avatar 4.0
+
+do
+	local avatarEnabled = false
+	local targetUsername = ""
+	local cachedDesc = nil
+	local appliedRigs = {} -- Tracks which rigs have already been modified
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	-- Helper to fetch the description and cache it
+	local function getDesc(username)
+		local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
+		if ok and userId then
+			local dOk, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
+			if dOk then return desc end
+		end
+		return nil
+	end
+
+	-- Helper to apply the description to a specific rig
+	local function applyToRig(rig, desc)
+		local hum = rig:FindFirstChildOfClass("Humanoid")
+		if not hum then return end
+		
+		-- Clear old items
+		for _, item in ipairs(rig:GetDescendants()) do
+			if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+				item:Destroy()
+			end
+		end
+		
+		local head = rig:FindFirstChild("Head")
+		if head then
+			for _, item in ipairs(head:GetChildren()) do
+				if item:IsA("Decal") then item:Destroy() end
+			end
+		end
+
+		-- Apply description
+		local successApply = pcall(function()
+			hum:ApplyDescription(desc)
+		end)
+
+		-- Fallback for custom rigs
+		if not successApply then
+			local userId = Players:GetUserIdFromNameAsync(desc.Name)
+			local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
+			if aSuccess and appearance then
+				for _, item in ipairs(appearance:GetDescendants()) do
+					if item:IsA("Accessory") then
+						pcall(function() hum:AddAccessory(item:Clone()) end)
+					elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+						item:Clone().Parent = rig
+					end
+				end
+			end
+		end
+		
+		-- Force apply Face
+		if desc.Face > 0 and head then
+			local face = Instance.new("Decal")
+			face.Name = "face"
+			face.Texture = "rbxassetid://" .. desc.Face
+			face.Parent = head
+		end
+	end
+
+	VisTab:CreateToggle({
+		name = "Local Avatar Changer",
+		value = false,
+		callback = function(v)
+			avatarEnabled = v
+			appliedRigs = {} -- Reset cache
+			
+			if v then
+				cachedDesc = nil
+				if targetUsername ~= "" then
+					task.spawn(function()
+						cachedDesc = getDesc(targetUsername)
+					end)
+				end
+			else
+				-- Revert everything to LocalPlayer
+				task.spawn(function()
+					local myDesc = getDesc(LP.Name)
+					if myDesc then
+						local rigs = workspace:FindFirstChild("Rigs")
+						if rigs then
+							for _, rig in ipairs(rigs:GetChildren()) do
+								if rig.Name == LP.Name then
+									applyToRig(rig, myDesc)
+								end
+							end
+						end
+					end
+				end)
+			end
+		end,
+	})
+
+	VisTab:CreateInput({
+		name = "Username:",
+		placeholder = "Enter username",
+		removeTextAfterFocusLost = false,
+		callback = function(text)
+			targetUsername = text
+			cachedDesc = nil -- Reset cache so it fetches the new name
+			appliedRigs = {} -- Force all rigs to update to the new name
+			
+			if avatarEnabled and targetUsername ~= "" then
+				task.spawn(function()
+					cachedDesc = getDesc(targetUsername)
+				end)
+			end
+		end,
+	})
+
+	-- Live updating loop
+	RunService.Heartbeat:Connect(function()
+		if not avatarEnabled then return end
+		if not targetUsername or targetUsername == "" then return end
+		
+		-- Wait for the description to load
+		if not cachedDesc then
+			cachedDesc = getDesc(targetUsername)
+			if not cachedDesc then return end
+		end
+
+		local rigs = workspace:FindFirstChild("Rigs")
+		if not rigs then return end
+		
+		local activeRigs = {}
+		
+		for _, rig in ipairs(rigs:GetChildren()) do
+			if rig.Name == LP.Name then
+				activeRigs[rig] = true
+				
+				-- If we haven't applied the avatar to this specific rig yet, do it now
+				if not appliedRigs[rig] then
+					appliedRigs[rig] = true
+					applyToRig(rig, cachedDesc)
+				end
+			end
+		end
+		
+		-- Cleanup the cache to prevent memory leaks from destroyed rigs
+		for rig in pairs(appliedRigs) do
+			if not activeRigs[rig] then
+				appliedRigs[rig] = nil
+			end
+		end
+	end)
+end
+
+-- others avatar v1.0
+
+do
+	local avatarEnabled = false
+	local targetUsername = ""
+	local cachedDesc = nil
+	local targetUserId = nil
+	local appliedRigs = {}
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	-- Helper to fetch the description and UserId
+	local function getDesc(username)
+		local ok, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
+		if ok and userId then
+			local dOk, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
+			if dOk then 
+				return desc, userId
+			end
+		end
+		return nil, nil
+	end
+
+	-- Helper to apply the description to a specific rig
+	local function applyToRig(rig, desc, userId)
+		local hum = rig:FindFirstChildOfClass("Humanoid")
+		if not hum then return end
+		
+		-- Clear old items
+		for _, item in ipairs(rig:GetDescendants()) do
+			if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+				item:Destroy()
+			end
+		end
+		
+		local head = rig:FindFirstChild("Head")
+		if head then
+			for _, item in ipairs(head:GetChildren()) do
+				if item:IsA("Decal") then item:Destroy() end
+			end
+		end
+
+		-- Apply description
+		local successApply = pcall(function()
+			hum:ApplyDescription(desc)
+		end)
+
+		-- Fallback for custom rigs
+		if not successApply and userId then
+			local aSuccess, appearance = pcall(function() return Players:GetCharacterAppearanceAsync(userId) end)
+			if aSuccess and appearance then
+				for _, item in ipairs(appearance:GetDescendants()) do
+					if item:IsA("Accessory") then
+						pcall(function() hum:AddAccessory(item:Clone()) end)
+					elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+						item:Clone().Parent = rig
+					end
+				end
+			end
+		end
+		
+		-- Force apply Face
+		if desc.Face > 0 and head then
+			local face = Instance.new("Decal")
+			face.Name = "face"
+			face.Texture = "rbxassetid://" .. desc.Face
+			face.Parent = head
+		end
+	end
+
+	VisTab:CreateToggle({
+		name = "Others Avatar Spoofer",
+		value = false,
+		callback = function(v)
+			avatarEnabled = v
+			appliedRigs = {}
+			
+			if v then
+				cachedDesc = nil
+				targetUserId = nil
+				if targetUsername ~= "" then
+					task.spawn(function()
+						cachedDesc, targetUserId = getDesc(targetUsername)
+					end)
+				end
+			else
+				-- Revert everything to their own actual avatars
+				task.spawn(function()
+					local rigs = workspace:FindFirstChild("Rigs")
+					if rigs then
+						for _, rig in ipairs(rigs:GetChildren()) do
+							-- Check if it's a real player
+							local plr = Players:FindFirstChild(rig.Name)
+							if plr and plr ~= LP then
+								local myDesc, myId = getDesc(plr.Name)
+								if myDesc then
+									applyToRig(rig, myDesc, myId)
+									task.wait(0.1) -- Small delay to prevent rate limits
+								end
+							end
+						end
+					end
+				end)
+			end
+		end,
+	})
+
+	VisTab:CreateInput({
+		name = "Username:",
+		placeholder = "Enter username",
+		removeTextAfterFocusLost = false,
+		callback = function(text)
+			targetUsername = text
+			cachedDesc = nil
+			targetUserId = nil
+			appliedRigs = {}
+			
+			if avatarEnabled and targetUsername ~= "" then
+				task.spawn(function()
+					cachedDesc, targetUserId = getDesc(targetUsername)
+				end)
+			end
+		end,
+	})
+
+	-- Live updating loop
+	RunService.Heartbeat:Connect(function()
+		if not avatarEnabled then return end
+		if not targetUsername or targetUsername == "" then return end
+		
+		-- Wait for description to load
+		if not cachedDesc then
+			cachedDesc, targetUserId = getDesc(targetUsername)
+			if not cachedDesc then return end
+		end
+
+		-- Build a table of valid players (excluding LocalPlayer)
+		local validPlayers = {}
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= LP then
+				validPlayers[plr.Name] = true
+			end
+		end
+
+		local rigs = workspace:FindFirstChild("Rigs")
+		if not rigs then return end
+		
+		local activeRigs = {}
+		
+		for _, rig in ipairs(rigs:GetChildren()) do
+			-- NEXTBOT CHECK: Only edit rigs that match an actual player in the game
+			if validPlayers[rig.Name] then
+				activeRigs[rig] = true
+				
+				-- If we haven't applied the avatar to this specific rig yet, do it now
+				if not appliedRigs[rig] then
+					appliedRigs[rig] = true
+					applyToRig(rig, cachedDesc, targetUserId)
+				end
+			end
+		end
+		
+		-- Cleanup the cache
+		for rig in pairs(appliedRigs) do
+			if not activeRigs[rig] then
+				appliedRigs[rig] = nil
+			end
+		end
+	end)
+end
+
+--[[
+===========================
+SPOOFS
+===========================
+]]--
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual%20tab/Spoofs"))()
+
+--[[
+===========================
+FULLBRIGHT
+===========================
+]]--
+
+do
+	local fullbrightEnabled = false
+	local currentLevel = "Medium"
+	local RunService = game:GetService("RunService")
+	local Lighting = game:GetService("Lighting")
+
+	-- Save original lighting properties so we can revert cleanly
+	local originalProps = {
+		Brightness = Lighting.Brightness,
+		ClockTime = Lighting.ClockTime,
+		GlobalShadows = Lighting.GlobalShadows,
+		Ambient = Lighting.Ambient,
+		OutdoorAmbient = Lighting.OutdoorAmbient,
+		FogEnd = Lighting.FogEnd,
+		FogStart = Lighting.FogStart,
+		FogColor = Lighting.FogColor
+	}
+	
+	-- Track atmospheric objects that we might need to hide
+	local hiddenObjects = {}
+
+	local function applyFullbright()
+		if not fullbrightEnabled then return end
+
+		-- Nuke fog
+		Lighting.FogEnd = 100000
+		Lighting.FogStart = 0
+		Lighting.FogColor = Color3.fromRGB(255, 255, 255)
+
+		-- Hide any Atmosphere or Clouds
+		for _, v in ipairs(Lighting:GetDescendants()) do
+			if v:IsA("Atmosphere") or v:IsA("Sky") then
+				if not hiddenObjects[v] then
+					hiddenObjects[v] = v.Parent
+					v.Parent = nil -- Hide it
+				end
+			end
+		end
+		local terrain = workspace:FindFirstChild("Terrain")
+		if terrain then
+			local clouds = terrain:FindFirstChild("Clouds")
+			if clouds and not hiddenObjects[clouds] then
+				hiddenObjects[clouds] = clouds.Parent
+				clouds.Parent = nil
+			end
+		end
+
+		-- Apply settings based on level
+		if currentLevel == "Low" then
+			Lighting.Brightness = 2
+			Lighting.ClockTime = 14
+			Lighting.GlobalShadows = true
+			Lighting.Ambient = Color3.fromRGB(120, 120, 120)
+			Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120)
+		elseif currentLevel == "Medium" then
+			Lighting.Brightness = 3
+			Lighting.ClockTime = 12
+			Lighting.GlobalShadows = false
+			Lighting.Ambient = Color3.fromRGB(200, 200, 200)
+			Lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
+		elseif currentLevel == "Extreme" then
+			Lighting.Brightness = 10
+			Lighting.ClockTime = 12
+			Lighting.GlobalShadows = false
+			Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+			Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+		end
+	end
+
+	local function revertFullbright()
+		-- Restore original lighting
+		for prop, val in pairs(originalProps) do
+			pcall(function()
+				Lighting[prop] = val
+			end)
+		end
+
+		-- Restore hidden objects
+		for obj, parent in pairs(hiddenObjects) do
+			if parent then
+				pcall(function()
+					obj.Parent = parent
+				end)
+			end
+		end
+		hiddenObjects = {}
+	end
+
+	VisTab:CreateDivider({ text = "Lighting" })
+
+	VisTab:CreateToggle({
+		name = "Fullbright",
+		value = false,
+		callback = function(v)
+			fullbrightEnabled = v
+			if v then
+				applyFullbright()
+			else
+				revertFullbright()
+			end
+		end,
+	})
+
+	VisTab:CreateDropdown({
+		name = "Level:",
+		options = { "Low", "Medium", "Extreme" },
+		default = { "Medium" },
+		multiSelect = false,
+		callback = function(selected)
+			currentLevel = type(selected) == "table" and selected[1] or selected
+			if fullbrightEnabled then
+				applyFullbright() -- Instantly update if changed while on
+			end
+		end,
+	})
+
+	-- Loop to enforce the lighting every frame (stops the game from overriding it)
+	RunService.Heartbeat:Connect(function()
+		if fullbrightEnabled then
+			applyFullbright()
+		end
+	end)
+end
+
+--[[
+===========================
+HUD COLORS (v.2.0)
+===========================
+]]--
+
+do
+	local hudEnabled = false
+	local healthColor = Color3.fromRGB(255, 255, 255)
+	local speedColor = Color3.fromRGB(255, 255, 255)
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+	
+	-- Store originals per instance
+	local savedColors = {}
+
+	-- Helper to find the new UI elements safely
+	local function getHUDElements()
+		local playerGui = LP:FindFirstChild("PlayerGui")
+		if not playerGui then return nil end
+		
+		local gameHud = playerGui:FindFirstChild("GameHud")
+		if not gameHud then return nil end
+		
+		local root = gameHud:FindFirstChild("Root")
+		if not root then return nil end
+		
+		local bottomLeft = root:FindFirstChild("BottomLeft")
+		if not bottomLeft then return nil end
+		
+		-- 1. Speedometer Path
+		local plate = bottomLeft:FindFirstChild("Plate")
+		local content = plate and plate:FindFirstChild("Content")
+		local speedText = content and content:FindFirstChild("Value")
+		local speedIcon = content and content:FindFirstChild("Icon")
+		
+		-- 2. Health Path
+		local row = bottomLeft:FindFirstChild("Row")
+		local rowPlate = row and row:FindFirstChild("Plate")
+		local rowContent = rowPlate and rowPlate:FindFirstChild("Content")
+		local healthText = rowContent and rowContent:FindFirstChild("Value")
+		local healthIcon = rowContent and rowContent:FindFirstChild("Icon")
+		
+		return {
+			HealthIcon = healthIcon,
+			HealthText = healthText,
+			SpeedImage = speedIcon,  -- Keeping variable name consistent with old script
+			SpeedText = speedText
+		}
+	end
+
+	-- Save original colors based on the specific UI instance
+	local function saveOriginalColor(inst, prop)
+		if inst and not savedColors[inst] then
+			savedColors[inst] = inst[prop]
+		end
+	end
+
+	-- Apply the chosen colors
+	local function applyColors()
+		local elements = getHUDElements()
+		if not elements then return end
+		
+		-- Health
+		if elements.HealthIcon then 
+			saveOriginalColor(elements.HealthIcon, "ImageColor3")
+			elements.HealthIcon.ImageColor3 = healthColor 
+		end
+		if elements.HealthText then 
+			saveOriginalColor(elements.HealthText, "TextColor3")
+			elements.HealthText.TextColor3 = healthColor 
+		end
+		
+		-- Speedometer
+		if elements.SpeedImage then 
+			saveOriginalColor(elements.SpeedImage, "ImageColor3")
+			elements.SpeedImage.ImageColor3 = speedColor 
+		end
+		if elements.SpeedText then 
+			saveOriginalColor(elements.SpeedText, "TextColor3")
+			elements.SpeedText.TextColor3 = speedColor 
+		end
+	end
+
+	-- Revert to original colors
+	local function revertColors()
+		local elements = getHUDElements()
+		if not elements then return end
+		
+		if elements.HealthIcon and savedColors[elements.HealthIcon] then 
+			elements.HealthIcon.ImageColor3 = savedColors[elements.HealthIcon] 
+		end
+		if elements.HealthText and savedColors[elements.HealthText] then 
+			elements.HealthText.TextColor3 = savedColors[elements.HealthText] 
+		end
+		
+		if elements.SpeedImage and savedColors[elements.SpeedImage] then 
+			elements.SpeedImage.ImageColor3 = savedColors[elements.SpeedImage] 
+		end
+		if elements.SpeedText and savedColors[elements.SpeedText] then 
+			elements.SpeedText.TextColor3 = savedColors[elements.SpeedText] 
+		end
+	end
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Change HUD Colors",
+		value = false,
+		callback = function(v)
+			hudEnabled = v
+			if not v then
+				revertColors()
+			end
+		end,
+	})
+
+	VisTab:CreateColorPicker({
+		name = "Health",
+		color = Color3.fromRGB(255, 50, 50), -- Default red
+		callback = function(color)
+			healthColor = color
+			if hudEnabled then applyColors() end
+		end,
+	})
+
+	VisTab:CreateColorPicker({
+		name = "Speedometer",
+		color = Color3.fromRGB(255, 255, 255), -- Default white
+		callback = function(color)
+			speedColor = color
+			if hudEnabled then applyColors() end
+		end,
+	})
+
+	-- Enforce colors every frame, wrapped in pcall just in case the UI disappears mid-frame
+	RunService.Heartbeat:Connect(function()
+		if hudEnabled then
+			pcall(applyColors)
+		end
+	end)
+end
+
+--[[
+===========================
+HIDE HUD v2.1
+===========================
+]]--
+
+do
+	local hideHudEnabled = false
+	local hideJumpEnabled = false
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Hide HUD",
+		value = false,
+		callback = function(v)
+			hideHudEnabled = v
+			if not v then
+				-- One-time restore so the game can take back over
+				local playerGui = LP:FindFirstChild("PlayerGui")
+				local gameGui = playerGui and playerGui:FindFirstChild("Game")
+				local hud = gameGui and gameGui:FindFirstChild("HUD")
+				if hud then
+					if hud:IsA("ScreenGui") then hud.Enabled = true else hud.Visible = true end
+				end
+				if gameGui and gameGui:IsA("ScreenGui") then gameGui.Enabled = true end
+				
+				local touchGui = playerGui and playerGui:FindFirstChild("TouchGui")
+				local touchFrame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
+				local jumpButton = touchFrame and touchFrame:FindFirstChild("JumpButton")
+				if jumpButton then jumpButton.Visible = true end
+			end
+		end,
+	})
+
+	VisTab:CreateToggle({
+		name = "Hide Mobile Jump Button",
+		value = false,
+		callback = function(v)
+			hideJumpEnabled = v
+		end,
+	})
+
+	RunService.RenderStepped:Connect(function()
+		-- IF MAIN TOGGLE IS OFF, STOP COMPLETELY. LET THE GAME HANDLE IT.
+		if not hideHudEnabled then return end
+		
+		local playerGui = LP:FindFirstChild("PlayerGui")
+		if not playerGui then return end
+
+		local gameGui = playerGui:FindFirstChild("Game")
+		local hud = gameGui and gameGui:FindFirstChild("HUD")
+
+		local touchGui = playerGui:FindFirstChild("TouchGui")
+		local jumpButton = nil
+		
+		if touchGui then
+			local frame = touchGui:FindFirstChild("TouchControlFrame")
+			if frame then
+				jumpButton = frame:FindFirstChild("JumpButton")
+			end
+		end
+
+		-- HIDE MAIN HUD
+		if hud then
+			if hud:IsA("ScreenGui") then
+				hud.Enabled = false
+			else
+				hud.Visible = false
+				if gameGui and gameGui:IsA("ScreenGui") then
+					gameGui.Enabled = false
+				end
+			end
+		elseif gameGui and gameGui:IsA("ScreenGui") then
+			gameGui.Enabled = false
+		end
+		
+		-- HANDLE JUMP BUTTON
+		if jumpButton then
+			jumpButton.Visible = not hideJumpEnabled
+		end
+	end)
+end
+
+--[[
+===========================
+KB OVERLAY
+===========================
+]]--
+
+-- Keyboard Overlay
+local function setGlobal(name, value)
+    getgenv()[name] = value
+    _G[name] = value
+end
+
+local function parseRGB(v)
+    if type(v) == "table" then return v end
+    if typeof and typeof(v) == "Color3" then return { v.R * 255, v.G * 255, v.B * 255 } end
+    if type(v) == "number" then return { v, v, v } end
+    local r, g, b = tostring(v):match("^%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*$")
+    if r then return { tonumber(r), tonumber(g), tonumber(b) } end
+    return { 0, 0, 0 }
+end
+
+setGlobal("KBON",   false)
+setGlobal("KBOTT",  0)
+setGlobal("KBOT",   0)
+setGlobal("KBOBGC", { 50, 50, 50 })
+setGlobal("KBOPC",  { 255, 0, 0 })
+setGlobal("KBOKC",  { 70, 70, 70 })
+
+local reloadQueued = false
+local function reloadOverlay()
+    if not getgenv().KBON then return end
+    if reloadQueued then return end
+    reloadQueued = true
+    task.delay(0.1, function()
+        reloadQueued = false
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Keyboarddelete"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+    end)
+end
+
+local KBODivider = VisTab:CreateDivider({ text = "Keyboard Overlay" })
+
+VisTab:CreateToggle({
+    name = "Keyboard Overlay",
+    flag = "KBOVERLAYYY",
+    value = false,
+    callback = function(v)
+        setGlobal("KBON", v)
+        if v then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/keyboard"))()
+        else
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Keyboarddelete"))()
+        end
+       if v then
+        KBODivider:Set("Keyboard Overlay Enabled")
+         task.wait(3)
+         KBODivider:Set("Keyboard Overlay")
+       else
+        KBODivider:Set("Keyboard Overlay Disabled")
+         task.wait(3)
+         KBODivider:Set("Keyboard Overlay")
+      end
+    end,
+})
+
+VisTab:CreateSlider({
+    name = "Backround Transparency",
+    flag = "KBO_TR_SLIDER",
+    range = { 0, 1 },
+    increment = 0.01,
+    value = 0,
+    suffix = "",
+    callback = function(v)
+        setGlobal("KBOT", v)
+        reloadOverlay()
+    end,
+})
+
+VisTab:CreateToggle({
+    name = "Tilt Keyboard",
+    flag = "KBOTT_TILT",
+    value = false,
+    callback = function(v)
+        setGlobal("KBOTT", v and 10 or 0)
+        reloadOverlay()
+    end,
+})
+
+local function colorCallback(key)
+    return function(...)
+        local args = table.pack(...)
+        local value
+        if args.n >= 3 then
+            value = { args[1], args[2], args[3] }
+        else
+            value = parseRGB(args[1])
+        end
+        setGlobal(key, value)
+        reloadOverlay()
+    end
+end
+
+VisTab:CreateColorPicker({
+    name = "Backround Color",
+    flag = "KBO_BG_PICK",
+    color = Color3.fromRGB(50, 50, 50),
+    callback = colorCallback("KBOBGC"),
+})
+
+VisTab:CreateColorPicker({
+    name = "Pressed Key Color",
+    flag = "KBO_OP_PICK",
+    color = Color3.fromRGB(255, 0, 0),
+    callback = colorCallback("KBOPC"),
+})
+
+VisTab:CreateColorPicker({
+    name = "Key Color",
+    flag = "KBO_K_PICK",
+    color = Color3.fromRGB(70, 70, 70),
+    callback = colorCallback("KBOKC"),
+})
+
+--[[
+===========================
+HIDE PLYS
+===========================
+]]--
+
+do
+	local hidePlayersEnabled = false
+	local showFriendsEnabled = false
+	
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local LP = Players.LocalPlayer
+	
+	-- Hidden folder kept in memory (unparented) so the game doesn't see the rigs
+	local hiddenFolder = Instance.new("Folder")
+	hiddenFolder.Name = "HiddenPlayerRigs"
+	
+	-- Tracks rigs we hid and their original parent so we can restore them
+	local hiddenRigs = {}
+
+	-- Helper to check if a rig belongs to a friend
+	local function isFriend(player)
+		local success, result = pcall(function()
+			return LP:IsFriendsWith(player.UserId)
+		end)
+		return success and result
+	end
+
+	VisTab:CreateDivider({ text = "Player + Character" })
+
+	VisTab:CreateToggle({
+		name = "Hide Players",
+		value = false,
+		callback = function(v)
+			hidePlayersEnabled = v
+			
+			if not v then
+				-- Restore all hidden rigs to their original locations
+				for rig, originalParent in pairs(hiddenRigs) do
+					if rig and originalParent then
+						pcall(function()
+							rig.Parent = originalParent
+						end)
+					end
+				end
+				hiddenRigs = {}
+			end
+		end,
+	})
+
+	VisTab:CreateToggle({
+		name = "Show Friends",
+		value = false,
+		callback = function(v)
+			showFriendsEnabled = v
+		end,
+	})
+
+	-- Enforce hiding every frame to catch newly spawned rigs
+	RunService.Heartbeat:Connect(function()
+		if not hidePlayersEnabled then return end
+		
+		-- Check both workspace.Rigs and workspace.Players
+		local containers = {
+			workspace:FindFirstChild("Rigs"),
+			workspace:FindFirstChild("Players")
+		}
+		
+		for _, container in ipairs(containers) do
+			if container then
+				for _, rig in ipairs(container:GetChildren()) do
+					-- Ensure it's a real player (prevents deleting Nextbots)
+					local plr = Players:FindFirstChild(rig.Name)
+					
+					if plr and plr ~= LP then
+						local shouldHide = true
+						
+						-- Check if we should keep friends visible
+						if showFriendsEnabled and isFriend(plr) then
+							shouldHide = false
+						end
+						
+						if shouldHide then
+							-- If it's not already hidden, hide it
+							if rig.Parent ~= hiddenFolder then
+								hiddenRigs[rig] = container
+								rig.Parent = hiddenFolder
+							end
+						end
+					end
+				end
+			end
+		end
+	end)
+end
+
+--[[
+===========================
+RSGASC p
+===========================
+]]--
+
+do
+	local modelEnabled = false
+	local assetIdText = ""
+	local savedOriginals = {}
+	
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local RunService = game:GetService("RunService")
+	local Players = game:GetService("Players")
+	local LP = Players.LocalPlayer
+
+	-- The exact CFrames you found
+	local C0_VAL = CFrame.new(0.0410000011, -0.200000003, 0.138999999, 1, 0, 0, 0, 0, 1, 0, -1, 0)
+	local C1_VAL = CFrame.new(0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+
+	-- Helper to find the EmoteModels in ReplicatedStorage and the active rig
+	local function getEmoteModels()
+		local models = {}
+		
+		local items = ReplicatedStorage:FindFirstChild("Items")
+		local itemPacks = items and items:FindFirstChild("ItemPacks")
+		local events = itemPacks and itemPacks:FindFirstChild("Events")
+		local y2022 = events and events:FindFirstChild("2022")
+		local halloween = y2022 and y2022:FindFirstChild("Halloween2022")
+		local emotes = halloween and halloween:FindFirstChild("Emotes")
+		local rockinStride = emotes and emotes:FindFirstChild("RockinStride")
+		
+		if rockinStride then
+			local classicModel = rockinStride:FindFirstChild("CharacterClassic") and rockinStride.CharacterClassic:FindFirstChild("EmoteModel")
+			if classicModel then table.insert(models, classicModel) end
+			
+			local charModel = rockinStride:FindFirstChild("Character") and rockinStride.Character:FindFirstChild("EmoteModel")
+			if charModel then table.insert(models, charModel) end
+		end
+
+		local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
+		if rig then
+			for _, v in ipairs(rig:GetDescendants()) do
+				if v.Name == "EmoteModel" then
+					table.insert(models, v)
+				end
+			end
+		end
+
+		return models
+	end
+
+	-- Load the 3D Asset (Handles both Models and MeshParts safely)
+	local function createCustomModel(assetId)
+		local success, objects = pcall(function()
+			return game:GetObjects("rbxassetid://" .. tostring(assetId))
+		end)
+		
+		if not success or not objects or #objects == 0 then return nil, nil end
+		
+		local newModel = Instance.new("Model")
+		newModel.Name = "CustomRockinStride"
+		
+		-- Parent everything into the new model
+		for _, obj in ipairs(objects) do
+			obj.Parent = newModel
+		end
+		
+		-- 1. Find the Handle (or create one)
+		local handle = newModel:FindFirstChild("Handle", true)
+		if not handle then
+			handle = newModel.PrimaryPart or newModel:FindFirstChildWhichIsA("BasePart")
+			if not handle then
+				handle = Instance.new("Part")
+				handle.Size = Vector3.new(1, 1, 1)
+				handle.Transparency = 1
+				handle.CanCollide = false
+				handle.Parent = newModel
+			end
+			handle.Name = "Handle"
+		end
+		
+		newModel.PrimaryPart = handle
+		
+		-- 2. Unanchor and Weld everything to the Handle
+		for _, part in ipairs(newModel:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.Anchored = false
+				part.CanCollide = false
+				
+				if part ~= handle then
+					local weld = Instance.new("WeldConstraint")
+					weld.Part0 = handle
+					weld.Part1 = part
+					weld.Parent = part
+				end
+			end
+		end
+		
+		return newModel, handle
+	end
+
+	local function applyModel()
+		if not modelEnabled or assetIdText == "" then return end
+		local models = getEmoteModels()
+		if #models == 0 then return end
+		
+		local customAsset, customHandle = createCustomModel(assetIdText)
+		if not customAsset then
+			window:Notify({ title = "Model Changer", content = "Failed to load Asset ID: "..assetIdText, duration = 3 })
+			return
+		end
+
+		local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
+		local leftHand = rig and (rig:FindFirstChild("LeftHand") or rig:FindFirstChild("Left Hand") or rig:FindFirstChild("Left Arm"))
+
+		for _, model in ipairs(models) do
+			-- Save originals only once
+			if not savedOriginals[model] then
+				savedOriginals[model] = {}
+				for _, child in ipairs(model:GetChildren()) do
+					table.insert(savedOriginals[model], child:Clone())
+				end
+			end
+
+			-- Nuke the old children
+			for _, child in ipairs(model:GetChildren()) do
+				child:Destroy()
+			end
+
+			-- Put in the new model
+			local clone = customAsset:Clone()
+			clone.Parent = model
+			
+			local cloneHandle = clone:FindFirstChild("Handle", true)
+			
+			-- 3. Wire up the Motor6D to the LeftHand
+			if rig and model:IsDescendantOf(rig) and cloneHandle and leftHand then
+				-- Remove any existing Motor6D in the Handle
+				for _, c in ipairs(cloneHandle:GetChildren()) do
+					if c:IsA("Motor6D") then c:Destroy() end
+				end
+
+				local motor = Instance.new("Motor6D")
+				motor.Name = "HandleWeld"
+				motor.Part0 = leftHand
+				motor.Part1 = cloneHandle
+				motor.C0 = C0_VAL
+				motor.C1 = C1_VAL
+				motor.Parent = leftHand -- Parent to Part0 (LeftHand)
+			end
+		end
+		
+		customAsset:Destroy()
+	end
+
+	local function revertModel()
+		for model, children in pairs(savedOriginals) do
+			if model and model.Parent then
+				for _, child in ipairs(model:GetChildren()) do
+					child:Destroy()
+				end
+				for _, child in ipairs(children) do
+					child:Clone().Parent = model
+				end
+			end
+		end
+		savedOriginals = {}
+	end
+
+	VisTab:CreateDivider()
+
+	VisTab:CreateToggle({
+		name = "Rockin' Stride Guitar Model Changer",
+		value = false,
+		callback = function(v)
+			modelEnabled = v
+			if v then
+				savedOriginals = {}
+				applyModel()
+			else
+				revertModel()
+			end
+		end,
+	})
+
+	VisTab:CreateInput({
+		name = "Asset ID:",
+		placeholder = "e.g. 123456789",
+		removeTextAfterFocusLost = false,
+		callback = function(text)
+			if not text then return end
+			assetIdText = tostring(text):gsub("%D", "")
+			
+			if modelEnabled and assetIdText ~= "" then
+				revertModel()
+				applyModel()
+			end
+		end,
+	})
+
+	-- Loop to enforce it in case the game resets the EmoteModel
+	RunService.Heartbeat:Connect(function()
+		if modelEnabled and assetIdText ~= "" then
+			local rig = workspace:FindFirstChild("Rigs") and workspace.Rigs:FindFirstChild(LP.Name)
+			if rig then
+				for _, v in ipairs(rig:GetDescendants()) do
+					if v.Name == "EmoteModel" then
+						local hasCustom = false
+						for _, child in ipairs(v:GetChildren()) do
+							if child.Name == "CustomRockinStride" then
+								hasCustom = true
+								break
+							end
+						end
+						if not hasCustom then
+							applyModel()
+							break
+						end
+					end
+				end
+			end
+		end
+	end)
+end
