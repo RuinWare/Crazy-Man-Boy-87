@@ -11,7 +11,7 @@
 -- Handles: every Create... call returns an empty handle. Read and write values through the window:
 --   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
 --   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
-
+-- tuff shit
 ----------------------------------------------------------------
 -- LIBRARY BODY
 ----------------------------------------------------------------
