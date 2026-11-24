@@ -45,7 +45,7 @@ Vistab:CreateDivider()
 	VisTab:CreateDropdown({
 		name = "Korblox",
 		options = { "Off", "Right Leg", "Left Leg", "Both" },
-		default = { "Off" },
+		value = { "Off" },
 		multiSelect = false,
 		callback = function(selected)
 			korbloxMode = type(selected) == "table" and selected[1] or selected
