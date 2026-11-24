@@ -2103,7 +2103,7 @@ tab:CreateSection({ name = "Modifiers" })
     tab:CreateToggle({
         name = "Friction Changer",
         icon = 102876083492144,
-        currentValue = false,
+        value = false,
         flag = "FrictionChanger_Toggle",
         callback = function(v)
             frictionEnabled = v
@@ -2112,14 +2112,12 @@ tab:CreateSection({ name = "Modifiers" })
             end
         end,
     })
-
-_G.RWCallbacks["FrictionChanger"] = function(v) frictionEnabled = v; if not v then fireFriction(5) end end
 	
     tab:CreateInput({
         name = "Friction Value",
         icon = 120640130652888,
         placeholder = "e.g. 5",
-        currentValue = "5",
+        value = "5",
         flag = "FrictionChanger_Value",
         callback = function(text)
             local n = tonumber(text)
@@ -2210,12 +2208,10 @@ do
         fireAirStrafe(airStrafeValue)
     end)
 
-    tab:CreateDivider()
-
     tab:CreateToggle({
         name = "Air Strafe Acceleration Changer",
 		icon = 76591949215082,
-        currentValue = false,
+        value = false,
         flag = "AirStrafe_Toggle",
         callback = function(v)
             airStrafeEnabled = v
@@ -2224,8 +2220,6 @@ do
             end
         end,
     })
-
-_G.RWCallbacks["AirStrafe"] = function(v) airStrafeEnabled = v; if not v then fireAirStrafe(182) end end
 	
     tab:CreateSlider({
         name = "Air Strafe Acceleration",
@@ -2233,7 +2227,7 @@ _G.RWCallbacks["AirStrafe"] = function(v) airStrafeEnabled = v; if not v then fi
         range = {182, 10000},
         increment = 1,
         suffix = "",
-        currentValue = 182,
+        value = 182,
         flag = "AirStrafe_Slider",
         callback = function(v)
             airStrafeValue = v
@@ -2321,12 +2315,10 @@ do
         fireJumpCap(jumpCapValue)
     end)
 
-    tab:CreateDivider()
-
     tab:CreateToggle({
         name = "Jump Cap Changer",
 		icon = 116351309458675,
-        currentValue = false,
+        value = false,
         flag = "JumpCap_Toggle",
         callback = function(v)
             jumpCapEnabled = v
@@ -2335,8 +2327,6 @@ do
             end
         end,
     })
-
-_G.RWCallbacks["JumpCap"] = function(v) jumpCapEnabled = v; if not v then fireJumpCap(2) end end
 	
     tab:CreateInput({
         name = "Amount",
@@ -2370,7 +2360,7 @@ do
     tab:CreateToggle({
         name = "Gravity Changer",
 		icon = 137214837348305,
-        currentValue = false,
+        value = false,
         flag = "GravityChanger_Toggle",
         callback = function(v)
             gravityEnabled = v
@@ -2381,8 +2371,6 @@ do
             end
         end,
     })
-
-_G.RWCallbacks["GravityChanger"] = function(v) gravityEnabled = v; workspace.Gravity = v and gravityValue or 196.2 end
 	
     tab:CreateSlider({
         name = "Gravity",
@@ -2390,7 +2378,7 @@ _G.RWCallbacks["GravityChanger"] = function(v) gravityEnabled = v; workspace.Gra
         range = {0, 800},
         increment = 0.1,
         suffix = "",
-        currentValue = 50,
+        value = 50,
         flag = "GravityChanger_Slider",
         callback = function(v)
             gravityValue = v
@@ -2452,12 +2440,10 @@ do
         b.MouseButton1Down:Connect(applyJump)
     end)
 
-    tab:CreateDivider()
-
     tab:CreateToggle({
         name = "Jump Height Changer",
 		icon = 97668677854395,
-        currentValue = false,
+        value = false,
         flag = "JumpHeight_Toggle",
         callback = function(v)
             jumpHeightEnabled = v
@@ -2467,15 +2453,13 @@ do
         end,
     })
 
-_G.RWCallbacks["JumpHeight"] = function(v) jumpHeightEnabled = v; if jhHum then jhHum.JumpPower = v and 0 or 50 end end
-
     tab:CreateSlider({
         name = "Jump Height",
 		icon = 120597962040224,
         range = {25, 1000},
         increment = 1,
         suffix = "Power",
-        currentValue = 50,
+        value = 50,
         flag = "JumpHeight_Slider",
         callback = function(v) jumpHeightValue = v end,
     })
@@ -2529,11 +2513,15 @@ do
 		end
 	end
 
+tab:CreateLeftRow()
+	
 tab:CreateSection({ name = "Unlock" })
 
 	tab:CreateToggle({
 		name = "Unlock Jump in All States",
 		value = false,
+		haveMB = true,
+		haveKeybinds = true,
 		callback = function(v)
 			jumpEnabled = v
 		end,
@@ -2612,6 +2600,8 @@ do
 	tab:CreateToggle({
 		name = "Unlock Tools in All States",
 		value = false,
+		haveMB = true,
+		haveKeybinds = true,
 		callback = function(v)
 			toolsEnabled = v
 		end,
@@ -2721,12 +2711,13 @@ do
 		modifiedEmotes = {}
 	end
 
-	tab:CreateDivider()
+	tab:CreateRightRow
+	tab:CreateSection({ name = "Emote" })
 
 	tab:CreateToggle({
 		name = "Change Emote Speed",
         icon = 121586615710226,
-		currentValue = false,
+		value = false,
 		callback = function(v)
 			speedEnabled = v
 			if speedEnabled then
@@ -2833,8 +2824,6 @@ do
 		end
 		modifiedEmotes = {}
 	end
-
-	tab:CreateDivider({ text = "Emotes" })
 
 	tab:CreateToggle({
 		name = "Unmovable Emote Bypass",
