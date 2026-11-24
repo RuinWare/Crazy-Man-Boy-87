@@ -1,4 +1,3 @@
--- I've added a message saying "HIII"
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
@@ -942,6 +941,8 @@ RunService.PreSimulation:Connect(function()
     if hum.FloorMaterial == Enum.Material.Air then return end
     tryJump(hum, root)
 end)
+
+local AJRP, AJOTOLD, AJOTOM, AJOTOMS
 
 tab:CreateToggle({
     name = "Auto Jump",
