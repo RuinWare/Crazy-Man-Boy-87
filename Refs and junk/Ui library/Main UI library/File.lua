@@ -2332,7 +2332,7 @@ SUPERJUMP
 ]]--
 
 do
-    local superJumpEnabled = false
+    local superJumpEnabled = true
     local superJumpYVelocity = 100
     local superJumpXVelocity = 50
     local superJumpDecaying = false
@@ -2388,15 +2388,13 @@ do
 
 tab:CreateDivider()
 
-    tab:CreateToggle({
+    tab:CreateButton({
         name = "Super Jump",
-        value = false,
 		haveMB = true,
 		haveKeybinds = true,
         flag = "SuperJump_Toggle",
-        callback = function(v)
-           superJumpEnabled = v
-
+        callback = function()
+           triggerSuperJump()
        end,
     })
 
