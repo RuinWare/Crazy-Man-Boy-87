@@ -16,7 +16,7 @@ do
 	local korbloxMode = "Off"
 	local savedAccessories = {}
 
-    Vistab:CreateSection({ name = "Cosmetics" })
+    VisTab:CreateSection({ name = "Cosmetics" })
 
 	VisTab:CreateDropdown({
 		name = "Headless",
@@ -40,7 +40,7 @@ do
 		end,
 	})
 
-Vistab:CreateDivider()
+VisTab:CreateDivider()
 
 	VisTab:CreateDropdown({
 		name = "Korblox",
