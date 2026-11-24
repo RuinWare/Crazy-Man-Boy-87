@@ -5644,7 +5644,167 @@ end
 
 local VisTab = window:CreateTab({ name = "Visuals", icon = 126802044806598 })
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Korbloxandheadless"))()
+-- hk
+
+do
+	local Players = game:GetService("Players")
+	local LP = Players.LocalPlayer
+
+	-- The exact child names you want affected by the headless toggle
+	local targetChildren = {
+		["FaceCenterAttachment"] = true,
+		["FaceFrontAttachment"] = true,
+		["HairAttachment"] = true,
+		["HatAttachment"] = true,
+		["Neck"] = true,
+		["face"] = true,
+	}
+
+	local headlessMode = "Off"
+	local korbloxMode = "Off"
+	local savedAccessories = {}
+
+    VisTab:CreateSection({ name = "Cosmetics" })
+
+	VisTab:CreateDropdown({
+		name = "Headless",
+		options = { "Off", "Only Head", "All" },
+		multiSelect = false,
+		callback = function(selected)
+			headlessMode = type(selected) == "table" and selected[1] or selected
+			-- Instantly restore accessories if turning off "All"
+			if headlessMode ~= "All" then
+				for rig, accs in pairs(savedAccessories) do
+					if rig and rig.Parent then
+						for accName, accInstance in pairs(accs) do
+							-- Put the exact original accessory back
+							accInstance.Parent = rig
+						end
+					end
+				end
+				savedAccessories = {}
+			end
+		end,
+	})
+
+VisTab:CreateDivider()
+
+	VisTab:CreateDropdown({
+		name = "Korblox",
+		options = { "Off", "Right Leg", "Left Leg", "Both" },
+		multiSelect = false,
+		callback = function(selected)
+			korbloxMode = type(selected) == "table" and selected[1] or selected
+		end,
+	})
+
+	task.spawn(function()
+		while true do
+			local rigs = workspace:FindFirstChild("Rigs")
+			if rigs then
+				-- LOOP THROUGH ALL RIGS TO CATCH DUPLICATES
+				for _, rig in ipairs(rigs:GetChildren()) do
+					if rig.Name == LP.Name then
+						local head = rig:FindFirstChild("Head")
+
+						if head then
+							-- Handle Head and specifically named children
+							if headlessMode == "Only Head" or headlessMode == "All" then
+								head.Transparency = 1
+								for _, child in ipairs(head:GetChildren()) do
+									if targetChildren[child.Name] then
+										if child:IsA("BasePart") or child:IsA("Decal") or child:IsA("Texture") then
+											child.Transparency = 1
+										end
+									end
+								end
+							elseif headlessMode == "Off" then
+								head.Transparency = 0
+								for _, child in ipairs(head:GetChildren()) do
+									if targetChildren[child.Name] then
+										if child:IsA("BasePart") or child:IsA("Decal") or child:IsA("Texture") then
+											child.Transparency = 0
+										end
+									end
+								end
+							end
+
+							-- Handle Accessories (All mode)
+							if headlessMode == "All" then
+								if not savedAccessories[rig] then savedAccessories[rig] = {} end
+								
+								local function process(container)
+									for _, c in ipairs(container:GetChildren()) do
+										if c:IsA("Accessory") or c:IsA("Hat") or c.Name == "Hair" or c:IsA("Face") then
+											if not savedAccessories[rig][c.Name] then
+												-- Save the exact instance and hide it
+												savedAccessories[rig][c.Name] = c
+												c.Parent = nil
+											end
+										end
+									end
+								end
+								process(rig)
+								process(head)
+								
+							-- Restore Accessories (Only Head / Off mode)
+							elseif headlessMode == "Only Head" or headlessMode == "Off" then
+								if savedAccessories[rig] then
+									for accName, accInstance in pairs(savedAccessories[rig]) do
+										-- Put the exact original accessory back
+										accInstance.Parent = rig
+									end
+									savedAccessories[rig] = nil
+								end
+							end
+						end
+
+						-- Handle Korblox
+						local function applyKorblox(legName, enable)
+							local leg = rig:FindFirstChild(legName) or rig:FindFirstChild(legName:gsub(" ", ""))
+							if not leg then return end
+							
+							local mesh = leg:FindFirstChild("KorbloxMesh") or leg:FindFirstChildOfClass("SpecialMesh")
+							
+							if enable then
+								if not mesh or mesh.Name ~= "KorbloxMesh" then
+									if mesh then mesh:Destroy() end
+									mesh = Instance.new("SpecialMesh")
+									mesh.Name = "KorbloxMesh"
+									mesh.MeshType = Enum.MeshType.FileMesh
+									mesh.MeshId = "rbxassetid://14581620882"
+									mesh.TextureId = "rbxassetid://14581621055"
+									mesh.Offset = Vector3.new(0, 0.55, 0)
+									mesh.Scale = Vector3.new(1.15, 1.15, 1.15)
+									mesh.Parent = leg
+								end
+							else
+								if mesh and mesh.Name == "KorbloxMesh" then
+									mesh:Destroy()
+								end
+							end
+						end
+
+						if korbloxMode == "Both" then
+							applyKorblox("Right Leg", true)
+							applyKorblox("Left Leg", true)
+						elseif korbloxMode == "Right Leg" then
+							applyKorblox("Right Leg", true)
+							applyKorblox("Left Leg", false)
+						elseif korbloxMode == "Left Leg" then
+							applyKorblox("Right Leg", false)
+							applyKorblox("Left Leg", true)
+						elseif korbloxMode == "Off" then
+							applyKorblox("Right Leg", false)
+							applyKorblox("Left Leg", false)
+						end
+					end
+				end
+			end
+			task.wait(0.5)
+		end
+	end)
+end
 
 -- ex
 
