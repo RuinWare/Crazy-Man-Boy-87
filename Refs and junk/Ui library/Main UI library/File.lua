@@ -943,7 +943,7 @@ RunService.PreSimulation:Connect(function()
     tryJump(hum, root)
 end)
 
-getgwnv().AJRP, AJOTOLD, AJOTOM, AJOTOMS
+getgenv().AJRP, AJOTOLD, AJOTOM, AJOTOMS
 
 tab:CreateToggle({
     name = "Auto Jump",
