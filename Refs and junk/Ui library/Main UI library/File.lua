@@ -2395,6 +2395,9 @@ end
 F JUMP
 ===========================================================================
 ]]--
+
+tab:CreateRightRow()
+
 do
     local frontalEnabled = false
     local frontalRamp = true
