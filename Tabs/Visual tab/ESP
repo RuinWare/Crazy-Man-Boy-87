@@ -551,7 +551,7 @@ do
         end
     end)
 
-    VisTab:CreateDivider({ text = "ESP" })
+    VisTab:CreateSection({ name = "ESP" })
 
     VisTab:CreateToggle({
         name = "ESP",
@@ -565,7 +565,6 @@ do
     VisTab:CreateDropdown({
         name = "Selection",
         options = { "Players", "Nextbots" },
-        currentOption = {},
         multiSelect = true,
         flag = "ESP_Selection",
         callback = function(selected)
@@ -583,7 +582,6 @@ do
     VisTab:CreateDropdown({
         name = "Options:",
         options = { "Box ESP", "Chams", "Name", "Distance", "Tracers" },
-        currentOption = {},
         multiSelect = true,
         flag = "ESP_Options",
         callback = function(selected)
