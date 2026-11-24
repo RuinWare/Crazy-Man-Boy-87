@@ -2457,6 +2457,8 @@ do
         name = "Frontal Jump",
         icon = 89569262948298,
         value = false,
+		haveMB = true,
+		haveKeybinds = true,
         flag = "FrontalJump_Toggle",
         callback = function(v)
             frontalEnabled = v
@@ -2482,6 +2484,944 @@ do
         flag = "FrontalJump_Slider",
         callback = function(v) frontalSlider = v end,
     })
+end
+
+--[[
+============================================================================
+BW JUMP
+============================================================================
+]]--
+
+do
+    local backwardEnabled = false
+    local backwardRamp = true
+    local backwardSlider = 55.5
+
+    local bRay = RaycastParams.new()
+    bRay.FilterType = Enum.RaycastFilterType.Exclude
+
+    local bHum, bRoot
+
+    local function backwardFlat(root)
+        if not backwardRamp then return true end
+        local r = workspace:Raycast(root.Position, Vector3.new(0, -10, 0), bRay)
+        if not r then return false end
+        return math.deg(math.acos(r.Normal.Unit.Y)) <= 8
+    end
+
+    local function backwardSPS()
+        return backwardSlider * 0.5
+    end
+
+    local function bAttach(char)
+        bHum = char:WaitForChild("Humanoid")
+        bRoot = char:WaitForChild("HumanoidRootPart")
+        bRay.FilterDescendantsInstances = {char}
+        if backwardEnabled then bHum.WalkSpeed = 0 end
+    end
+
+    if player.Character then task.spawn(bAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(bAttach, c) end)
+
+    RunService.Heartbeat:Connect(function(dt)
+        if not backwardEnabled then return end
+        if not bHum or not bRoot or not bRoot.Parent then return end
+        if bHum.Health <= 0 then return end
+
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        local look = cam.CFrame.LookVector
+        local dir = Vector3.new(-look.X, 0, -look.Z)
+        if dir.Magnitude > 0.001 then dir = dir.Unit end
+
+        local speed = backwardSPS()
+        bRoot.CFrame = bRoot.CFrame + dir * speed * dt
+
+        if bHum.FloorMaterial ~= Enum.Material.Air then
+            if backwardFlat(bRoot) then
+                bHum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Backward Jump",
+        icon = 89569262948298,
+        value = false,
+		haveMB = true,
+		haveKeybinds = true,
+        flag = "BackwardJump_Toggle",
+        callback = function(v)
+            backwardEnabled = v
+            if bHum then bHum.WalkSpeed = v and 0 or 16 end
+        end,
+    })
+	
+    tab:CreateToggle({
+        name = "Backward Jump Ramp Protection",
+        icon = 111308594268728,
+        value = false,
+        flag = "BackwardJump_Ramp_Toggle",
+        callback = function(v) backwardRamp = v end,
+    })
+
+    tab:CreateSlider({
+        name = "Backward Jump Speed",
+        icon = 79297485010070,
+        range = {33.3, 555.5},
+        increment = 0.1,
+        suffix = "",
+        value = 55.5,
+        flag = "BackwardJump_Slider",
+        callback = function(v) backwardSlider = v end,
+    })
+end
+
+--[[
+============================================================================
+SPEED CHANGER
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local speedChangerEnabled = false
+    local speedValue = 1500
+    local cachedTag = nil
+    local cachedService = nil
+    local cachedCharacter = nil
+
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
+    local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
+
+    local function getService()
+        if cachedService then return cachedService end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
+    end
+
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            if type(char.Tag) == "number" and not cachedTag then cachedTag = char.Tag end
+            return char
+        end
+        return nil
+    end
+
+    local function getTag()
+        if cachedTag then return cachedTag end
+        getCharacter()
+        return cachedTag
+    end
+
+    local function setLocalSpeed(v)
+        local char = getCharacter()
+        if not char or not char.Movement or not char.Movement.MoveStats then return end
+        local stats = char.Movement.MoveStats
+        if stats.Modifiers then
+            stats.Modifiers.Speed = v
+        end
+        if stats.MoveStats then
+            stats.MoveStats.Speed = v
+        end
+    end
+
+    local function fireSpeed(v)
+        local tag = getTag()
+        if not tag or not firesignal then return end
+        pcall(firesignal, CharacterTask.OnClientEvent, tag, "ModifyMovement", {"Speed", v})
+        setLocalSpeed(v)
+    end
+
+    CharacterTask.OnClientEvent:Connect(function(first)
+        if type(first) == "number" then
+            cachedTag = first
+            cachedCharacter = nil
+        end
+    end)
+
+    player.CharacterAdded:Connect(function()
+        cachedTag = nil
+        cachedCharacter = nil
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not speedChangerEnabled then return end
+        fireSpeed(speedValue)
+    end)
+
+tab:CreateSection({ name = "Speed" })
+
+    tab:CreateToggle({
+        name = "Speed Changer",
+		icon = 103917802962919,
+        value = false,
+        flag = "SpeedChanger_Toggle",
+        callback = function(v)
+            speedChangerEnabled = v
+            if not v then
+                fireSpeed(1500)
+            end
+        end,
+    })
+	
+    tab:CreateInput({
+        name = "Speed Amount",
+		icon = 79297485010070,
+        placeholder = "1500",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                speedValue = n
+                if speedChangerEnabled then
+                    fireSpeed(speedValue)
+                end
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
+TP WALK
+============================================================================
+]]--
+
+do
+    local tpWalkEnabled = false
+    local tpWalkSlider = 1500
+
+    local function sliderToSPS(value)
+        return 16.6 + (value - 1500) * (114.07 / 8500)
+    end
+
+    local tpHum, tpRoot
+
+    local function tpAttach(char)
+        tpHum = char:WaitForChild("Humanoid")
+        tpRoot = char:WaitForChild("HumanoidRootPart")
+        if tpWalkEnabled then tpHum.WalkSpeed = 0 end
+    end
+
+    if player.Character then task.spawn(tpAttach, player.Character) end
+    player.CharacterAdded:Connect(function(char) task.spawn(tpAttach, char) end)
+
+    RunService.Heartbeat:Connect(function(dt)
+        if not tpWalkEnabled then return end
+        if not tpHum or not tpRoot or not tpRoot.Parent then return end
+        if tpHum.Health <= 0 then return end
+
+        local moveDir = tpHum.MoveDirection
+        if moveDir.Magnitude <= 0 then return end
+
+        local speed = sliderToSPS(tpWalkSlider)
+        local dir = moveDir.Unit
+        tpRoot.CFrame = tpRoot.CFrame + Vector3.new(dir.X * speed * dt, 0, dir.Z * speed * dt)
+    end)
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "TP Walk",
+        icon = 104227978260927,
+        value = false,
+        flag = "TPWalk_Toggle",
+        callback = function(v)
+            tpWalkEnabled = v
+            if tpHum then tpHum.WalkSpeed = v and 0 or 16 end
+        end,
+    })
+
+	tab:CreateSlider({
+        name = "TP Walk Speed",
+        icon = 79297485010070,
+        range = {1500, 8000},
+        increment = 1,
+        suffix = "",
+        value = 1500,
+        flag = "TPWalk_Slider",
+        callback = function(v)
+            tpWalkSlider = v
+        end,
+    })
+end
+
+--[[
+============================================================================
+IA
+============================================================================
+]]--
+do
+local instantAccelEnabled = false
+
+local IA_SPEED = 16.6
+local IA_BACKWARDS_MULT = 0.5
+local IA_BACKWARDS_DOT = -0.3
+local IA_DURATION = 2.5
+
+local iaHum, iaRoot
+local iaMoveStart = 0
+local iaWasMoving = false
+
+local function iaAttach(char)
+    iaHum = char:WaitForChild("Humanoid")
+    iaRoot = char:WaitForChild("HumanoidRootPart")
+    iaMoveStart = 0
+    iaWasMoving = false
+    if instantAccelEnabled then iaHum.WalkSpeed = 0 end
+end
+
+if player.Character then task.spawn(iaAttach, player.Character) end
+player.CharacterAdded:Connect(function(char) task.spawn(iaAttach, char) end)
+
+RunService.Heartbeat:Connect(function(dt)
+    if not instantAccelEnabled then return end
+    if not iaHum or not iaRoot or not iaRoot.Parent then return end
+    if iaHum.Health <= 0 then return end
+
+    local moveDir = iaHum.MoveDirection
+    local moving = moveDir.Magnitude > 0
+
+    if moving and not iaWasMoving then
+        iaMoveStart = tick()
+    end
+    iaWasMoving = moving
+
+    if not moving then return end
+    if tick() - iaMoveStart >= IA_DURATION then return end
+
+    local wishDir = moveDir.Unit
+    local backwards = iaRoot.CFrame.LookVector:Dot(wishDir) < IA_BACKWARDS_DOT
+    local speed = backwards and (IA_SPEED * IA_BACKWARDS_MULT) or IA_SPEED
+
+    iaRoot.CFrame = iaRoot.CFrame + Vector3.new(wishDir.X * speed * dt, 0, wishDir.Z * speed * dt)
+end)
+
+tab:CreateToggle({
+    name = "Instant Acceleration",
+    icon = 99352190313338,
+    value = false,
+    flag = "InstantAccel_Toggle",
+    callback = function(value)
+        instantAccelEnabled = value
+        if iaHum then
+            iaHum.WalkSpeed = value and 0 or 16
+        end
+    end,
+})
+end
+--[[
+============================================================================
+FRICTION
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local frictionEnabled = false
+    local frictionValue = 5
+    local cachedTag = nil
+    local cachedService = nil
+    local cachedCharacter = nil
+
+    local UpdateCharacterDataRegistry = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Registry"):WaitForChild("UpdateCharacterDataRegistry")
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
+    local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
+
+    local function getService()
+        if cachedService then return cachedService end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
+    end
+
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            if type(char.Tag) == "number" and not cachedTag then cachedTag = char.Tag end
+            return char
+        end
+        return nil
+    end
+
+    local function getTag()
+        if cachedTag then return cachedTag end
+        getCharacter()
+        return cachedTag
+    end
+
+    local function setLocalFriction(v)
+        local char = getCharacter()
+        if not char or not char.Movement or not char.Movement.MoveStats or not char.Movement.MoveStats.Modifiers then return end
+        char.Movement.MoveStats.Modifiers.Friction = v
+    end
+
+    local function fireFriction(v)
+        local tag = getTag()
+        if not tag or not firesignal then return end
+        pcall(firesignal, CharacterTask.OnClientEvent, tag, "ModifyMovement", {"Friction", v})
+        setLocalFriction(v)
+    end
+
+    CharacterTask.OnClientEvent:Connect(function(first)
+        if type(first) == "number" then
+            cachedTag = first
+            cachedCharacter = nil
+        end
+    end)
+
+    player.CharacterAdded:Connect(function()
+        cachedTag = nil
+        cachedCharacter = nil
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not frictionEnabled then return end
+        fireFriction(frictionValue)
+    end)
+
+tab:CreateSection({ name = "Modifiers" })
+
+    tab:CreateToggle({
+        name = "Friction Changer",
+        icon = 102876083492144,
+        value = false,
+        flag = "FrictionChanger_Toggle",
+        callback = function(v)
+            frictionEnabled = v
+            if not v then
+                fireFriction(5)
+            end
+        end,
+    })
+	
+    tab:CreateInput({
+        name = "Friction Value",
+        icon = 120640130652888,
+        placeholder = "e.g. 5",
+        value = "5",
+        flag = "FrictionChanger_Value",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                frictionValue = n
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
+ASA CHANGER
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local airStrafeEnabled = false
+    local airStrafeValue = 182
+    local cachedTag = nil
+    local cachedService = nil
+    local cachedCharacter = nil
+
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
+    local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
+
+    local function getService()
+        if cachedService then return cachedService end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
+    end
+
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            if type(char.Tag) == "number" and not cachedTag then cachedTag = char.Tag end
+            return char
+        end
+        return nil
+    end
+
+    local function getTag()
+        if cachedTag then return cachedTag end
+        getCharacter()
+        return cachedTag
+    end
+
+    local function setLocalAirStrafe(v)
+        local char = getCharacter()
+        if not char or not char.Movement or not char.Movement.MoveStats then return end
+        local stats = char.Movement.MoveStats
+        if stats.Modifiers then
+            stats.Modifiers.AirStrafeAcceleration = v
+        end
+        if stats.MoveStats then
+            stats.MoveStats.AirStrafeAcceleration = v
+        end
+    end
+
+    local function fireAirStrafe(v)
+        local tag = getTag()
+        if not tag or not firesignal then return end
+        pcall(firesignal, CharacterTask.OnClientEvent, tag, "ModifyMovement", {"AirStrafeAcceleration", v})
+        setLocalAirStrafe(v)
+    end
+
+    CharacterTask.OnClientEvent:Connect(function(first)
+        if type(first) == "number" then
+            cachedTag = first
+            cachedCharacter = nil
+        end
+    end)
+
+    player.CharacterAdded:Connect(function()
+        cachedTag = nil
+        cachedCharacter = nil
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not airStrafeEnabled then return end
+        fireAirStrafe(airStrafeValue)
+    end)
+
+    tab:CreateToggle({
+        name = "Air Strafe Acceleration Changer",
+		icon = 76591949215082,
+        value = false,
+        flag = "AirStrafe_Toggle",
+        callback = function(v)
+            airStrafeEnabled = v
+            if not v then
+                fireAirStrafe(182)
+            end
+        end,
+    })
+	
+    tab:CreateSlider({
+        name = "Air Strafe Acceleration",
+		icon = 120597962040224,
+        range = {182, 10000},
+        increment = 1,
+        suffix = "",
+        value = 182,
+        flag = "AirStrafe_Slider",
+        callback = function(v)
+            airStrafeValue = v
+        end,
+    })
+end
+
+--[[
+============================================================================
+JC CHANGER
+============================================================================
+]]--
+
+do
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local jumpCapEnabled = false
+    local jumpCapValue = 2
+    local cachedTag = nil
+    local cachedService = nil
+    local cachedCharacter = nil
+
+    local CharacterTask = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Character"):WaitForChild("CharacterTask")
+    local CharacterServiceModule = ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService")
+
+    local function getService()
+        if cachedService then return cachedService end
+        local ok, mod = pcall(require, CharacterServiceModule)
+        if ok and type(mod) == "table" then cachedService = mod end
+        return cachedService
+    end
+
+    local function getCharacter()
+        if cachedCharacter then return cachedCharacter end
+        local svc = getService()
+        if not svc or not svc.GetLocalCharacter then return nil end
+        local ok, char = pcall(svc.GetLocalCharacter, svc)
+        if ok and type(char) == "table" then
+            cachedCharacter = char
+            if type(char.Tag) == "number" and not cachedTag then cachedTag = char.Tag end
+            return char
+        end
+        return nil
+    end
+
+    local function getTag()
+        if cachedTag then return cachedTag end
+        getCharacter()
+        return cachedTag
+    end
+
+    local function setLocalJumpCap(v)
+        local char = getCharacter()
+        if not char or not char.Movement or not char.Movement.MoveStats then return end
+        local stats = char.Movement.MoveStats
+        if stats.Modifiers then
+            stats.Modifiers.JumpCap = v
+        end
+        if stats.MoveStats then
+            stats.MoveStats.JumpCap = v
+        end
+    end
+
+    local function fireJumpCap(v)
+        local tag = getTag()
+        if not tag or not firesignal then return end
+        pcall(firesignal, CharacterTask.OnClientEvent, tag, "ModifyMovement", {"JumpCap", v})
+        setLocalJumpCap(v)
+    end
+
+    CharacterTask.OnClientEvent:Connect(function(first)
+        if type(first) == "number" then
+            cachedTag = first
+            cachedCharacter = nil
+        end
+    end)
+
+    player.CharacterAdded:Connect(function()
+        cachedTag = nil
+        cachedCharacter = nil
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not jumpCapEnabled then return end
+        fireJumpCap(jumpCapValue)
+    end)
+
+    tab:CreateToggle({
+        name = "Jump Cap Changer",
+		icon = 116351309458675,
+        value = false,
+        flag = "JumpCap_Toggle",
+        callback = function(v)
+            jumpCapEnabled = v
+            if not v then
+                fireJumpCap(2)
+            end
+        end,
+    })
+	
+    tab:CreateInput({
+        name = "Amount",
+		icon = 120640130652888,
+        placeholder = "e.g. 5",
+        callback = function(text)
+            local n = tonumber(text)
+            if n then
+                jumpCapValue = n
+                if jumpCapEnabled then
+                    fireJumpCap(jumpCapValue)
+                end
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
+G changer
+============================================================================
+]]--
+
+do
+    local gravityEnabled = false
+    local gravityValue = 50
+    local DEFAULT_GRAVITY = 50
+
+    tab:CreateDivider()
+
+    tab:CreateToggle({
+        name = "Gravity Changer",
+		icon = 137214837348305,
+        value = false,
+        flag = "GravityChanger_Toggle",
+        callback = function(v)
+            gravityEnabled = v
+            if v then
+                workspace.Gravity = gravityValue
+            else
+                workspace.Gravity = DEFAULT_GRAVITY
+            end
+        end,
+    })
+	
+    tab:CreateSlider({
+        name = "Gravity",
+		icon = 120597962040224,
+        range = {0, 800},
+        increment = 0.1,
+        suffix = "",
+        value = 50,
+        flag = "GravityChanger_Slider",
+        callback = function(v)
+            gravityValue = v
+            if gravityEnabled then
+                workspace.Gravity = v
+            end
+        end,
+    })
+end
+
+--[[
+============================================================================
+JUMP POWER
+============================================================================
+]]--
+
+do
+    local jumpHeightEnabled = false
+    local jumpHeightValue = 50
+
+    local jhHum, jhRoot
+
+    local function applyJump()
+        if not jumpHeightEnabled then return end
+        if not jhHum or not jhRoot or not jhRoot.Parent then return end
+        if jhHum.Health <= 0 then return end
+        if jhHum.FloorMaterial == Enum.Material.Air then return end
+        jhRoot.AssemblyLinearVelocity = Vector3.new(
+            jhRoot.AssemblyLinearVelocity.X,
+            jumpHeightValue,
+            jhRoot.AssemblyLinearVelocity.Z
+        )
+    end
+
+    local function jhAttach(char)
+        jhHum = char:WaitForChild("Humanoid")
+        jhRoot = char:WaitForChild("HumanoidRootPart")
+        if jumpHeightEnabled then jhHum.JumpPower = 0 end
+    end
+
+    if player.Character then task.spawn(jhAttach, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(jhAttach, c) end)
+
+    UserInputService.InputBegan:Connect(function(i, gp)
+        if gp then return end
+        if i.KeyCode == Enum.KeyCode.Space then
+            applyJump()
+        end
+    end)
+
+    task.spawn(function()
+        local pg = player:WaitForChild("PlayerGui")
+        local tg = pg:WaitForChild("TouchGui", 30)
+        if not tg then return end
+        local f = tg:WaitForChild("TouchControlFrame", 10)
+        if not f then return end
+        local b = f:WaitForChild("JumpButton", 10)
+        if not b then return end
+        b.MouseButton1Down:Connect(applyJump)
+    end)
+
+    tab:CreateToggle({
+        name = "Jump Height Changer",
+		icon = 97668677854395,
+        value = false,
+        flag = "JumpHeight_Toggle",
+        callback = function(v)
+            jumpHeightEnabled = v
+            if jhHum then
+                jhHum.JumpPower = v and 0 or 50
+            end
+        end,
+    })
+
+    tab:CreateSlider({
+        name = "Jump Height",
+		icon = 120597962040224,
+        range = {25, 1000},
+        increment = 1,
+        suffix = "Power",
+        value = 50,
+        flag = "JumpHeight_Slider",
+        callback = function(v) jumpHeightValue = v end,
+    })
+end
+
+--[[
+===========================
+UNLOCK JUMP
+===========================
+]]--
+
+do
+	local jumpEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local RunService = game:GetService("RunService")
+	
+	local cachedData = nil
+
+	-- Helper to safely locate the CharacterService module
+	local function getCharacterService()
+		local services = ReplicatedStorage:FindFirstChild("Services")
+		if not services then return nil end
+		
+		local asset = services:FindFirstChild("Asset")
+		if not asset then return nil end
+		
+		local charService = asset:FindFirstChild("CharacterService")
+		if not charService then return nil end
+		
+		if charService:IsA("ModuleScript") then
+			return charService
+		else
+			return charService:FindFirstChildWhichIsA("ModuleScript")
+		end
+	end
+
+	-- Recursive function to search the table and flip the values
+	local function forceUnlockJump(tbl, visited)
+		visited = visited or {}
+		if visited[tbl] then return end
+		visited[tbl] = true
+
+		for k, v in pairs(tbl) do
+			if type(v) == "table" then
+				forceUnlockJump(v, visited)
+			elseif type(k) == "string" then
+				if (k == "CanJump" or k == "JumpButtonVisible") and v == false then
+					tbl[k] = true
+				end
+			end
+		end
+	end
+
+tab:CreateLeftRow()
+	
+tab:CreateSection({ name = "Unlock" })
+
+	tab:CreateToggle({
+		name = "Unlock Jump in All States",
+		value = false,
+		haveMB = true,
+		haveKeybinds = true,
+		callback = function(v)
+			jumpEnabled = v
+		end,
+	})
+
+	-- Update EVERY FRAME (using Heartbeat)
+	RunService.Heartbeat:Connect(function()
+		if jumpEnabled then
+			-- If we haven't grabbed the data yet, do it now
+			if not cachedData then
+				local charService = getCharacterService()
+				if charService then
+					local ok, data = pcall(require, charService)
+					if ok and type(data) == "table" then
+						cachedData = data
+					end
+				end
+			end
+			
+			-- If we have the data, force the jump states every frame
+			if cachedData then
+				forceUnlockJump(cachedData)
+			end
+		end
+	end)
+end
+
+--[[
+===========================
+UNLOCK TOOLS
+===========================
+]]--
+
+do
+	local toolsEnabled = false
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local RunService = game:GetService("RunService")
+	
+	local cachedData = nil
+
+	-- Helper to safely locate the CharacterService module
+	local function getCharacterService()
+		local services = ReplicatedStorage:FindFirstChild("Services")
+		if not services then return nil end
+		
+		local asset = services:FindFirstChild("Asset")
+		if not asset then return nil end
+		
+		local charService = asset:FindFirstChild("CharacterService")
+		if not charService then return nil end
+		
+		if charService:IsA("ModuleScript") then
+			return charService
+		else
+			return charService:FindFirstChildWhichIsA("ModuleScript")
+		end
+	end
+
+	-- Recursive function to search the table and flip the values
+	local function forceUnlockTools(tbl, visited)
+		visited = visited or {}
+		if visited[tbl] then return end
+		visited[tbl] = true
+
+		for k, v in pairs(tbl) do
+			if type(v) == "table" then
+				forceUnlockTools(v, visited)
+			elseif type(k) == "string" then
+				if k == "CanUseTools" and v == false then
+					tbl[k] = true
+				end
+			end
+		end
+	end
+
+	tab:CreateToggle({
+		name = "Unlock Tools in All States",
+		value = false,
+		haveMB = true,
+		haveKeybinds = true,
+		callback = function(v)
+			toolsEnabled = v
+		end,
+	})
+
+	-- Update EVERY FRAME (using Heartbeat)
+	RunService.Heartbeat:Connect(function()
+		if toolsEnabled then
+			if not cachedData then
+				local charService = getCharacterService()
+				if charService then
+					local ok, data = pcall(require, charService)
+					if ok and type(data) == "table" then
+						cachedData = data
+					end
+				end
+			end
+			
+			if cachedData then
+				forceUnlockTools(cachedData)
+			end
+		end
+	end)
 end
 
 -- vis
