@@ -1,3 +1,7 @@
+-- lb body
+--
+-- tuff
+
 ----------------------------------------------------------------
 -- LIBRARY BODY
 ----------------------------------------------------------------
@@ -18,7 +22,7 @@ local Library = (function()
 	local ICON_SEARCH = 77209819096039
 	local ICON_SETTINGS = 140694242057630
 	local ICON_DOTS = 123906774409861
-	local GLOW_ASSET = "rbxassetid://85788072313178"
+	local GLOW_ASSET = "rbxassetid://75609606636258"
 
 	-- sizes (pixels)
 	local C = {
@@ -47,7 +51,7 @@ local Library = (function()
 		ICON_THICK = 2.5,
 		ICON_INSET = 12,
 		GLOW_SPREAD = 46,
-		GLOW_BRIGHTNESS = 0.8,
+		GLOW_BRIGHTNESS = 1,
 		GLOW_SLICE = 0.4,
 	}
 	C.BAR_BELOW = C.BAR_DISTANCE + C.BAR_HIT.Y / 2
