@@ -1,16 +1,3 @@
--- Library (the main UI)
---
--- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
--- search, a Settings tab that is always there, notifications and toasts.
---
--- The first part is the library body (it only declares things, nothing is built until CreateWindow is called).
--- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
--- file and end it with `return Library`.
---
--- Handles: every Create... call returns an empty handle. Read and write values through the window:
---   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
---   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
-
 ----------------------------------------------------------------
 -- LIBRARY BODY
 ----------------------------------------------------------------
@@ -31,7 +18,7 @@ local Library = (function()
 	local ICON_SEARCH = 77209819096039
 	local ICON_SETTINGS = 140694242057630
 	local ICON_DOTS = 123906774409861
-	local GLOW_ASSET = "rbxassetid://138843696730147"
+	local GLOW_ASSET = "rbxassetid://85788072313178"
 
 	-- sizes (pixels)
 	local C = {
