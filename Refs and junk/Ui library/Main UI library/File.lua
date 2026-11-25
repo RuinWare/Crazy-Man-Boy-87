@@ -1,4 +1,3 @@
--- upd
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
@@ -5787,11 +5786,11 @@ local TasTab = window:CreateTab({ name = "TAS", icon = 106970371098897 })
 
 -- atmo
 
-local AtmoTab = window:CreateMTab({ name = "Atmosphere", icon = 90547516100800 })
+local AtmoTab = VisTab:CreateMTab({ name = "Atmosphere", icon = 90547516100800 })
 
 -- cos
 
-local CosTab = window:CreateMTab({ name = "Cosmetics", icon = 93893786571261 })
+local CosTab = VisTab:CreateMTab({ name = "Cosmetics", icon = 93893786571261 })
 buildEmoteChanger(CosTab, window)
 buildCosmeticChanger(CosTab, window)
 -- map
