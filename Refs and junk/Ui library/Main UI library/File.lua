@@ -942,7 +942,7 @@ RunService.PreSimulation:Connect(function()
     tryJump(hum, root)
 end)
 
-tab:CreateToggle({
+local AJAUTOJUMP = tab:CreateToggle({
     name = "Auto Jump",
     icon = 109475752270721,
 	haveMB = true,
@@ -954,7 +954,7 @@ tab:CreateToggle({
       end,
 })
 
-tab:CreateToggle({
+AJAUTOJUMP:CreateToggle({
     name = "Ramp Protection",
     icon = 111308594268728,
     value = false,
@@ -964,7 +964,7 @@ tab:CreateToggle({
     end,
 })
 
-tab:CreateToggle({
+AJAUTOJUMP:CreateToggle({
     name = "Only Trigger On Look Down",
     icon = 128804949999663,
     value = false,
@@ -974,7 +974,7 @@ tab:CreateToggle({
     end,
 })
 
-tab:CreateToggle({
+local AJAUTOJUMPOOM = AJAUTOJUMP:CreateToggle({
     name = "Only Trigger On Move",
     icon = 135743813499745,
     value = false,
@@ -984,7 +984,7 @@ tab:CreateToggle({
     end,
 })
 
-tab:CreateSlider({
+AJAUTOJUMPOOM:CreateSlider({
     name = "Move Hold Time",
     icon = 136077598178846,
     range = {0, 5},
