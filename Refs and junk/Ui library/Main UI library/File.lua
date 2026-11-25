@@ -5787,11 +5787,11 @@ local TasTab = window:CreateTab({ name = "TAS", icon = 106970371098897 })
 
 -- atmo
 
-local AtmoTab = window:CreateTab({ name = "Atmosphere", icon = 90547516100800 })
+local AtmoTab = window:CreateMTab({ name = "Atmosphere", icon = 90547516100800 })
 
 -- cos
 
-local CosTab = window:CreateTab({ name = "Cosmetics", icon = 93893786571261 })
+local CosTab = window:CreateMTab({ name = "Cosmetics", icon = 93893786571261 })
 buildEmoteChanger(CosTab, window)
 buildCosmeticChanger(CosTab, window)
 -- map
