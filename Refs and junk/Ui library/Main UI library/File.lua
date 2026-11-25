@@ -5778,6 +5778,8 @@ VisTab:CreateDivider()
 	end)
 end
 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Refs%20and%20junk/Ui%20library/Main%20UI%20library/Tabs/Vis"))()
+
 -- tas
 
 local TasTab = window:CreateTab({ name = "TAS", icon = 106970371098897 })
