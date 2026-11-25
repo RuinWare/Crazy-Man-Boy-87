@@ -60,7 +60,7 @@ local Library = (function()
 		ICON_THICK = 2.5,
 		ICON_INSET = 12,
 		GLOW_SPREAD = 46,
-		GLOW_BRIGHTNESS = 0.3,
+		GLOW_BRIGHTNESS = 0.8,
 		GLOW_SLICE = 0.4,
 	}
 	C.BAR_BELOW = C.BAR_DISTANCE + C.BAR_HIT.Y / 2
@@ -2986,7 +2986,7 @@ local Library = (function()
 				Position = UDim2.new(0, x, 1, -2),
 				Size = UDim2.new(1, -(x + 6), 0, 18),
 				Text = name,
-				TextSize = 11,
+				TextSize = 15,
 				TextColor3 = T.sub,
 			})
 			row._lastSection = name
