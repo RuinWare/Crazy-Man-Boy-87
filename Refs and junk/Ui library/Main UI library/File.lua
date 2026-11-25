@@ -2426,23 +2426,21 @@ tab:CreateRightRow()
 
 do
     local frontalEnabled = false
-    local frontalRamp = backwardRamp
-    local frontalSlider = backwardSlider
-
+	
     local fRay = RaycastParams.new()
     fRay.FilterType = Enum.RaycastFilterType.Exclude
 
     local fHum, fRoot
 
     local function frontalFlat(root)
-        if not frontalRamp then return true end
+        if not backwardRamp then return true end
         local r = workspace:Raycast(root.Position, Vector3.new(0, -10, 0), fRay)
         if not r then return false end
         return math.deg(math.acos(r.Normal.Unit.Y)) <= 8
     end
 
     local function frontalSPS()
-        return frontalSlider * 0.5
+        return backwardSlider * 0.5
     end
 
     local function fAttach(char)
