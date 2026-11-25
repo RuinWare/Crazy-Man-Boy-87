@@ -1,3 +1,19 @@
+-- Library (the main UI)
+--
+-- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
+-- search, a Settings tab that is always there, notifications and toasts.
+--
+-- The first part is the library body (it only declares things, nothing is built until CreateWindow is called).
+-- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
+-- file and end it with `return Library`.
+--
+-- Handles: every Create... call returns an empty handle. Read and write values through the window:
+--   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
+--   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
+
+----------------------------------------------------------------
+-- LIBRARY BODY
+----------------------------------------------------------------
 local Library = (function()
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
@@ -35,7 +51,7 @@ local Library = (function()
 		BAR_DISTANCE = 5,
 		BAR_SIZE = Vector2.new(130, 3),
 		BAR_SIZE_ACTIVE = Vector2.new(142, 4),
-		BAR_HIT = Vector2.new(72, 22),
+		BAR_HIT = Vector2.new(142, 4),
 		DRAG_FOLLOW_SPEED = 9,
 		RESIZE_FOLLOW_SPEED = 26,
 		BAR_IDLE = 0.55,
@@ -729,7 +745,7 @@ local Library = (function()
 		local MORPH_FOLLOW_SPEED = 10                  -- lower = slower, smoother shape changes
 		local SAVE_POSITION = true                     -- remember where you left each button (by its FLAG)
 		local SAVE_FILE = "MobileButtons_Positions.json" -- must match ResetMBPositions
-		local MODE_NAMES = { default = "Default", pill = "Pill", circle = "Circle" } -- shown when the shape changes
+		local MODE_NAMES = { default = "Square", pill = "Pill", circle = "Circle" } -- shown when the shape changes
 		local MODE_TEXT_TIME = 1                       -- seconds the shape name stays before fading back to the title
 
 		local TAG = "DraggableBoxGui" -- must match DestroyAllGuis
@@ -2043,6 +2059,7 @@ local Library = (function()
 				window._values[self.flag] = value
 				if self._mb then self._mb.SetState(value) end
 				window:_changed()
+				if self._applyChildren then self:_applyChildren() end
 				if not quiet then U.run(self.callback, value) end
 			end
 			function el:_load(data)
@@ -3010,7 +3027,13 @@ local Library = (function()
 		end
 
 		function Row:_add(item)
-			self._items[#self._items + 1] = item
+			local after = self._insertAfter
+			local index = after and table.find(self._items, after)
+			if index then
+				table.insert(self._items, index + 1, item)
+			else
+				self._items[#self._items + 1] = item
+			end
 			self:_queueLayout()
 		end
 
@@ -3145,6 +3168,7 @@ local Library = (function()
 					item.gone = true
 					row:_queueLayout()
 				end)
+				if el and el._applyChildren then el:_applyChildren() end
 			end
 
 			function handle:Show()
@@ -3155,10 +3179,14 @@ local Library = (function()
 				local frame = item.frame
 				if el then el._hidden = false end
 				item._busy = true
+				local wasGone = item.gone
 				item.gone = false
 				frame.Visible = true
+				if item._clip == nil then item._clip = frame.ClipsDescendants end
+				frame.ClipsDescendants = true
 				row:_layout() -- back into its box right away
 				local c = cover()
+				if wasGone then c.BackgroundTransparency = 0 end
 				c.Visible = true
 				U.tween(frame, 0.35, { Size = UDim2.new(1, 0, 0, item.height or C.ROW_H) })
 				U.tween(c, 0.3, { BackgroundTransparency = 1 })
@@ -3169,6 +3197,54 @@ local Library = (function()
 					if item._clip ~= nil then frame.ClipsDescendants = item._clip end
 					item._clip = nil
 				end)
+				if el and el._applyChildren then el:_applyChildren() end
+			end
+
+			-- hides it right away, no animation (used for a child that starts out hidden)
+			function handle._hideNow()
+				if hidden then return end
+				hidden = true
+				token += 1
+				if el then el._hidden = true end
+				item.height = item.frame.Size.Y.Offset
+				item.frame.Size = UDim2.new(1, 0, 0, 0)
+				item.frame.Visible = false
+				item.gone = true
+				row:_queueLayout()
+			end
+			handle._item = item
+			handle._el = el
+
+			-- Toggle:CreateToggle({ WhenOn = true, ... }) and every other Create...: a normal component that sits right
+			-- under the toggle and is only visible while the toggle is on (WhenOn = true) or off (WhenOn = false).
+			-- Only a toggle gets these.
+			if el and el.kind == "toggle" then
+				local children = {}
+				local lastItem = item
+				el._children = children
+
+				function el:_applyChildren()
+					for _, child in ipairs(children) do
+						local visible = (self.value == child.whenOn) and not self._hidden
+						if visible then child.handle:Show() else child.handle:Hide() end
+						if child.el and child.el._applyChildren then child.el:_applyChildren() end
+					end
+				end
+
+				for _, method in ipairs(COMPONENTS) do
+					handle[method] = function(_, cfg)
+						cfg = cfg or {}
+						local whenOn = cfg.WhenOn ~= false
+						row._insertAfter = lastItem
+						local ok, childHandle = pcall(row[method], row, cfg)
+						row._insertAfter = nil
+						if not ok then error(childHandle, 0) end
+						lastItem = childHandle._item
+						children[#children + 1] = { handle = childHandle, whenOn = whenOn, el = childHandle._el }
+						if not ((el.value == whenOn) and not el._hidden) then childHandle._hideNow() end
+						return childHandle
+					end
+				end
 			end
 
 			return handle
@@ -4606,6 +4682,6 @@ local Library = (function()
 		N.toast(props)
 	end
 
-                    	return Library
-                 end)()
+                     	return Library
+               end)()
 return Library
