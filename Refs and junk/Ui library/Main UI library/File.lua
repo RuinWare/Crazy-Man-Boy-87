@@ -1,3 +1,4 @@
+-- / github.Refresh.Raw.File(0)
 local SHARED_PATHS = {
 		{"Items","ItemPacks","Gamepass","Unorganized","EmotePack","Emotes"},
 		{"Items","ItemPacks","Gamepass","Unorganized","EclipseSet","Emotes"},
@@ -1701,6 +1702,8 @@ getgenv().EHBMS = tab:CreateSlider({
         bounceMultiplier = value
     end,
 })
+
+EHBMS:Hide
 
 --[[
 ============================================================================
