@@ -803,7 +803,7 @@ tab:CreateSection({ name = "Jumping" })
 AUTO JUMP
 ============================================================================
 ]]--
-
+do
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -1012,6 +1012,7 @@ AJRP:Hide()
 AJOTOLD:Hide()	
 AJOTOM:Hide()
 AJOTOMS:Hide()
+end
 
 --[[
 ============================================================================
@@ -1118,10 +1119,21 @@ do
         flag = "DelayJump_Toggle",
         callback = function(v) 
          djEnabled = v 
-          end,
+				if v then
+					LJRP:Show()
+					LJOLD:Show()
+					LJOOM:Show()
+					LJOOMS:Show()
+				else
+					LJRP:Hide()
+					LJOLD:Hide()
+					LJOOM:Hide()
+					LJOOMS:Hide()
+			end
+	   end,
     })
 	
-    tab:CreateToggle({
+    getgenv().LJRP = tab:CreateToggle({
         name = "Legit Jump Ramp Protection",
         icon = 111308594268728,
         value = false,
@@ -1129,7 +1141,7 @@ do
         callback = function(v) djRamp = v end,
     })
 
-    tab:CreateToggle({
+    getgenv().LJOLD = tab:CreateToggle({
         name = "Legit Jump Only Look Down",
         icon = 128804949999663,
         value = false,
@@ -1137,7 +1149,7 @@ do
         callback = function(v) djLookDown = v end,
     })
 
-    tab:CreateToggle({
+    getgenv().LJOOM = tab:CreateToggle({
         name = "Legit Jump Only On Move",
         icon = 135743813499745,
         value = false,
@@ -1145,7 +1157,7 @@ do
         callback = function(v) djMoveOnly = v end,
     })
 
-    tab:CreateSlider({
+    getgenv().LJOOMS = tab:CreateSlider({
         name = "Legit Jump Move Hold",
         icon = 136077598178846,
         range = {0, 5},
@@ -1156,6 +1168,11 @@ do
         callback = function(v) djMoveHold = v end,
     })
 end
+
+LJRP:Hide()
+LJOLD:Hide()
+LJOOM:Hide()
+LJOOMS:Hide()
 
 --[[
 ============================================================================
@@ -1277,10 +1294,21 @@ do
         flag = "HoldJump_Toggle",
         callback = function(v)
             hjEnabled = v
+				if v then
+					HJRP:Show()
+					HJOLD:Show()
+					HJOOM:Show()
+					HJOOMS:Show()
+			    else
+					HJRP:Hide()
+					HJOLD:Hide()
+					HJOOM:Hide()
+					HJOOMS:Hide()
+			end
        end,
     })
 	
-    tab:CreateToggle({
+    getgenv().HJRP = tab:CreateToggle({
         name = "Hold Jump Ramp Protection",
         icon = 111308594268728,
         value = false,
@@ -1288,7 +1316,7 @@ do
         callback = function(v) hjRamp = v end,
     })
 
-    tab:CreateToggle({
+    getgenv().HJOLD = tab:CreateToggle({
         name = "Hold Jump Only Look Down",
         icon = 128804949999663,
         value = false,
@@ -1296,7 +1324,7 @@ do
         callback = function(v) hjLookDown = v end,
     })
 
-    tab:CreateToggle({
+    getgenv().HJOOM = tab:CreateToggle({
         name = "Hold Jump Only On Move",
         icon = 135743813499745,
         value = false,
@@ -1304,7 +1332,7 @@ do
         callback = function(v) hjMoveOnly = v end,
     })
 
-    tab:CreateSlider({
+    getgenv().HJOOMS = tab:CreateSlider({
         name = "Hold Jump Move Hold",
         icon = 136077598178846,
         range = {0, 5},
@@ -1319,6 +1347,11 @@ end
 tab:CreateRightRow()
 
 tab:CreateSection({ name = "Movement" })
+
+HJRP:Hide()
+HJOLD:Hide()
+HJOOM:Hide()
+HJOOMS:Hide()
 
 --[[
 ============================================================================
@@ -1392,19 +1425,11 @@ tab:CreateToggle({
     flag = "EasyBounce_Toggle",
     callback = function(v)
         easyBounceEnabled = v
-    end,
-})
-
-tab:CreateSlider({
-    name = "Easy Bounce Multiplier",
-    icon = 120597962040224,
-    range = {1.08, 3.00},
-    increment = 0.01,
-    suffix = "x",
-    value = 1.5,
-    flag = "EasyBounce_Multiplier",
-    callback = function(value)
-        bounceMultiplier = value
+			if v then
+				EHBMS:Show()
+			        else
+				EHBMS:Hide()
+		end
     end,
 })
 
@@ -1478,8 +1503,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-tab:CreateDivider()
-
 tab:CreateToggle({
     name = "Hard Bounce",
     icon = 116414714090955,
@@ -1487,8 +1510,13 @@ tab:CreateToggle({
 	haveMB = true,
 	haveKeybinds = true,
     flag = "HardBounce_Toggle",
-    callback = function(value)
-        hardBounceEnabled = value
+    callback = function(v)
+        hardBounceEnabled = v
+			if v then
+				EHBMS:Show()
+			        else
+				EHBMS:Hide()
+			end
     end,
 })
 
@@ -1661,6 +1689,19 @@ do
     })
 end
 
+getgenv().EHBMS = tab:CreateSlider({
+    name = "Easy Bounce Multiplier",
+    icon = 120597962040224,
+    range = {1.08, 3.00},
+    increment = 0.01,
+    suffix = "x",
+    value = 1.5,
+    flag = "EasyBounce_Multiplier",
+    callback = function(value)
+        bounceMultiplier = value
+    end,
+})
+
 --[[
 ============================================================================
 INF SLIDE
@@ -1802,7 +1843,7 @@ tab:CreateToggle({
     end,
 })
 
-tab:CreateSlider({
+getgenv().INFSLIDES = tab:CreateSlider({
     name = "Inf Slide Speed",
     icon = 79297485010070,
     range = {1, 90},
