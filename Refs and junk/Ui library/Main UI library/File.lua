@@ -1379,19 +1379,6 @@ tab:CreateToggle({
     end,
 })
 
-tab:CreateSlider({
-    name = "Easy Bounce Multiplier",
-    icon = 120597962040224,
-    range = {1.08, 3.00},
-    increment = 0.01,
-    suffix = "x",
-    value = 1.5,
-    flag = "EasyBounce_Multiplier",
-    callback = function(value)
-        bounceMultiplier = value
-    end,
-})
-
 --[[
 ============================================================================
 HARD BOUNCE
@@ -1403,7 +1390,7 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local hardBounceEnabled = false
-local hardBounceMultiplier = 1.5
+local hardBounceMultiplier = bounceMultiplier
 
 local hardBounceRayParams = RaycastParams.new()
 hardBounceRayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -1461,8 +1448,6 @@ RunService.Heartbeat:Connect(function()
         wasInAir = false
     end
 end)
-
-tab:CreateDivider()
 
 tab:CreateToggle({
     name = "Hard Bounce",
@@ -1554,8 +1539,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-tab:CreateDivider()
-
 tab:CreateToggle({
     name = "Legit Bounce",
     icon = 116414714090955,
@@ -1630,8 +1613,6 @@ do
             emoteFlingWasInAir = false
         end
     end)
-
-    tab:CreateDivider()
 	
     tab:CreateToggle({
         name = "Emote Fling",
@@ -1644,6 +1625,19 @@ do
         end,
     })
 end
+
+tab:CreateSlider({
+    name = "Easy And Hard Bounce Multiplier",
+    icon = 120597962040224,
+    range = {1.08, 3.00},
+    increment = 0.01,
+    suffix = "x",
+    value = 1.5,
+    flag = "EasyBounce_Multiplier",
+    callback = function(value)
+        bounceMultiplier = value
+    end,
+})
 
 --[[
 ============================================================================
@@ -1998,6 +1992,8 @@ end
         end
     end)
 
+	tab:CreateDivider()
+	
     tab:CreateToggle({
         name = "Pixel Surf",
 		icon = 76201258239230,
@@ -2307,6 +2303,8 @@ do
         while tick() - start < lagDuration do end
     end
 
+	tab:CreateDivider()
+	
     tab:CreateButton({
         name = "Lag Switch",
 		icon = 122975828478366,
@@ -2332,7 +2330,7 @@ SUPERJUMP
 ]]--
 
 do
-    local superJumpEnabled = false
+    local superJumpEnabled = true
     local superJumpYVelocity = 100
     local superJumpXVelocity = 50
     local superJumpDecaying = false
@@ -2388,15 +2386,13 @@ do
 
 tab:CreateDivider()
 
-    tab:CreateToggle({
+    tab:CreateButton({
         name = "Super Jump",
-        value = false,
 		haveMB = true,
 		haveKeybinds = true,
         flag = "SuperJump_Toggle",
-        callback = function(v)
-           superJumpEnabled = v
-
+        callback = function()
+           triggerSuperJump()
        end,
     })
 
@@ -2430,8 +2426,8 @@ tab:CreateRightRow()
 
 do
     local frontalEnabled = false
-    local frontalRamp = true
-    local frontalSlider = 55.5
+    local frontalRamp = backwardRamp
+    local frontalSlider = backwardSlider
 
     local fRay = RaycastParams.new()
     fRay.FilterType = Enum.RaycastFilterType.Exclude
@@ -2495,25 +2491,6 @@ do
             if fHum then fHum.WalkSpeed = v and 0 or 16 end
         end,
     })
-	
-    tab:CreateToggle({
-        name = "Frontal Jump Ramp Protection",
-        icon = 111308594268728,
-        value = false,
-        flag = "FrontalJump_Ramp_Toggle",
-        callback = function(v) frontalRamp = v end,
-    })
-	
-    tab:CreateSlider({
-        name = "Frontal Jump Speed",
-        icon = 79297485010070,
-        range = {33.3, 555.5},
-        increment = 0.1,
-        suffix = "",
-        value = 55.5,
-        flag = "FrontalJump_Slider",
-        callback = function(v) frontalSlider = v end,
-    })
 end
 
 --[[
@@ -2575,8 +2552,6 @@ do
         end
     end)
 
-    tab:CreateDivider()
-
     tab:CreateToggle({
         name = "Backward Jump",
         icon = 89569262948298,
@@ -2591,7 +2566,7 @@ do
     })
 	
     tab:CreateToggle({
-        name = "Backward Jump Ramp Protection",
+        name = "Ramp Protection",
         icon = 111308594268728,
         value = false,
         flag = "BackwardJump_Ramp_Toggle",
@@ -2599,7 +2574,7 @@ do
     })
 
     tab:CreateSlider({
-        name = "Backward Jump Speed",
+        name = "Speed:",
         icon = 79297485010070,
         range = {33.3, 555.5},
         increment = 0.1,
@@ -2758,8 +2733,6 @@ do
         local dir = moveDir.Unit
         tpRoot.CFrame = tpRoot.CFrame + Vector3.new(dir.X * speed * dt, 0, dir.Z * speed * dt)
     end)
-
-    tab:CreateDivider()
 
     tab:CreateToggle({
         name = "TP Walk",
