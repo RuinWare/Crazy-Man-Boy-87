@@ -1,3 +1,7 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual%20tab/ESP"))()
+
+VisTab:CreateRightRow()
+
 do
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,12 +26,12 @@ do
         end)
     end
 
-    VisTab:CreateDivider({ text = "Field of View" })
+    VisTab:CreateSection({ name = "Field of View" })
 
     VisTab:CreateToggle({
         name = "FOV Changer",
         icon = 97562574851729,
-        currentValue = false,
+        value = false,
         flag = "FOVChanger_Toggle",
         callback = function(v)
             fovEnabled = v
@@ -56,12 +60,14 @@ do
 end
 
 do
+
 VisTab:CreateDivider()
 
 VisTab:CreateToggle({
     name = "Fix 90+ FOV bug",
-    flag = "F9FOVB",
-    CurrentValue = false,
+    haveMB = true,
+    haveKeybinds = true,
+    value = false,
     callback = function(v)
         local RunService = game:GetService("RunService")
         if v then
@@ -80,24 +86,16 @@ end
 
 --[[
 ===========================
-ESP
-===========================
-]]--
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/RuinWare/Crazy-Man-Boy-87/refs/heads/main/Tabs/Visual%20tab/ESP"))()
-
---[[
-===========================
 REMOVE BREACHER LAG
 ===========================
 ]]--
 do
-VisTab:CreateDivider({ "Game" })
+VisTab:CreateSection({ name = "Game" })
 
 VisTab:CreateToggle({
     name = "Remove Breacher Lag",
     flag = "RBLREMOVEBREACHERLAG",
-    currentValue = false,
+    value = false,
     callback = function(v)
         if v then
    _G.RuinWarePortalLag = true
@@ -132,12 +130,6 @@ _G.RuinWarePortalLagThread = task.spawn(function()
         end
     end
 end)
-
-window:Notify({
-    title = "RuinWare",
-    content = "Breacher Effects Removed",
-    duration = 5,
-})
        else
 _G.RuinWarePortalLag = false
 
@@ -162,8 +154,6 @@ do
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
 	local LP = Players.LocalPlayer
-
-	VisTab:CreateDivider()
 
 	-- Helper to safely get the NightVision folder
 	local function getNightVisionFolder()
@@ -260,11 +250,11 @@ do
 		return roundTimer:FindFirstChild("IngameRoundTimer")
 	end
 
-	VisTab:CreateDivider()
-
 	VisTab:CreateToggle({
 		name = "Round Timer",
 		value = false,
+        haveMB = true,
+        haveKeybinds = true,
 		callback = function(v)
 			roundTimerEnabled = v
 			
@@ -299,7 +289,6 @@ RES STRECHER
 ===========================
 ]]--
 do
--- declare
 local RunService = game:GetService("RunService")
 
 local BIND_RESTORE = "StretchResolutionRestore"
@@ -368,7 +357,7 @@ RunService.Heartbeat:Connect(function()
 	setStretch(tonumber(RESAMOUNT1) or 1)
 end)
 
-VisTab:CreateDivider({ text = "Camera" })
+VisTab:CreateSection({ name = "Camera" })
 
 VisTab:CreateToggle({
 	name = "Resolution Stretcher",
@@ -381,7 +370,6 @@ VisTab:CreateToggle({
 
 VisTab:CreateInput({
 	name = "Amount:",
-	value = "",
 	placeholder = "0.00",
 	callback = function(text)
 		RESAMOUNT1 = tonumber(text) or 1
@@ -427,7 +415,7 @@ do
 
     VisTab:CreateToggle({
         name = "3rd Person",
-        currentValue = false,
+        value = false,
         flag = "ThirdPerson_Toggle",
         callback = function(v)
             thirdPersonEnabled = v
@@ -440,16 +428,10 @@ do
         range = {1, 50},
         increment = 0.5,
         suffix = "s",
-        currentValue = 10,
+        value = 10,
         flag = "ThirdPerson_Distance",
         callback = function(v) zoomDistance = v end,
     })
-
-    _G.RWCallbacks = _G.RWCallbacks or {}
-    _G.RWCallbacks["ThirdPerson"] = function(v)
-        thirdPersonEnabled = v
-        if v then start() else stop() end
-    end
 end
 
 --[[
@@ -457,6 +439,8 @@ end
 SPOOFING
 ===========================
 ]]--
+
+VisTab:CreateLeftRow()
 
 do
     local Plr = game.Players.LocalPlayer
@@ -557,10 +541,11 @@ do
     local usernameSpoofer = makeSpoofer("username",    function() return Plr.Name        end)
     local displaySpoofer  = makeSpoofer("displayName", function() return Plr.DisplayName end)
 
-    VisTab:CreateDivider({ text = "Spoofing" })
+    VisTab:CreateSection({ name = "Spoofing" })
+    VisTab:CreateDivider({ text = "Local" })
 
     VisTab:CreateToggle({
-        name = "Local Spoof Username",
+        name = "Local Username Spoofer",
         flag = "SpoofUsername",
         value = false,
         callback = function(v)
@@ -570,15 +555,14 @@ do
 
     VisTab:CreateInput({
         name = "Username:",
-        value = Plr.Name,
-        placeholder = "New username",
+        placeholder = "Username",
         callback = function(text)
             if text ~= "" then usernameSpoofer.setName(text) end
         end,
     })
 
     VisTab:CreateToggle({
-        name = "Local Spoof Display Name",
+        name = "Local Display Name Spoofer",
         flag = "SpoofDisplayName",
         value = false,
         callback = function(v)
@@ -588,8 +572,7 @@ do
 
     VisTab:CreateInput({
         name = "Display Name:",
-        value = Plr.DisplayName,
-        placeholder = "New display name",
+        placeholder = "Display Name",
         callback = function(text)
             if text ~= "" then displaySpoofer.setName(text) end
         end,
@@ -669,7 +652,7 @@ do
 	end
 
 	VisTab:CreateToggle({
-		name = "Local Avatar Changer",
+		name = "Local Avatar Avatar",
 		value = false,
 		callback = function(v)
 			avatarEnabled = v
