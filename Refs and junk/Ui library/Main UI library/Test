@@ -1,5 +1,7 @@
 -- Library (the main UI)
 --
+-- Added MiniTab
+--
 -- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
 -- search, a Settings tab that is always there, notifications and toasts.
 --
@@ -7,7 +9,12 @@
 -- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
 -- file and end it with `return Library`.
 --
--- Handles: every Create... call returns an empty handle. Read and write values through the window:
+-- Saving: everything goes to  RuinWare/<Script-Name>/  (the window name, spaces become "-"):
+--   Settings.json   the Settings tab's settings
+--   Configs/        one file per saved configuration (My-Config.json shows in game as "My Config")
+--   Extras/         last session, window position, mobile button positions
+--
+-- Handles: every Create... call returns a handle (Hide / Show; a toggle's handle can also create children). Read and write values through the window:
 --   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
 --   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
 
@@ -39,6 +46,7 @@ local Library = (function()
 		SIDEBAR_W = 160,
 		PANEL_PAD = 8,
 		TAB_H = 30,
+		MINI_H = 26,
 		ROW_H = 30,
 		PROFILE_H = 58,
 		PAGE_PAD = 12,
@@ -267,47 +275,127 @@ local Library = (function()
 	end
 
 	----------------------------------------------------------------
-	-- Storage: one file per window name (settings, last session, saved configurations, window position)
+	-- Storage: RuinWare/<Script-Name>/  with  Settings.json, a Configs folder (one file per configuration)
+	-- and an Extras folder (last session, window position, mobile button positions)
 	----------------------------------------------------------------
 	do
 		local canFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
-		local memory = {}
+		local canFolders = type(makefolder) == "function" and type(isfolder) == "function"
+		local memory = {}  -- no file access here: remembered until the game closes
 		pcall(function()
 			if getgenv then
 				local env = getgenv()
-				env.__LibraryMemory = env.__LibraryMemory or {}
-				memory = env.__LibraryMemory
+				env.__RuinWareMemory = env.__RuinWareMemory or {}
+				memory = env.__RuinWareMemory
 			end
 		end)
+		local known = {}   -- every path written this session (so Configs can be listed even without listfiles)
 
-		function S.file(name)
-			local clean = tostring(name):gsub("[^%w_%-]", "_")
-			return "Library_" .. clean .. ".json"
+		S.ROOT = "RuinWare"
+
+		-- "My Script" -> "My-Script"
+		function S.slug(name)
+			local text = tostring(name or "")
+			text = text:gsub("^%s+", ""):gsub("%s+$", "")
+			text = text:gsub("%s+", "-")
+			text = text:gsub('[\\/:*?"<>|%c]', "_")
+			if text == "" then text = "Unnamed" end
+			return text
 		end
 
-		function S.read(name)
-			local file = S.file(name)
+		-- "My-Config" -> "My Config"
+		function S.display(slug)
+			return (tostring(slug):gsub("%-", " "))
+		end
+
+		function S.paths(scriptName)
+			local base = S.ROOT .. "/" .. S.slug(scriptName)
+			return {
+				base = base,
+				configs = base .. "/Configs",
+				extras = base .. "/Extras",
+				settings = base .. "/Settings.json",
+			}
+		end
+
+		function S.ensure(paths)
+			if not canFolders then return end
+			for _, folder in ipairs({ S.ROOT, paths.base, paths.configs, paths.extras }) do
+				pcall(function()
+					if not isfolder(folder) then makefolder(folder) end
+				end)
+			end
+		end
+
+		function S.read(path)
 			local ok, data = pcall(function()
 				if canFiles then
-					if not isfile(file) then return nil end
-					return HttpService:JSONDecode(readfile(file))
+					if not isfile(path) then return nil end
+					return HttpService:JSONDecode(readfile(path))
 				end
-				if memory[file] then return HttpService:JSONDecode(memory[file]) end
+				if memory[path] then return HttpService:JSONDecode(memory[path]) end
 				return nil
 			end)
 			if ok and type(data) == "table" then return data end
 			return {}
 		end
 
-		function S.write(name, data)
-			local file = S.file(name)
+		function S.write(path, data)
 			local ok, text = pcall(function() return HttpService:JSONEncode(data) end)
 			if not ok then return false end
+			known[path] = true
 			if canFiles then
-				return (pcall(writefile, file, text))
+				return (pcall(writefile, path, text))
 			end
-			memory[file] = text
+			memory[path] = text
 			return true
+		end
+
+		function S.delete(path)
+			known[path] = nil
+			memory[path] = nil
+			if canFiles and type(delfile) == "function" then
+				return (pcall(delfile, path))
+			end
+			return true
+		end
+
+		function S.configPath(paths, name)
+			return paths.configs .. "/" .. S.slug(name) .. ".json"
+		end
+
+		-- display name -> file path, for every file in the Configs folder.
+		-- A file put there by hand shows up too: "-" becomes a space and the extension is dropped.
+		function S.configs(paths)
+			local found = {}
+			local prefix = paths.configs .. "/"
+			local function add(path)
+				local file = tostring(path):match("([^/\\]+)$")
+				if not file then return end
+				local base = file:gsub("%.[^%.]*$", "")
+				if base == "" then return end
+				found[S.display(base)] = path
+			end
+			if canFiles and type(listfiles) == "function" then
+				local ok, files = pcall(listfiles, paths.configs)
+				if ok and type(files) == "table" then
+					for _, path in ipairs(files) do
+						local isDir = false
+						if type(isfolder) == "function" then
+							local okDir, result = pcall(isfolder, path)
+							isDir = okDir and result == true
+						end
+						if not isDir then add(path) end
+					end
+				end
+			end
+			for path in pairs(known) do
+				if path:sub(1, #prefix) == prefix then add(path) end
+			end
+			for path in pairs(memory) do
+				if path:sub(1, #prefix) == prefix then add(path) end
+			end
+			return found
 		end
 	end
 
@@ -858,11 +946,12 @@ local Library = (function()
 			if getgenv then memoryStore = getgenv() end
 		end)
 
-		local function loadAllPositions()
+		local function loadAllPositions(path)
+			local file = path or SAVE_FILE
 			if canUseFiles then
 				local ok, result = pcall(function()
-					if not isfile(SAVE_FILE) then return {} end
-					local data = HttpService:JSONDecode(readfile(SAVE_FILE))
+					if not isfile(file) then return {} end
+					local data = HttpService:JSONDecode(readfile(file))
 					if type(data) == "table" and type(data.positions) == "table" then
 						return data.positions
 					end
@@ -874,10 +963,10 @@ local Library = (function()
 			return memoryStore.MobileButtonPositions or {} -- no file access here: remembered until the game closes
 		end
 
-		local function saveAllPositions(positions)
+		local function saveAllPositions(positions, path)
 			if canUseFiles then
 				pcall(function()
-					writefile(SAVE_FILE, HttpService:JSONEncode({ version = 1, positions = positions }))
+					writefile(path or SAVE_FILE, HttpService:JSONEncode({ version = 1, positions = positions }))
 				end)
 			else
 				memoryStore.MobileButtonPositions = positions
@@ -1018,7 +1107,7 @@ local Library = (function()
 			local defaultCenter = clampCenter(Vector2.new(v0.X * SPAWN.X + (opts.offset or 0), v0.Y * SPAWN.Y + (opts.offset or 0)), startSize) -- the starting point
 			local startCenter = defaultCenter
 			if SAVE_POSITION then
-				local saved = loadAllPositions()[FLAG]
+				local saved = loadAllPositions(opts.saveFile)[FLAG]
 				if type(saved) == "table" and type(saved.x) == "number" and type(saved.y) == "number" then
 					startCenter = clampCenter(Vector2.new(v0.X * saved.x, v0.Y * saved.y), startSize)
 				end
@@ -1353,9 +1442,9 @@ local Library = (function()
 			local function savePosition()
 				if not SAVE_POSITION then return end
 				local v = viewport()
-				local all = loadAllPositions()
+				local all = loadAllPositions(opts.saveFile)
 				all[FLAG] = { x = posTarget.X / v.X, y = posTarget.Y / v.Y }
-				saveAllPositions(all)
+				saveAllPositions(all, opts.saveFile)
 			end
 
 			-- ResetMBPositions sends every button back to its starting point
@@ -1820,6 +1909,7 @@ local Library = (function()
 				text = el.name,
 				flag = el.flag,
 				kind = el.kind == "toggle" and "Toggle" or "Button",
+				saveFile = window._paths.extras .. "/MobileButtons.json",
 				initial = el.kind == "toggle" and el.value == true,
 				offset = (count % 5) * 28,
 				onToggle = function(on) el:_set(on) end,
@@ -3274,6 +3364,51 @@ local Library = (function()
 			return self.Right
 		end
 
+		-- Tab:CreateMTab({ name, icon, isDefault }): a tab under this tab (it has all the Create... of a tab)
+		function Tab:CreateMTab(config)
+			config = config or {}
+			local window = self._window
+			if self._parent then
+				warn("[Library] a mini tab can't have mini tabs of its own")
+				return nil
+			end
+			local mini = W.newTab(window, config, false, self)
+			if config.isDefault == true then
+				if self._default then
+					warn("[Library] only one mini tab per tab can be the default: '" .. mini._title .. "' is a normal mini tab")
+				else
+					self._default = mini
+				end
+			end
+			window:_refreshMinis(false)
+			-- a default mini tab takes over right away if its tab is the open one
+			if self._default == mini and window._selected == self then window:_select(mini) end
+			return mini
+		end
+
+		-- shows or collapses a mini tab's sidebar button
+		function Tab:_setMiniShown(show, animate)
+			if self._miniShown == show then return end
+			self._miniShown = show
+			self._miniToken = (self._miniToken or 0) + 1
+			local mine = self._miniToken
+			local button = self._button
+			local full = UDim2.new(1, -12, 0, C.MINI_H)
+			local zero = UDim2.new(1, -12, 0, 0)
+			if show then
+				button.Visible = true
+				if animate then U.tween(button, 0.3, { Size = full }) else button.Size = full end
+			elseif animate then
+				U.tween(button, 0.3, { Size = zero })
+				task.delay(0.42, function()
+					if self._miniToken == mine then button.Visible = false end
+				end)
+			else
+				button.Size = zero
+				button.Visible = false
+			end
+		end
+
 		for _, method in ipairs(COMPONENTS) do
 			Tab[method] = function(self, cfg)
 				local row = self._current
@@ -3304,38 +3439,59 @@ local Library = (function()
 		}, Row)
 	end
 
-	function W.newTab(window, config, isSettings)
+	function W.newTab(window, config, isSettings, parent)
 		local tab = setmetatable({
 			_window = window,
 			_title = tostring(config.title or config.name or "Tab"),
+			_parent = parent,   -- set for a mini tab: the tab it sits under
+			_minis = {},
 		}, Tab)
+		if parent then
+			tab._display = parent._title .. " / " .. tab._title
+			tab._flagBase = parent._title .. "/" .. tab._title
+		end
 
-		-- the sidebar button
+		-- the sidebar button (a mini tab is smaller, sits a little to the right, and starts out collapsed)
+		local order
+		if isSettings then
+			order = 1000000
+		elseif parent then
+			order = parent._order + #parent._minis + 1
+		else
+			window._mainCount = (window._mainCount or 0) + 1
+			order = window._mainCount * 100
+		end
+		tab._order = order
+		local isMini = parent ~= nil
 		local button = U.button(window._tabList, {
 			Name = tab._title,
-			LayoutOrder = isSettings and 1000000 or (#window.Tabs + 1),
-			Size = UDim2.new(1, 0, 0, C.TAB_H),
+			LayoutOrder = order,
+			Size = isMini and UDim2.new(1, -12, 0, 0) or UDim2.new(1, 0, 0, C.TAB_H),
 			BackgroundTransparency = 1,
 			BackgroundColor3 = T.selected,
+			ClipsDescendants = isMini,
+			Visible = not isMini,
 		})
-		U.corner(button, 8)
+		U.corner(button, isMini and 6 or 8)
+		local iconSize = isMini and 14 or 16
 		local textX = 12
 		if U.hasIcon(config.icon) then
 			tab._icon = U.make("ImageLabel", {
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0, 10, 0.5, 0),
-				Size = UDim2.fromOffset(16, 16),
+				Size = UDim2.fromOffset(iconSize, iconSize),
 				BackgroundTransparency = 1,
 				Image = U.assetUrl(config.icon),
 				ImageColor3 = T.sub,
 				ScaleType = Enum.ScaleType.Fit,
 			}, button)
-			textX = 34
+			textX = isMini and 30 or 34
 		end
 		tab._label = U.label(button, {
 			Position = UDim2.fromOffset(textX, 0),
 			Size = UDim2.new(1, -(textX + 6), 1, 0),
 			Text = tab._title,
+			TextSize = isMini and 11 or 12,
 			TextColor3 = T.sub,
 		})
 		tab._button = button
@@ -3393,26 +3549,41 @@ local Library = (function()
 		tab._current = tab.Left
 
 		window.Tabs[#window.Tabs + 1] = tab
+		if parent then parent._minis[#parent._minis + 1] = tab end
 		return tab
 	end
 
 	function Window:_select(tab)
+		-- a tab that has a default mini tab never shows a page of its own: it opens the mini tab
+		if not tab._parent and tab._default then tab = tab._default end
 		if self._selected == tab then return end
 		local previous = self._selected
 		self._selected = tab
+		local group = tab._parent or tab
 		for _, other in ipairs(self.Tabs) do
 			local on = other == tab
-			U.tween(other._button, 0.2, { BackgroundTransparency = on and 0 or 1 }, Enum.EasingStyle.Quad)
-			U.tween(other._label, 0.2, { TextColor3 = on and T.text or T.sub }, Enum.EasingStyle.Quad)
+			local lit = on or other == group -- the main tab stays lit while one of its mini tabs is open
+			U.tween(other._button, 0.2, { BackgroundTransparency = on and 0 or 1 })
+			U.tween(other._label, 0.2, { TextColor3 = lit and T.text or T.sub })
 			if other._icon then
-				U.tween(other._icon, 0.2, { ImageColor3 = on and T.text or T.sub }, Enum.EasingStyle.Quad)
+				U.tween(other._icon, 0.2, { ImageColor3 = lit and T.text or T.sub })
 			end
 		end
+		self:_refreshMinis(true)
 		if self._menu then self._menu.close() end
 		if previous then previous._page.Visible = false end
 		tab._page.Visible = not self._searching
 		tab._page.Position = UDim2.fromOffset(0, 12)
 		U.tween(tab._page, 0.35, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
+	end
+
+	-- mini tabs are only in the sidebar while their main tab (or one of its mini tabs) is the open one
+	function Window:_refreshMinis(animate)
+		local selected = self._selected
+		local group = selected and (selected._parent or selected)
+		for _, tab in ipairs(self.Tabs) do
+			if tab._parent then tab:_setMiniShown(tab._parent == group, animate) end
+		end
 	end
 
 	-- takes you to a tab (by its handle or its title)
@@ -3447,7 +3618,7 @@ local Library = (function()
 
 		local flag = cfg.flag
 		if flag == nil then
-			local base = tab._title .. "/" .. el.name
+			local base = (tab._flagBase or tab._title) .. "/" .. el.name
 			self._flagCount[base] = (self._flagCount[base] or 0) + 1
 			flag = self._flagCount[base] > 1 and (base .. "#" .. self._flagCount[base]) or base
 		end
@@ -3516,8 +3687,19 @@ local Library = (function()
 		return values, extras
 	end
 
-	function Window:_flush()
-		S.write(self.Name, self._store)
+	function Window:_writeSettings()
+		S.ensure(self._paths)
+		S.write(self._paths.settings, self._store.settings)
+	end
+
+	function Window:_writeLast()
+		S.ensure(self._paths)
+		S.write(self._paths.extras .. "/LastSession.json", self._store.last)
+	end
+
+	function Window:_writeWindow()
+		S.ensure(self._paths)
+		S.write(self._paths.extras .. "/Window.json", self._store.window)
 	end
 
 	-- remembers the last session (a second and a half after the last change)
@@ -3530,7 +3712,7 @@ local Library = (function()
 			local values, extras = self:_snapshot()
 			for flag, value in pairs(values) do self._store.last.values[flag] = value end
 			for flag, entry in pairs(extras) do self._store.last.extras[flag] = entry end
-			self:_flush()
+			self:_writeLast()
 		end)
 	end
 
@@ -3540,7 +3722,7 @@ local Library = (function()
 			autoLoad = s.autoLoad, protect = s.protect, hidePill = s.hidePill,
 			notifications = s.notifications, reopen = s.reopen,
 		}
-		self:_flush()
+		self:_writeSettings()
 	end
 
 	function Window:Get(flag)
@@ -3557,14 +3739,15 @@ local Library = (function()
 	function Window:Save(name)
 		name = tostring(name or "default")
 		local values, extras = self:_snapshot()
-		self._store.configs[name] = { values = values, extras = extras }
-		self:_flush()
-		return true
+		S.ensure(self._paths)
+		return S.write(S.configPath(self._paths, name), { values = values, extras = extras })
 	end
 
 	function Window:Load(name)
-		local config = self._store.configs[tostring(name)]
-		if type(config) ~= "table" then return false end
+		name = tostring(name)
+		local path = S.configs(self._paths)[name] or S.configPath(self._paths, name)
+		local config = S.read(path)
+		if type(config.values) ~= "table" and type(config.extras) ~= "table" then return false end
 		for flag, data in pairs(config.values or {}) do
 			local el = self._all[flag]
 			if el then self:_applyData(el, data) end
@@ -3576,18 +3759,18 @@ local Library = (function()
 		return true
 	end
 
+	-- the names of the files in the Configs folder ("My-Config.json" is listed as "My Config")
 	function Window:ListConfigs()
 		local names = {}
-		for name in pairs(self._store.configs) do names[#names + 1] = name end
+		for name in pairs(S.configs(self._paths)) do names[#names + 1] = name end
 		table.sort(names)
 		return names
 	end
 
 	function Window:DeleteConfig(name)
-		if self._store.configs[tostring(name)] == nil then return false end
-		self._store.configs[tostring(name)] = nil
-		self:_flush()
-		return true
+		local path = S.configs(self._paths)[tostring(name)]
+		if not path then return false end
+		return S.delete(path)
 	end
 
 	function Window:_resetElement(el)
@@ -3990,7 +4173,7 @@ local Library = (function()
 		local function saveWindowPosition()
 			local v = U.viewport()
 			window._store.window = { x = posTarget.X / v.X, y = posTarget.Y / v.Y }
-			window:_flush()
+			window:_writeWindow()
 		end
 
 		-- drag: from the bar below, or from the top bar (window._startDrag is used by the header)
@@ -4324,7 +4507,7 @@ local Library = (function()
 						Size = UDim2.new(0.55, -12, 1, 0),
 						Text = entry.el.name,
 					})
-					local where = entry.tab._title
+					local where = entry.tab._display or entry.tab._title
 					if entry.section ~= "" then where = where .. "  >  " .. entry.section end
 					U.label(result, {
 						AnchorPoint = Vector2.new(1, 0),
@@ -4404,7 +4587,11 @@ local Library = (function()
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			ZIndex = 2,
 		}, sidebar)
-		U.make("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, list)
+		U.make("UIListLayout", {
+			Padding = UDim.new(0, 3),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			HorizontalAlignment = Enum.HorizontalAlignment.Right, -- (mini tabs are narrower, so they sit indented)
+		}, list)
 		U.make("UIPadding", {
 			PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 4),
 		}, list)
@@ -4484,7 +4671,7 @@ local Library = (function()
 					return
 				end
 				window:Save(name)
-				refreshList(name)
+				refreshList(S.display(S.slug(name)))
 				Library:Toast({ title = "Saved", subtitle = name })
 			end,
 		})
@@ -4625,13 +4812,16 @@ local Library = (function()
 			_openToken = 0,
 		}, Window)
 
-		-- the saved file: settings, last session, configurations, window position
-		local store = S.read(window.Name)
-		store.settings = type(store.settings) == "table" and store.settings or {}
-		store.last = type(store.last) == "table" and store.last or {}
+		-- RuinWare/<Script-Name>/: Settings.json, Configs/, Extras/ (last session, window position, mobile buttons)
+		window._paths = S.paths(window.Name)
+		S.ensure(window._paths)
+		local store = {
+			settings = S.read(window._paths.settings),
+			last = S.read(window._paths.extras .. "/LastSession.json"),
+			window = S.read(window._paths.extras .. "/Window.json"),
+		}
 		store.last.values = type(store.last.values) == "table" and store.last.values or {}
 		store.last.extras = type(store.last.extras) == "table" and store.last.extras or {}
-		store.configs = type(store.configs) == "table" and store.configs or {}
 		window._store = store
 		local saved = store.settings
 		window._settings = {
@@ -4872,3 +5062,86 @@ second:CreateButton({
 second:CreateRightRow()
 second:CreateSection({ name = "Empty on purpose" })
 second:CreateDivider()
+
+-- Mini tabs: Tab:CreateMTab({ name, icon, isDefault }). They show in the sidebar under their tab, only while that tab is open.
+-- isDefault = false: a separate page, next to the main tab's own components.
+local miniDemo = window:CreateTab({ title = "Mini Tabs", icon = 0 })
+miniDemo:CreateLeftRow()
+miniDemo:CreateSection({ name = "The main tab's own components" })
+miniDemo:CreateToggle({
+	name = "Main tab toggle",
+	flag = "MainTabToggle",
+	value = false,
+	callback = function(v)
+		print("Main tab toggle:", v)
+	end,
+})
+
+local miniA = miniDemo:CreateMTab({ name = "Mini Tab A", icon = 0, isDefault = false })
+miniA:CreateLeftRow()
+miniA:CreateSection({ name = "Mini Tab A" })
+miniA:CreateToggle({
+	name = "Toggle in A",
+	flag = "MiniAToggle",
+	value = false,
+	callback = function(v)
+		print("Toggle in A:", v)
+	end,
+})
+miniA:CreateSlider({
+	name = "Slider in A",
+	range = { 0, 50 },
+	increment = 1,
+	flag = "MiniASlider",
+	value = 10,
+	callback = function(value)
+		print("Slider in A:", value)
+	end,
+})
+miniA:CreateRightRow()
+miniA:CreateSection({ name = "Right row of A" })
+miniA:CreateButton({
+	name = "Button in A",
+	callback = function()
+		print("button in A")
+	end,
+})
+
+local miniB = miniDemo:CreateMTab({ name = "Mini Tab B", icon = 0, isDefault = false })
+miniB:CreateLeftRow()
+miniB:CreateSection({ name = "Mini Tab B" })
+miniB:CreateDropdown({
+	name = "Dropdown in B",
+	options = { "one", "two", "three" },
+	flag = "MiniBDropdown",
+	value = "one",
+	callback = function(selected)
+		print("Dropdown in B:", selected)
+	end,
+})
+
+-- isDefault = true: the main tab has no components of its own, selecting it opens this mini tab.
+local defaultDemo = window:CreateTab({ title = "Default Mini", icon = 0 })
+local opensFirst = defaultDemo:CreateMTab({ name = "Opens first", icon = 0, isDefault = true })
+opensFirst:CreateLeftRow()
+opensFirst:CreateSection({ name = "Opens when you pick Default Mini" })
+opensFirst:CreateToggle({
+	name = "Toggle in Opens first",
+	flag = "DefaultMiniToggle",
+	value = false,
+	callback = function(v)
+		print("Toggle in Opens first:", v)
+	end,
+})
+local otherMini = defaultDemo:CreateMTab({ name = "Other", icon = 0, isDefault = false })
+otherMini:CreateLeftRow()
+otherMini:CreateSection({ name = "Other" })
+otherMini:CreateInput({
+	name = "Input in Other",
+	value = "",
+	placeholder = "Type here",
+	flag = "OtherMiniInput",
+	callback = function(text)
+		print("Input in Other:", text)
+	end,
+})
