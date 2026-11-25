@@ -2423,6 +2423,10 @@ F JUMP
 ===========================================================================
 ]]--
 
+    getgenv().backwardRamp = false
+    getgenv().backwardSlider = 55.5
+
+
 tab:CreateRightRow()
 
 do
@@ -2500,9 +2504,7 @@ BW JUMP
 
 do
     local backwardEnabled = false
-    local backwardRamp = true
-    local backwardSlider = 55.5
-
+	
     local bRay = RaycastParams.new()
     bRay.FilterType = Enum.RaycastFilterType.Exclude
 
