@@ -1093,7 +1093,7 @@ do
 
     tab:CreateDivider()
 	
-    tab:CreateToggle({
+    local LJLEGITJUMP = tab:CreateToggle({
         name = "Legit Jump",
         icon = 109475752270721,
         value = false,
@@ -1105,7 +1105,7 @@ do
           end,
     })
 	
-    tab:CreateToggle({
+    LJLEGITJUMP:CreateToggle({
         name = "Legit Jump Ramp Protection",
         icon = 111308594268728,
         value = false,
@@ -1113,7 +1113,7 @@ do
         callback = function(v) djRamp = v end,
     })
 
-    tab:CreateToggle({
+    LJLEGITJUMP:CreateToggle({
         name = "Legit Jump Only Look Down",
         icon = 128804949999663,
         value = false,
@@ -1121,7 +1121,7 @@ do
         callback = function(v) djLookDown = v end,
     })
 
-    tab:CreateToggle({
+    local LJLEGITJUMPOOM = LJLEGITJUMP:CreateToggle({
         name = "Legit Jump Only On Move",
         icon = 135743813499745,
         value = false,
@@ -1129,7 +1129,7 @@ do
         callback = function(v) djMoveOnly = v end,
     })
 
-    tab:CreateSlider({
+    LJLEGITJUMPOOM:CreateSlider({
         name = "Legit Jump Move Hold",
         icon = 136077598178846,
         range = {0, 5},
@@ -1252,7 +1252,7 @@ do
 
     tab:CreateDivider()
 
-    tab:CreateToggle({
+    local HJHOLDJUMP = tab:CreateToggle({
         name = "Hold Jump",
         icon = 97668677854395,
         value = false,
