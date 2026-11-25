@@ -1,6 +1,20 @@
--- lb body
+-- Library (the main UI)
 --
--- tuff
+-- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
+-- search, a Settings tab that is always there, notifications and toasts.
+--
+-- The first part is the library body (it only declares things, nothing is built until CreateWindow is called).
+-- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
+-- file and end it with `return Library`.
+--
+-- Saving: everything goes to  RuinWare/<Script-Name>/  (the window name, spaces become "-"):
+--   Settings.json   the Settings tab's settings
+--   Configs/        one file per saved configuration (My-Config.json shows in game as "My Config")
+--   Extras/         last session, window position, mobile button positions
+--
+-- Handles: every Create... call returns a handle (Hide / Show; a toggle's handle can also create children). Read and write values through the window:
+--   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
+--   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
 
 ----------------------------------------------------------------
 -- LIBRARY BODY
@@ -22,7 +36,7 @@ local Library = (function()
 	local ICON_SEARCH = 77209819096039
 	local ICON_SETTINGS = 140694242057630
 	local ICON_DOTS = 123906774409861
-	local GLOW_ASSET = "rbxassetid://75609606636258"
+	local GLOW_ASSET = "rbxassetid://138843696730147"
 
 	-- sizes (pixels)
 	local C = {
@@ -40,9 +54,9 @@ local Library = (function()
 		SCREEN_MARGIN = 6,
 		-- drag bar + resize corner (same as the mobile buttons)
 		BAR_DISTANCE = 5,
-		BAR_SIZE = Vector2.new(130, 3),
-		BAR_SIZE_ACTIVE = Vector2.new(142, 4),
-		BAR_HIT = Vector2.new(142, 4),
+		BAR_SIZE = Vector2.new(51, 3),
+		BAR_SIZE_ACTIVE = Vector2.new(61, 4),
+		BAR_HIT = Vector2.new(72, 22),
 		DRAG_FOLLOW_SPEED = 9,
 		RESIZE_FOLLOW_SPEED = 26,
 		BAR_IDLE = 0.55,
@@ -51,7 +65,7 @@ local Library = (function()
 		ICON_THICK = 2.5,
 		ICON_INSET = 12,
 		GLOW_SPREAD = 46,
-		GLOW_BRIGHTNESS = 1,
+		GLOW_BRIGHTNESS = 0.3,
 		GLOW_SLICE = 0.4,
 	}
 	C.BAR_BELOW = C.BAR_DISTANCE + C.BAR_HIT.Y / 2
@@ -258,47 +272,127 @@ local Library = (function()
 	end
 
 	----------------------------------------------------------------
-	-- Storage: one file per window name (settings, last session, saved configurations, window position)
+	-- Storage: RuinWare/<Script-Name>/  with  Settings.json, a Configs folder (one file per configuration)
+	-- and an Extras folder (last session, window position, mobile button positions)
 	----------------------------------------------------------------
 	do
 		local canFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
-		local memory = {}
+		local canFolders = type(makefolder) == "function" and type(isfolder) == "function"
+		local memory = {}  -- no file access here: remembered until the game closes
 		pcall(function()
 			if getgenv then
 				local env = getgenv()
-				env.__LibraryMemory = env.__LibraryMemory or {}
-				memory = env.__LibraryMemory
+				env.__RuinWareMemory = env.__RuinWareMemory or {}
+				memory = env.__RuinWareMemory
 			end
 		end)
+		local known = {}   -- every path written this session (so Configs can be listed even without listfiles)
 
-		function S.file(name)
-			local clean = tostring(name):gsub("[^%w_%-]", "_")
-			return "Library_" .. clean .. ".json"
+		S.ROOT = "RuinWare"
+
+		-- "My Script" -> "My-Script"
+		function S.slug(name)
+			local text = tostring(name or "")
+			text = text:gsub("^%s+", ""):gsub("%s+$", "")
+			text = text:gsub("%s+", "-")
+			text = text:gsub('[\\/:*?"<>|%c]', "_")
+			if text == "" then text = "Unnamed" end
+			return text
 		end
 
-		function S.read(name)
-			local file = S.file(name)
+		-- "My-Config" -> "My Config"
+		function S.display(slug)
+			return (tostring(slug):gsub("%-", " "))
+		end
+
+		function S.paths(scriptName)
+			local base = S.ROOT .. "/" .. S.slug(scriptName)
+			return {
+				base = base,
+				configs = base .. "/Configs",
+				extras = base .. "/Extras",
+				settings = base .. "/Settings.json",
+			}
+		end
+
+		function S.ensure(paths)
+			if not canFolders then return end
+			for _, folder in ipairs({ S.ROOT, paths.base, paths.configs, paths.extras }) do
+				pcall(function()
+					if not isfolder(folder) then makefolder(folder) end
+				end)
+			end
+		end
+
+		function S.read(path)
 			local ok, data = pcall(function()
 				if canFiles then
-					if not isfile(file) then return nil end
-					return HttpService:JSONDecode(readfile(file))
+					if not isfile(path) then return nil end
+					return HttpService:JSONDecode(readfile(path))
 				end
-				if memory[file] then return HttpService:JSONDecode(memory[file]) end
+				if memory[path] then return HttpService:JSONDecode(memory[path]) end
 				return nil
 			end)
 			if ok and type(data) == "table" then return data end
 			return {}
 		end
 
-		function S.write(name, data)
-			local file = S.file(name)
+		function S.write(path, data)
 			local ok, text = pcall(function() return HttpService:JSONEncode(data) end)
 			if not ok then return false end
+			known[path] = true
 			if canFiles then
-				return (pcall(writefile, file, text))
+				return (pcall(writefile, path, text))
 			end
-			memory[file] = text
+			memory[path] = text
 			return true
+		end
+
+		function S.delete(path)
+			known[path] = nil
+			memory[path] = nil
+			if canFiles and type(delfile) == "function" then
+				return (pcall(delfile, path))
+			end
+			return true
+		end
+
+		function S.configPath(paths, name)
+			return paths.configs .. "/" .. S.slug(name) .. ".json"
+		end
+
+		-- display name -> file path, for every file in the Configs folder.
+		-- A file put there by hand shows up too: "-" becomes a space and the extension is dropped.
+		function S.configs(paths)
+			local found = {}
+			local prefix = paths.configs .. "/"
+			local function add(path)
+				local file = tostring(path):match("([^/\\]+)$")
+				if not file then return end
+				local base = file:gsub("%.[^%.]*$", "")
+				if base == "" then return end
+				found[S.display(base)] = path
+			end
+			if canFiles and type(listfiles) == "function" then
+				local ok, files = pcall(listfiles, paths.configs)
+				if ok and type(files) == "table" then
+					for _, path in ipairs(files) do
+						local isDir = false
+						if type(isfolder) == "function" then
+							local okDir, result = pcall(isfolder, path)
+							isDir = okDir and result == true
+						end
+						if not isDir then add(path) end
+					end
+				end
+			end
+			for path in pairs(known) do
+				if path:sub(1, #prefix) == prefix then add(path) end
+			end
+			for path in pairs(memory) do
+				if path:sub(1, #prefix) == prefix then add(path) end
+			end
+			return found
 		end
 	end
 
@@ -726,7 +820,7 @@ local Library = (function()
 		local GLOW_BRIGHTNESS = 0.50
 		local GLOW_SLICE = 0.4
 		local SCREEN_MARGIN = 6
-		local TEXT_NUDGE_Y = 0
+		local TEXT_NUDGE_Y = -30
 		local BAR_DISTANCE = 5
 		local DRAG_FOLLOW_SPEED = 9
 		local RESIZE_FOLLOW_SPEED = 26
@@ -736,7 +830,7 @@ local Library = (function()
 		local MORPH_FOLLOW_SPEED = 10                  -- lower = slower, smoother shape changes
 		local SAVE_POSITION = true                     -- remember where you left each button (by its FLAG)
 		local SAVE_FILE = "MobileButtons_Positions.json" -- must match ResetMBPositions
-		local MODE_NAMES = { default = "Square", pill = "Pill", circle = "Circle" } -- shown when the shape changes
+		local MODE_NAMES = { default = "Default", pill = "Pill", circle = "Circle" } -- shown when the shape changes
 		local MODE_TEXT_TIME = 1                       -- seconds the shape name stays before fading back to the title
 
 		local TAG = "DraggableBoxGui" -- must match DestroyAllGuis
@@ -849,11 +943,12 @@ local Library = (function()
 			if getgenv then memoryStore = getgenv() end
 		end)
 
-		local function loadAllPositions()
+		local function loadAllPositions(path)
+			local file = path or SAVE_FILE
 			if canUseFiles then
 				local ok, result = pcall(function()
-					if not isfile(SAVE_FILE) then return {} end
-					local data = HttpService:JSONDecode(readfile(SAVE_FILE))
+					if not isfile(file) then return {} end
+					local data = HttpService:JSONDecode(readfile(file))
 					if type(data) == "table" and type(data.positions) == "table" then
 						return data.positions
 					end
@@ -865,10 +960,10 @@ local Library = (function()
 			return memoryStore.MobileButtonPositions or {} -- no file access here: remembered until the game closes
 		end
 
-		local function saveAllPositions(positions)
+		local function saveAllPositions(positions, path)
 			if canUseFiles then
 				pcall(function()
-					writefile(SAVE_FILE, HttpService:JSONEncode({ version = 1, positions = positions }))
+					writefile(path or SAVE_FILE, HttpService:JSONEncode({ version = 1, positions = positions }))
 				end)
 			else
 				memoryStore.MobileButtonPositions = positions
@@ -1009,7 +1104,7 @@ local Library = (function()
 			local defaultCenter = clampCenter(Vector2.new(v0.X * SPAWN.X + (opts.offset or 0), v0.Y * SPAWN.Y + (opts.offset or 0)), startSize) -- the starting point
 			local startCenter = defaultCenter
 			if SAVE_POSITION then
-				local saved = loadAllPositions()[FLAG]
+				local saved = loadAllPositions(opts.saveFile)[FLAG]
 				if type(saved) == "table" and type(saved.x) == "number" and type(saved.y) == "number" then
 					startCenter = clampCenter(Vector2.new(v0.X * saved.x, v0.Y * saved.y), startSize)
 				end
@@ -1344,9 +1439,9 @@ local Library = (function()
 			local function savePosition()
 				if not SAVE_POSITION then return end
 				local v = viewport()
-				local all = loadAllPositions()
+				local all = loadAllPositions(opts.saveFile)
 				all[FLAG] = { x = posTarget.X / v.X, y = posTarget.Y / v.Y }
-				saveAllPositions(all)
+				saveAllPositions(all, opts.saveFile)
 			end
 
 			-- ResetMBPositions sends every button back to its starting point
@@ -1811,6 +1906,7 @@ local Library = (function()
 				text = el.name,
 				flag = el.flag,
 				kind = el.kind == "toggle" and "Toggle" or "Button",
+				saveFile = window._paths.extras .. "/MobileButtons.json",
 				initial = el.kind == "toggle" and el.value == true,
 				offset = (count % 5) * 28,
 				onToggle = function(on) el:_set(on) end,
@@ -2977,7 +3073,7 @@ local Library = (function()
 				Position = UDim2.new(0, x, 1, -2),
 				Size = UDim2.new(1, -(x + 6), 0, 18),
 				Text = name,
-				TextSize = 15,
+				TextSize = 11,
 				TextColor3 = T.sub,
 			})
 			row._lastSection = name
@@ -3507,8 +3603,19 @@ local Library = (function()
 		return values, extras
 	end
 
-	function Window:_flush()
-		S.write(self.Name, self._store)
+	function Window:_writeSettings()
+		S.ensure(self._paths)
+		S.write(self._paths.settings, self._store.settings)
+	end
+
+	function Window:_writeLast()
+		S.ensure(self._paths)
+		S.write(self._paths.extras .. "/LastSession.json", self._store.last)
+	end
+
+	function Window:_writeWindow()
+		S.ensure(self._paths)
+		S.write(self._paths.extras .. "/Window.json", self._store.window)
 	end
 
 	-- remembers the last session (a second and a half after the last change)
@@ -3521,7 +3628,7 @@ local Library = (function()
 			local values, extras = self:_snapshot()
 			for flag, value in pairs(values) do self._store.last.values[flag] = value end
 			for flag, entry in pairs(extras) do self._store.last.extras[flag] = entry end
-			self:_flush()
+			self:_writeLast()
 		end)
 	end
 
@@ -3531,7 +3638,7 @@ local Library = (function()
 			autoLoad = s.autoLoad, protect = s.protect, hidePill = s.hidePill,
 			notifications = s.notifications, reopen = s.reopen,
 		}
-		self:_flush()
+		self:_writeSettings()
 	end
 
 	function Window:Get(flag)
@@ -3548,14 +3655,15 @@ local Library = (function()
 	function Window:Save(name)
 		name = tostring(name or "default")
 		local values, extras = self:_snapshot()
-		self._store.configs[name] = { values = values, extras = extras }
-		self:_flush()
-		return true
+		S.ensure(self._paths)
+		return S.write(S.configPath(self._paths, name), { values = values, extras = extras })
 	end
 
 	function Window:Load(name)
-		local config = self._store.configs[tostring(name)]
-		if type(config) ~= "table" then return false end
+		name = tostring(name)
+		local path = S.configs(self._paths)[name] or S.configPath(self._paths, name)
+		local config = S.read(path)
+		if type(config.values) ~= "table" and type(config.extras) ~= "table" then return false end
 		for flag, data in pairs(config.values or {}) do
 			local el = self._all[flag]
 			if el then self:_applyData(el, data) end
@@ -3567,18 +3675,18 @@ local Library = (function()
 		return true
 	end
 
+	-- the names of the files in the Configs folder ("My-Config.json" is listed as "My Config")
 	function Window:ListConfigs()
 		local names = {}
-		for name in pairs(self._store.configs) do names[#names + 1] = name end
+		for name in pairs(S.configs(self._paths)) do names[#names + 1] = name end
 		table.sort(names)
 		return names
 	end
 
 	function Window:DeleteConfig(name)
-		if self._store.configs[tostring(name)] == nil then return false end
-		self._store.configs[tostring(name)] = nil
-		self:_flush()
-		return true
+		local path = S.configs(self._paths)[tostring(name)]
+		if not path then return false end
+		return S.delete(path)
 	end
 
 	function Window:_resetElement(el)
@@ -3981,7 +4089,7 @@ local Library = (function()
 		local function saveWindowPosition()
 			local v = U.viewport()
 			window._store.window = { x = posTarget.X / v.X, y = posTarget.Y / v.Y }
-			window:_flush()
+			window:_writeWindow()
 		end
 
 		-- drag: from the bar below, or from the top bar (window._startDrag is used by the header)
@@ -4475,7 +4583,7 @@ local Library = (function()
 					return
 				end
 				window:Save(name)
-				refreshList(name)
+				refreshList(S.display(S.slug(name)))
 				Library:Toast({ title = "Saved", subtitle = name })
 			end,
 		})
@@ -4616,13 +4724,16 @@ local Library = (function()
 			_openToken = 0,
 		}, Window)
 
-		-- the saved file: settings, last session, configurations, window position
-		local store = S.read(window.Name)
-		store.settings = type(store.settings) == "table" and store.settings or {}
-		store.last = type(store.last) == "table" and store.last or {}
+		-- RuinWare/<Script-Name>/: Settings.json, Configs/, Extras/ (last session, window position, mobile buttons)
+		window._paths = S.paths(window.Name)
+		S.ensure(window._paths)
+		local store = {
+			settings = S.read(window._paths.settings),
+			last = S.read(window._paths.extras .. "/LastSession.json"),
+			window = S.read(window._paths.extras .. "/Window.json"),
+		}
 		store.last.values = type(store.last.values) == "table" and store.last.values or {}
 		store.last.extras = type(store.last.extras) == "table" and store.last.extras or {}
-		store.configs = type(store.configs) == "table" and store.configs or {}
 		window._store = store
 		local saved = store.settings
 		window._settings = {
@@ -4673,6 +4784,6 @@ local Library = (function()
 		N.toast(props)
 	end
 
-                     	return Library
-               end)()
+                       	return Library
+                 end)()
 return Library
