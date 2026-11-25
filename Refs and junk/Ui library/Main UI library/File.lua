@@ -804,7 +804,7 @@ tab:CreateSection({ name = "Jumping" })
 AUTO JUMP
 ============================================================================
 ]]--
-do
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -1013,7 +1013,6 @@ AJRP:Hide()
 AJOTOLD:Hide()	
 AJOTOM:Hide()
 AJOTOMS:Hide()
-end
 
 --[[
 ============================================================================
