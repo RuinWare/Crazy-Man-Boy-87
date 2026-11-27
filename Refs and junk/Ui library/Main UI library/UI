@@ -1,26 +1,3 @@
--- Library (the main UI)
---
--- Added Mini Tabs.
---
--- Big, resizable, draggable window: sidebar tabs, sections, two rows that scroll together, a profile card,
--- search, a Settings tab that is always there, notifications and toasts.
---
--- The first part is the library body (it only declares things, nothing is built until CreateWindow is called).
--- Everything below "TEST" builds a window to try it out. To use the body from a loadstring, put it in its own
--- file and end it with `return Library`.
---
--- Saving: everything goes to  RuinWare/<Script-Name>/  (the window name, spaces become "-"):
---   Settings.json   the Settings tab's settings
---   Configs/        one file per saved configuration (My-Config.json shows in game as "My Config")
---   Extras/         last session, window position, mobile button positions
---
--- Handles: every Create... call returns a handle (Hide / Show; a toggle's handle can also create children). Read and write values through the window:
---   window.Flags.MyFlag        read a value        window.Flags.MyFlag = true    write it (UI + callback)
---   window:Get("MyFlag")       the same read        window:Set("MyFlag", true)    the same write
-
-----------------------------------------------------------------
--- LIBRARY BODY
-----------------------------------------------------------------
 local Library = (function()
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
@@ -32,7 +9,6 @@ local Library = (function()
 
 	local Library = { Windows = {} }
 
-	-- the icons that are part of the UI itself (they are not declared in your script)
 	local ICON_CLOSE = 105495420516711
 	local ICON_CLOSE_CROPPED = 79433481401060
 	local ICON_SEARCH = 77209819096039
@@ -40,7 +16,6 @@ local Library = (function()
 	local ICON_DOTS = 123906774409861
 	local GLOW_ASSET = "rbxassetid://138843696730147"
 
-	-- sizes (pixels)
 	local C = {
 		HEADER_H = 50,
 		SIDEBAR_W = 160,
@@ -55,7 +30,6 @@ local Library = (function()
 		MIN_SIZE = Vector2.new(500, 280),
 		MAX_SIZE = Vector2.new(1100, 760),
 		SCREEN_MARGIN = 6,
-		-- drag bar + resize corner (same as the mobile buttons)
 		BAR_DISTANCE = 5,
 		BAR_SIZE = Vector2.new(51, 3),
 		BAR_SIZE_ACTIVE = Vector2.new(61, 4),
@@ -73,7 +47,6 @@ local Library = (function()
 	}
 	C.BAR_BELOW = C.BAR_DISTANCE + C.BAR_HIT.Y / 2
 
-	-- colors (plain gray, no blue)
 	local T = {
 		base = Color3.fromRGB(17, 17, 17),
 		baseAlpha = 0.02,
@@ -94,15 +67,11 @@ local Library = (function()
 
 	local U, D, K, S, N, E, W = {}, {}, {}, {}, {}, {}, {}
 
-	----------------------------------------------------------------
-	-- Helpers
-	----------------------------------------------------------------
 	do
 		local gui = nil
 		local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 		local rng = Random.new()
 
-		-- every animation eases out on one smooth curve (no overshoot, never a hard snap), a little slower than asked
 		function U.tween(obj, time, props)
 			local t = TweenService:Create(
 				obj,
@@ -169,8 +138,6 @@ local Library = (function()
 			return Vector2.new(input.Position.X, input.Position.Y)
 		end
 
-		-- Pointer height vs GUI height. Mouse positions come without the top bar inset, touch positions don't need it.
-		-- The first press settles it: the pointer has to be inside the thing that was pressed.
 		function U.insetMode(input, target)
 			local inset = GuiService:GetGuiInset().Y
 			local top, height = target.AbsolutePosition.Y, target.AbsoluteSize.Y
@@ -194,7 +161,6 @@ local Library = (function()
 			return "rbxassetid://" .. tostring(id)
 		end
 
-		-- runs a callback on its own thread so an error in it can't break the UI
 		function U.run(callback, ...)
 			if type(callback) ~= "function" then return end
 			local args = table.pack(...)
@@ -213,7 +179,6 @@ local Library = (function()
 			return table.concat(out)
 		end
 
-		-- hidden UI container > CoreGui > PlayerGui
 		function U.parentGui(target)
 			local places = {}
 			if gethui then
@@ -231,7 +196,6 @@ local Library = (function()
 			end
 		end
 
-		-- the one ScreenGui everything lives in
 		function U.gui()
 			if gui and gui.Parent then return gui end
 			gui = U.make("ScreenGui", {
@@ -255,7 +219,6 @@ local Library = (function()
 			return workspace.CurrentCamera.ViewportSize
 		end
 
-		-- how many decimals a step like 0.01 has
 		function U.decimalsOf(step)
 			local text = string.format("%.8f", step)
 			text = text:gsub("0+$", "")
@@ -274,14 +237,10 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Storage: RuinWare/<Script-Name>/  with  Settings.json, a Configs folder (one file per configuration)
-	-- and an Extras folder (last session, window position, mobile button positions)
-	----------------------------------------------------------------
 	do
 		local canFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 		local canFolders = type(makefolder) == "function" and type(isfolder) == "function"
-		local memory = {}  -- no file access here: remembered until the game closes
+		local memory = {}
 		pcall(function()
 			if getgenv then
 				local env = getgenv()
@@ -289,11 +248,10 @@ local Library = (function()
 				memory = env.__RuinWareMemory
 			end
 		end)
-		local known = {}   -- every path written this session (so Configs can be listed even without listfiles)
+		local known = {}
 
 		S.ROOT = "RuinWare"
 
-		-- "My Script" -> "My-Script"
 		function S.slug(name)
 			local text = tostring(name or "")
 			text = text:gsub("^%s+", ""):gsub("%s+$", "")
@@ -303,7 +261,6 @@ local Library = (function()
 			return text
 		end
 
-		-- "My-Config" -> "My Config"
 		function S.display(slug)
 			return (tostring(slug):gsub("%-", " "))
 		end
@@ -364,8 +321,6 @@ local Library = (function()
 			return paths.configs .. "/" .. S.slug(name) .. ".json"
 		end
 
-		-- display name -> file path, for every file in the Configs folder.
-		-- A file put there by hand shows up too: "-" becomes a space and the extension is dropped.
 		function S.configs(paths)
 			local found = {}
 			local prefix = paths.configs .. "/"
@@ -399,12 +354,9 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Keys: bound keys, and "press a key" capture
-	----------------------------------------------------------------
 	do
-		K.list = {}       -- elements that have a key
-		K.capturing = nil -- when set, the next key press goes to this function
+		K.list = {}
+		K.capturing = nil
 
 		local NAMES = {
 			One = "1", Two = "2", Three = "3", Four = "4", Five = "5",
@@ -414,7 +366,6 @@ local Library = (function()
 			Comma = ",", Period = ".", Slash = "/", BackSlash = "\\",
 		}
 
-		-- Q, E, Left Shift, Caps Lock ...
 		function K.label(keyCode)
 			if not keyCode then return "None" end
 			local name = keyCode.Name
@@ -431,7 +382,6 @@ local Library = (function()
 			if index then table.remove(K.list, index) end
 		end
 
-		-- cancel runs if the capture is replaced or abandoned
 		function K.capture(callback, cancel)
 			if K.capturing and K.cancel then K.cancel() end
 			K.capturing = callback
@@ -457,9 +407,6 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Dragging: one thing at a time (window bar, resize, slider, color picker)
-	----------------------------------------------------------------
 	do
 		D.state = nil
 
@@ -471,7 +418,6 @@ local Library = (function()
 			if state.onEnd then state.onEnd() end
 		end
 
-		-- scroller: a ScrollingFrame to freeze while dragging (otherwise a moving finger gets taken over by the scrolling)
 		function D.begin(input, onMove, onEnd, scroller)
 			if D.state then return false end
 			local state = { input = input, onMove = onMove, onEnd = onEnd, scroller = scroller }
@@ -513,9 +459,6 @@ local Library = (function()
 		connections[#connections + 1] = UserInputService.InputBegan:Connect(K.began)
 	end
 
-	----------------------------------------------------------------
-	-- Notifications (bottom right, click to dismiss) and toasts (a pill from the top)
-	----------------------------------------------------------------
 	do
 		local stack, toastStack = nil, nil
 		local active = {}
@@ -563,7 +506,6 @@ local Library = (function()
 			return toastStack
 		end
 
-		-- slides the card out, then closes the gap it leaves
 		local function retire(wrapper, card, offX, offY)
 			if not wrapper.Parent then return end
 			local height = wrapper.AbsoluteSize.Y
@@ -585,7 +527,6 @@ local Library = (function()
 			local list = getStack()
 			counter += 1
 
-			-- the stack holds six: the oldest leaves early
 			while #active >= 6 do
 				local oldest = table.remove(active, 1)
 				oldest.finish(true)
@@ -711,7 +652,7 @@ local Library = (function()
 
 			local wrapper = U.make("Frame", {
 				Name = "Wrapper",
-				LayoutOrder = -counter, -- newest on top
+				LayoutOrder = -counter,
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
@@ -798,11 +739,6 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Mobile button: the same MB as the Button / Toggle GUI scripts (same look, shapes, drag bar, resize,
-	-- saved position in MobileButtons_Positions.json, tag DraggableBoxGui so DestroyAllGuis,
-	-- DeleteGuiByFlag and ResetMBPositions work on it)
-	----------------------------------------------------------------
 	local createMobileButton = (function()
 		local CollectionService = game:GetService("CollectionService")
 		local HttpService = game:GetService("HttpService")
@@ -827,16 +763,16 @@ local Library = (function()
 		local BAR_DISTANCE = 5
 		local DRAG_FOLLOW_SPEED = 9
 		local RESIZE_FOLLOW_SPEED = 26
-		local PILL_HEIGHT = MIN_SIZE.Y                 -- how tall the pill shape is
-		local PILL_TEXT_NUDGE_Y = 0                    -- text height in the pill shape
-		local CIRCLE_TEXT_NUDGE_Y = TEXT_NUDGE_Y       -- text height in the circle shape
-		local MORPH_FOLLOW_SPEED = 10                  -- lower = slower, smoother shape changes
-		local SAVE_POSITION = true                     -- remember where you left each button (by its FLAG)
-		local SAVE_FILE = "MobileButtons_Positions.json" -- must match ResetMBPositions
-		local MODE_NAMES = { default = "Default", pill = "Pill", circle = "Circle" } -- shown when the shape changes
-		local MODE_TEXT_TIME = 1                       -- seconds the shape name stays before fading back to the title
+		local PILL_HEIGHT = MIN_SIZE.Y
+		local PILL_TEXT_NUDGE_Y = 0
+		local CIRCLE_TEXT_NUDGE_Y = TEXT_NUDGE_Y
+		local MORPH_FOLLOW_SPEED = 10
+		local SAVE_POSITION = true
+		local SAVE_FILE = "MobileButtons_Positions.json"
+		local MODE_NAMES = { default = "Default", pill = "Pill", circle = "Circle" }
+		local MODE_TEXT_TIME = 1
 
-		local TAG = "DraggableBoxGui" -- must match DestroyAllGuis
+		local TAG = "DraggableBoxGui"
 		local player = Players.LocalPlayer
 		local playerGui = player:WaitForChild("PlayerGui")
 
@@ -848,32 +784,27 @@ local Library = (function()
 		local ICON_IDLE = 0.45
 		local TEXT_TRANSPARENCY = 0.05
 
-		-- Drag bar sits outside, below the box
 		local BAR_SIZE = UDim2.fromOffset(51, 3)
 		local BAR_SIZE_ACTIVE = UDim2.fromOffset(61, 4)
 		local BAR_HIT = Vector2.new(72, 22)
-		local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2 -- how far the bar area reaches below the box
+		local BAR_BELOW = BAR_DISTANCE + BAR_HIT.Y / 2
 
-		-- Pill shape: a vertical resize bar inside the body (resizes the length only)
 		local PILL_BAR_SIZE = UDim2.fromOffset(3, 36)
 		local PILL_BAR_SIZE_ACTIVE = UDim2.fromOffset(4, 46)
 		local PILL_HIT = Vector2.new(30, 60)
 
-		-- Cycle button (top-left): a circle with two arrows, cycles the shape (default > pill > circle)
 		local CYCLE_BOX = 26
 		local CYCLE_R = 7
 		local CYCLE_THICK = 2
 		local CYCLE_HIT = 34
 		local CYCLE_IDLE = 0.55
-		local CORNER_SPEED = 14 -- how fast the corners ease between shapes
+		local CORNER_SPEED = 14
 
-		-- Resize icon: a hollow quarter circle with rounded ends
-		local ICON_R = 15          -- radius of the quarter circle
-		local ICON_THICK = 2.5     -- line thickness
-		local ICON_INSET = 12      -- distance from the box edges
+		local ICON_R = 15
+		local ICON_THICK = 2.5
+		local ICON_INSET = 12
 		local ICON_BOX = math.ceil(ICON_R + ICON_THICK)
 
-		-- Flag rules: no spaces and none of these characters
 		local FLAG_FORBIDDEN = [===['";*()^%$+×÷=/€£¥₩`~\|<>{}[]▪︎○●□■♤♡◇♧☆⊙°•¤《》¡¿,.]===]
 
 		local function flagProblem(flag)
@@ -895,7 +826,6 @@ local Library = (function()
 			return nil
 		end
 
-		-- Turns any text into a valid flag: spaces and the forbidden characters are dropped
 		local function cleanFlag(raw)
 			local banned = { [160] = true, [0x200B] = true, [0x3000] = true }
 			pcall(function()
@@ -913,7 +843,6 @@ local Library = (function()
 			return text
 		end
 
-		-- Every GUI made by these scripts, wherever it lives
 		local function collectGuis()
 			local list, seen = {}, {}
 			local function add(inst)
@@ -938,8 +867,6 @@ local Library = (function()
 			return list
 		end
 
-
-		-- Saved positions: kept in a file by FLAG, so they survive between sessions
 		local canUseFiles = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 		local memoryStore = _G
 		pcall(function()
@@ -960,7 +887,7 @@ local Library = (function()
 				if ok and type(result) == "table" then return result end
 				return {}
 			end
-			return memoryStore.MobileButtonPositions or {} -- no file access here: remembered until the game closes
+			return memoryStore.MobileButtonPositions or {}
 		end
 
 		local function saveAllPositions(positions, path)
@@ -973,7 +900,6 @@ local Library = (function()
 			end
 		end
 
-		-- Random 20-character name, different for every GUI
 		local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789*^%/?#$"
 		local rng = Random.new()
 
@@ -1021,7 +947,6 @@ local Library = (function()
 			end)
 		end
 
-		-- Highest place available: hidden UI container > CoreGui > PlayerGui
 		local function parentGui(gui)
 			local targets = {}
 			if gethui then
@@ -1043,7 +968,6 @@ local Library = (function()
 			local kind = opts.kind == "Toggle" and "Toggle" or "Button"
 			local FLAG = cleanFlag(opts.flag or TEXT)
 
-			-- One GUI per flag: making it again with the same flag replaces the old one
 			for _, old in ipairs(collectGuis()) do
 				if old:GetAttribute("Flag") == FLAG then
 					old:Destroy()
@@ -1054,7 +978,7 @@ local Library = (function()
 				Name = randomName(20),
 				ResetOnSpawn = false,
 				IgnoreGuiInset = true,
-				DisplayOrder = 2147483647, -- above every other GUI
+				DisplayOrder = 2147483647,
 				OnTopOfCoreBlur = true,
 				ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			}, nil)
@@ -1071,7 +995,6 @@ local Library = (function()
 				return size
 			end
 
-			-- Off-screen protection (the drag bar below the box is counted too)
 			local function fitSize(size)
 				local v = viewport()
 				return Vector2.new(
@@ -1092,8 +1015,6 @@ local Library = (function()
 				)
 			end
 
-			-- Corner roundness: the default shape scales with the box (never past MAX_CORNER pixels),
-			-- the pill and circle shapes are fully round
 			local function cornerFor(size, forMode)
 				if forMode == "pill" or forMode == "circle" then
 					return math.floor(math.min(size.X, size.Y) / 2 + 0.5)
@@ -1101,10 +1022,9 @@ local Library = (function()
 				return math.floor(math.min(CORNER * math.min(size.X, size.Y), MAX_CORNER) + 0.5)
 			end
 
-			-- Both versions use the same size and the same SPAWN point, so they appear in the exact same spot
 			local startSize = fitSize(START_SIZE)
 			local v0 = viewport()
-			local defaultCenter = clampCenter(Vector2.new(v0.X * SPAWN.X + (opts.offset or 0), v0.Y * SPAWN.Y + (opts.offset or 0)), startSize) -- the starting point
+			local defaultCenter = clampCenter(Vector2.new(v0.X * SPAWN.X + (opts.offset or 0), v0.Y * SPAWN.Y + (opts.offset or 0)), startSize)
 			local startCenter = defaultCenter
 			if SAVE_POSITION then
 				local saved = loadAllPositions(opts.saveFile)[FLAG]
@@ -1113,7 +1033,6 @@ local Library = (function()
 				end
 			end
 
-			-- Holder: the thing that moves and resizes. Everything lives inside it.
 			local holder = make("Frame", {
 				Name = "Holder",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1124,7 +1043,6 @@ local Library = (function()
 
 			local popScale = make("UIScale", { Name = "PopScale", Scale = 0.7 }, holder)
 
-			-- Glow: soft image behind the box
 			local glow = make("ImageLabel", {
 				Name = "Glow",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1138,13 +1056,11 @@ local Library = (function()
 				ZIndex = 1,
 			}, holder)
 
-			-- 9-slice the glow using the image's real size: the corners and soft edges stay a
-			-- constant size and only the middle stretches, so resizing never distorts it.
 			task.spawn(function()
 				local deadline = os.clock() + 5
 				while glow.Parent and os.clock() < deadline do
 					local ok, size = pcall(function() return glow.ContentImageSize end)
-					if not ok then return end -- older client: keep the plain stretch
+					if not ok then return end
 					if size.X > 0 and size.Y > 0 then
 						local sx, sy = size.X * GLOW_SLICE, size.Y * GLOW_SLICE
 						glow.SliceCenter = Rect.new(sx, sy, size.X - sx, size.Y - sy)
@@ -1156,12 +1072,10 @@ local Library = (function()
 				end
 			end)
 
-			-- strength: 0 = off, 1 = full flash
 			local function setGlow(strength, time, style)
 				tween(glow, time, { ImageTransparency = 1 - GLOW_BRIGHTNESS * strength }, style)
 			end
 
-			-- Box
 			local box = make("Frame", {
 				Name = "Box",
 				Size = UDim2.fromScale(1, 1),
@@ -1178,7 +1092,6 @@ local Library = (function()
 				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			}, box)
 
-			-- Clickable body
 			local body = make("TextButton", {
 				Name = "Body",
 				Size = UDim2.fromScale(1, 1),
@@ -1189,7 +1102,6 @@ local Library = (function()
 				ZIndex = 1,
 			}, box)
 
-			-- Text: fixed size, dead center of the box
 			local label = make("TextLabel", {
 				Name = "Label",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1208,7 +1120,6 @@ local Library = (function()
 				ZIndex = 2,
 			}, box)
 
-			-- Drag bar: outside the box, just below it (fixed pixel size)
 			local dragHit = make("TextButton", {
 				Name = "DragHit",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1232,7 +1143,6 @@ local Library = (function()
 			}, dragHit)
 			make("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
 
-			-- Resize handle in the bottom-right corner (invisible hit area + the arc icon)
 			local handle = make("TextButton", {
 				Name = "ResizeHandle",
 				AnchorPoint = Vector2.new(1, 1),
@@ -1245,8 +1155,6 @@ local Library = (function()
 				ZIndex = 5,
 			}, box)
 
-			-- The icon is a quarter circle drawn with round dots, so both ends are rounded.
-			-- It sits in a CanvasGroup so the overlapping dots fade as one clean shape.
 			local iconGroup = make("CanvasGroup", {
 				Name = "Icon",
 				AnchorPoint = Vector2.new(1, 1),
@@ -1274,7 +1182,6 @@ local Library = (function()
 				end
 			end
 
-			-- Pill shape: a vertical bar inside the body at the right end (resizes the length only)
 			local pillHandle = make("TextButton", {
 				Name = "PillHandle",
 				AnchorPoint = Vector2.new(1, 0.5),
@@ -1299,8 +1206,6 @@ local Library = (function()
 			}, pillHandle)
 			make("UICorner", { CornerRadius = UDim.new(1, 0) }, pillBar)
 
-			-- Cycle button (top-left): a circle with two arrows. Tapping it cycles the shape
-			-- default > pill > circle, and the icon spins every time it switches
 			local collapseHit = make("TextButton", {
 				Name = "CycleHit",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1323,8 +1228,8 @@ local Library = (function()
 			}, collapseHit)
 			do
 				local center = CYCLE_BOX / 2
-				local wing = 5              -- length of each arrow-head line
-				local sweep = math.rad(120) -- how much of the circle each arrow covers
+				local wing = 5
+				local sweep = math.rad(120)
 				local steps = math.max(8, math.ceil((CYCLE_R * sweep) / (CYCLE_THICK / 3)))
 
 				local function roundPart(position, size, rotation)
@@ -1341,7 +1246,6 @@ local Library = (function()
 				end
 
 				for _, startAngle in ipairs({ 0, math.pi }) do
-					-- the arc, drawn with round dots
 					for i = 0, steps do
 						local angle = startAngle + sweep * (i / steps)
 						roundPart(
@@ -1351,10 +1255,9 @@ local Library = (function()
 						)
 					end
 
-					-- the arrow head at the end of the arc (two short lines meeting at the tip)
 					local endAngle = startAngle + sweep
 					local tip = Vector2.new(center + CYCLE_R * math.cos(endAngle), center + CYCLE_R * math.sin(endAngle))
-					local back = Vector2.new(math.sin(endAngle), -math.cos(endAngle)) -- back along the arc
+					local back = Vector2.new(math.sin(endAngle), -math.cos(endAngle))
 					for _, spread in ipairs({ math.rad(40), -math.rad(40) }) do
 						local cosS, sinS = math.cos(spread), math.sin(spread)
 						local dir = Vector2.new(back.X * cosS - back.Y * sinS, back.X * sinS + back.Y * cosS)
@@ -1363,17 +1266,13 @@ local Library = (function()
 				end
 			end
 
-			----------------------------------------------------------------
-			-- Smooth move + resize + shapes
-			----------------------------------------------------------------
 			local connections = {}
 
-			local mode = "default" -- "default", "pill" or "circle"
+			local mode = "default"
 			local dragging, resizing = false, false
 			local activeInput, inputStart
 			local dragOrigin, resizeOriginSize, resizeTopLeft
 
-			-- Size limits for the pill and circle shapes
 			local pillMinWidth = math.max(MIN_SIZE.X, PILL_HEIGHT * 1.25)
 			local circleMin = math.max(MIN_SIZE.X, MIN_SIZE.Y)
 			local circleMax = math.min(MAX_SIZE.X, MAX_SIZE.Y)
@@ -1386,7 +1285,6 @@ local Library = (function()
 			local lastInset = -1
 			local morphUntil = 0
 
-			-- Each shape remembers its own size, so switching back and forth feels natural
 			local circleStart = math.clamp((startSize.X + startSize.Y) / 2, circleMin, circleMax)
 			local modeSizes = {
 				default = startSize,
@@ -1395,7 +1293,6 @@ local Library = (function()
 			}
 
 			connections[#connections + 1] = RunService.RenderStepped:Connect(function(dt)
-				-- off-screen protection every frame (and the shape rules)
 				sizeTarget = fitSize(sizeTarget)
 				if mode == "circle" then
 					local side = math.min(sizeTarget.X, sizeTarget.Y)
@@ -1405,7 +1302,6 @@ local Library = (function()
 				end
 				posTarget = clampCenter(posTarget, sizeTarget)
 
-				-- slower follow while dragging = the box trails behind the bar, shape changes ease in gently
 				local speed = DRAG_FOLLOW_SPEED
 				if resizing then
 					speed = RESIZE_FOLLOW_SPEED
@@ -1419,7 +1315,6 @@ local Library = (function()
 				holder.Size = UDim2.fromOffset(math.floor(sizeCur.X + 0.5), math.floor(sizeCur.Y + 0.5))
 				holder.Position = UDim2.fromOffset(math.floor(posCur.X + 0.5), math.floor(posCur.Y + 0.5))
 
-				-- the corners ease toward the roundness of the current shape
 				cornerCur += (cornerFor(sizeCur, mode) - cornerCur) * (1 - math.exp(-dt * CORNER_SPEED))
 				local corner = math.floor(cornerCur + 0.5)
 				if corner ~= lastCorner then
@@ -1427,7 +1322,6 @@ local Library = (function()
 					boxCorner.CornerRadius = UDim.new(0, corner)
 				end
 
-				-- the corner icons follow the rounded edge, so they always stay inside the shape
 				local inset = math.max(ICON_INSET, 0.293 * cornerCur + 1)
 				if math.abs(inset - lastInset) > 0.05 then
 					lastInset = inset
@@ -1438,7 +1332,6 @@ local Library = (function()
 				end
 			end)
 
-			-- Save where this button is (by its FLAG)
 			local function savePosition()
 				if not SAVE_POSITION then return end
 				local v = viewport()
@@ -1447,12 +1340,10 @@ local Library = (function()
 				saveAllPositions(all, opts.saveFile)
 			end
 
-			-- ResetMBPositions sends every button back to its starting point
 			screenGui:GetAttributeChangedSignal("ResetPosition"):Connect(function()
 				posTarget = clampCenter(defaultCenter, sizeTarget)
 			end)
 
-			-- Drag: only while holding the bar
 			dragHit.InputBegan:Connect(function(input)
 				if not isPress(input) or dragging or resizing then return end
 				dragging = true
@@ -1475,7 +1366,6 @@ local Library = (function()
 				if not dragging then tween(bar, 0.25, { BackgroundTransparency = BAR_IDLE }) end
 			end)
 
-			-- Resize (default and circle shapes): only while holding the corner handle
 			handle.InputBegan:Connect(function(input)
 				if not isPress(input) or dragging or resizing or mode == "pill" then return end
 				resizing = true
@@ -1498,7 +1388,6 @@ local Library = (function()
 				if not resizing and mode ~= "pill" then tween(iconGroup, 0.25, { GroupTransparency = ICON_IDLE }) end
 			end)
 
-			-- Resize (pill shape): only the length, by holding the vertical bar
 			pillHandle.InputBegan:Connect(function(input)
 				if not isPress(input) or dragging or resizing or mode ~= "pill" then return end
 				resizing = true
@@ -1532,10 +1421,8 @@ local Library = (function()
 					local v = viewport()
 					local newSize
 					if mode == "pill" then
-						-- only the length changes, the height stays locked
 						newSize = Vector2.new(math.clamp(resizeOriginSize.X + delta.X, pillMinWidth, MAX_SIZE.X), PILL_HEIGHT)
 					elseif mode == "circle" then
-						-- x and y always stay the same size
 						local side = math.clamp(resizeOriginSize.X + (delta.X + delta.Y) / 2, circleMin, circleMax)
 						newSize = Vector2.new(side, side)
 					else
@@ -1544,7 +1431,6 @@ local Library = (function()
 							math.clamp(resizeOriginSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y)
 						)
 					end
-					-- never grow past the edge of the screen
 					newSize = Vector2.new(
 						math.min(newSize.X, v.X - SCREEN_MARGIN - resizeTopLeft.X),
 						math.min(newSize.Y, v.Y - SCREEN_MARGIN - BAR_BELOW - resizeTopLeft.Y)
@@ -1554,11 +1440,10 @@ local Library = (function()
 						newSize = Vector2.new(side, side)
 					end
 					sizeTarget = newSize
-					posTarget = resizeTopLeft + newSize / 2 -- top-left corner stays put
+					posTarget = resizeTopLeft + newSize / 2
 				end
 			end)
 
-			-- Shape name: sits on top of the title and shows for a moment when the shape changes
 			local modeLabel = make("TextLabel", {
 				Name = "ModeLabel",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1583,11 +1468,9 @@ local Library = (function()
 				local token = flashToken
 				modeLabel.Text = name
 
-				-- quick crossfade: the title fades out while the shape name fades in
 				tween(label, 0.2, { TextTransparency = 1 }, Enum.EasingStyle.Quad)
 				tween(modeLabel, 0.2, { TextTransparency = TEXT_TRANSPARENCY }, Enum.EasingStyle.Quad)
 
-				-- after a moment it fades out into the normal title
 				task.delay(0.2 + MODE_TEXT_TIME, function()
 					if token ~= flashToken or not screenGui.Parent then return end
 					tween(modeLabel, 0.4, { TextTransparency = 1 }, Enum.EasingStyle.Sine)
@@ -1595,24 +1478,21 @@ local Library = (function()
 				end)
 			end
 
-			-- Shapes: the cycle button goes default > pill > circle > default
 			local MODES = { "default", "pill", "circle" }
 
 			local function setMode(newMode)
 				if newMode == mode or dragging or resizing then return end
-				modeSizes[mode] = sizeTarget -- remember the shape we're leaving
+				modeSizes[mode] = sizeTarget
 				mode = newMode
 				sizeTarget = fitSize(modeSizes[newMode])
 				morphUntil = os.clock() + 0.8
 
-				-- the old resize icon fades out, the new one fades in
 				local isPill = newMode == "pill"
 				handle.Interactable = not isPill
 				pillHandle.Interactable = isPill
 				tween(iconGroup, 0.35, { GroupTransparency = isPill and 1 or ICON_IDLE }, Enum.EasingStyle.Quad)
 				tween(pillBar, 0.4, { BackgroundTransparency = isPill and BAR_IDLE or 1 }, Enum.EasingStyle.Quad)
 
-				-- the text glides to the right height for the new shape
 				local nudge = TEXT_NUDGE_Y
 				if isPill then nudge = PILL_TEXT_NUDGE_Y elseif newMode == "circle" then nudge = CIRCLE_TEXT_NUDGE_Y end
 				local textPosition = UDim2.new(0.5, 0, 0.5, nudge)
@@ -1626,9 +1506,8 @@ local Library = (function()
 			collapseHit.Activated:Connect(function()
 				local before = mode
 				setMode(MODES[(table.find(MODES, mode) or 1) % #MODES + 1])
-				if mode == before then return end -- it didn't switch (busy dragging or resizing)
+				if mode == before then return end
 
-				-- spin once, smoothly, every time the shape switches
 				spin += 360
 				tween(cycleIcon, 0.7, { Rotation = spin }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 			end)
@@ -1639,9 +1518,6 @@ local Library = (function()
 				tween(cycleIcon, 0.25, { GroupTransparency = CYCLE_IDLE })
 			end)
 
-			----------------------------------------------------------------
-			-- Click: a toggle keeps a steady on/off state, a button flashes
-			----------------------------------------------------------------
 			local isOn = opts.initial == true and kind == "Toggle"
 			local stateToken = 0
 			local glowToken = 0
@@ -1655,7 +1531,6 @@ local Library = (function()
 				tween(stroke, 0.25, { Transparency = on and 0.3 or STROKE_IDLE, Thickness = on and 2 or 1 })
 
 				if on then
-					-- bright flash, then settle into a steady glow
 					setGlow(1, 0.08, Enum.EasingStyle.Quad)
 					task.delay(0.1, function()
 						if token ~= stateToken or not screenGui.Parent then return end
@@ -1704,7 +1579,6 @@ local Library = (function()
 				end
 			end)
 
-			-- what the library uses to drive this button
 			local api = {}
 			function api.SetState(on)
 				if kind ~= "Toggle" or on == isOn then return end
@@ -1718,15 +1592,11 @@ local Library = (function()
 			end
 			api.Gui = screenGui
 
-			----------------------------------------------------------------
-			-- Cleanup + pop-in
-			----------------------------------------------------------------
 			screenGui.Destroying:Connect(function()
 				for _, c in ipairs(connections) do c:Disconnect() end
 				table.clear(connections)
 				if opts.onGone then run(opts.onGone) end
 			end)
-
 
 			local fades = {
 				{ box, "BackgroundTransparency", BG_TRANSPARENCY },
@@ -1741,8 +1611,6 @@ local Library = (function()
 				tween(f[1], 0.4, { [f[2]] = f[3] }, Enum.EasingStyle.Quad)
 			end
 
-
-			-- a toggle that was already on when its button was made shows that after the pop-in
 			if isOn then
 				task.delay(0.45, function()
 					if screenGui.Parent then setState(true) end
@@ -1756,13 +1624,9 @@ local Library = (function()
 		return create
 	end)()
 
-	----------------------------------------------------------------
-	-- Components
-	----------------------------------------------------------------
 	do
 		local ROW_H = C.ROW_H
 
-		-- the frame every component lives in (the thin line under it is shown by the layout when another component follows)
 		local function makeItem(row, height)
 			local frame = U.make("Frame", {
 				Name = "Item",
@@ -1786,7 +1650,6 @@ local Library = (function()
 			return U.button(frame, { Name = "Hit", Size = UDim2.new(1, 0, 0, height or ROW_H), ZIndex = 1 })
 		end
 
-		-- a soft highlight behind a row while the pointer is over it
 		local function makeHover(frame, hit, height)
 			local glow = U.make("Frame", {
 				Name = "Hover",
@@ -1838,7 +1701,6 @@ local Library = (function()
 			return { track = track, knob = knob, set = set }
 		end
 
-		-- a small rounded box with a text box inside
 		local function makeChipBox(parent, props)
 			local chip = U.make("Frame", {
 				AnchorPoint = Vector2.new(1, 0.5),
@@ -1874,9 +1736,6 @@ local Library = (function()
 			return chip, box
 		end
 
-		----------------------------------------------------------------
-		-- The 3 dots on toggles and buttons: Keybind + Mobile Button
-		----------------------------------------------------------------
 		local function closeMenu(window)
 			if window._menu then window._menu.close() end
 		end
@@ -1915,7 +1774,6 @@ local Library = (function()
 				onToggle = function(on) el:_set(on) end,
 				onClick = function() el:_run() end,
 				onGone = function()
-					-- it was deleted from outside (DestroyAllGuis, DeleteGuiByFlag): the switch goes off too
 					if el._mb ~= handle then return end
 					el._mb = nil
 					el._mbOn = false
@@ -2014,7 +1872,6 @@ local Library = (function()
 					})
 					U.corner(keyButton, 6)
 					keyButton.Activated:Connect(function()
-						-- the next key you press becomes the keybind (Escape cancels, Backspace clears it)
 						keyButton.Text = "..."
 						U.tween(keyButton, 0.15, { BackgroundColor3 = T.green }, Enum.EasingStyle.Quad)
 						K.capture(function(keyCode)
@@ -2056,8 +1913,6 @@ local Library = (function()
 			end
 		end
 
-		-- the 3 dots (only when the component has a keybind or a mobile button), and the methods the window
-		-- uses to apply saved extras
 		local function attachOptions(el, frame, rightOffset)
 			function el:_setKey(keyCode) setKey(self, keyCode) end
 			function el:_setMB(state)
@@ -2099,14 +1954,10 @@ local Library = (function()
 			end)
 		end
 
-		-- the part every value component shares: its flag, saved values, and the search list
 		local function finish(row, el, cfg, frame, sep)
 			return row._window:_register(el, row, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Toggle
-		----------------------------------------------------------------
 		function E.toggle(row, cfg)
 			local window = row._window
 			local el = {
@@ -2164,9 +2015,6 @@ local Library = (function()
 			return finish(row, el, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Button (no flash, no label)
-		----------------------------------------------------------------
 		function E.button(row, cfg)
 			local window = row._window
 			local el = {
@@ -2206,9 +2054,6 @@ local Library = (function()
 			return finish(row, el, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Slider
-		----------------------------------------------------------------
 		function E.slider(row, cfg)
 			local window = row._window
 			local minValue, maxValue = 0, 100
@@ -2280,7 +2125,6 @@ local Library = (function()
 			}, track)
 			U.corner(knob, 5)
 
-			-- the grab area: the track, a little wider than it is, the full height of the row
 			local hit = U.button(frame, {
 				Name = "Hit",
 				Position = UDim2.new(0.4, -8, 0, 0),
@@ -2327,7 +2171,6 @@ local Library = (function()
 				el:_set(minValue + (maxValue - minValue) * alpha)
 			end
 
-			-- press and slide: the tab stops scrolling while you do
 			hit.InputBegan:Connect(function(input)
 				if not U.isPress(input) then return end
 				local started = D.begin(input, function(moved)
@@ -2348,9 +2191,6 @@ local Library = (function()
 			return finish(row, el, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Dropdown (multiSelect for several)
-		----------------------------------------------------------------
 		function E.dropdown(row, cfg)
 			local window = row._window
 			local OPTION_H = 26
@@ -2536,7 +2376,6 @@ local Library = (function()
 				return true
 			end
 			function el:_fire() U.run(self.callback, self:_natural()) end
-			-- (used by the Settings tab) replace the options, dropping a selection that no longer exists
 			function el:_setOptions(options)
 				self.options = {}
 				for _, option in ipairs(options) do self.options[#self.options + 1] = tostring(option) end
@@ -2549,9 +2388,6 @@ local Library = (function()
 			return finish(row, el, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Input (a text box, commits when you press enter or click away)
-		----------------------------------------------------------------
 		function E.input(row, cfg)
 			local window = row._window
 			local el = {
@@ -2601,9 +2437,6 @@ local Library = (function()
 			return finish(row, el, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Keybind (shows the key, outputs an Enum.KeyCode)
-		----------------------------------------------------------------
 		function E.keybind(row, cfg)
 			local window = row._window
 			local function toKey(value)
@@ -2652,7 +2485,6 @@ local Library = (function()
 
 			function el:_natural() return self.value end
 			function el:_serialize() return self.value and self.value.Name or "" end
-			-- changing the key never runs the press callback
 			function el:_set(value)
 				value = toKey(value)
 				self.value = value
@@ -2666,7 +2498,7 @@ local Library = (function()
 			function el:_load(data)
 				if type(data) ~= "string" then return false end
 				self:_set(data)
-				return false -- nothing to fire: the callback is for presses
+				return false
 			end
 			function el:_fire() end
 			function el:_onKey() U.run(self.callback, self.value) end
@@ -2690,7 +2522,6 @@ local Library = (function()
 				if U.isPress(input) then U.tween(chipScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back) end
 			end)
 			chip.Activated:Connect(function()
-				-- press a key to bind it: Backspace clears, Escape keeps the current one
 				chip.Text = "..."
 				U.tween(chip, 0.15, { BackgroundColor3 = T.green }, Enum.EasingStyle.Quad)
 				K.capture(function(keyCode)
@@ -2706,9 +2537,6 @@ local Library = (function()
 			return finish(row, el, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Color picker (whole-number RGB, no alpha)
-		----------------------------------------------------------------
 		function E.colorpicker(row, cfg)
 			local window = row._window
 			local PICK_H = 96
@@ -2765,7 +2593,6 @@ local Library = (function()
 			U.corner(swatch, 5)
 			U.stroke(swatch, T.white, 0.8)
 
-			-- everything that opens lives in one clipped area under the row: while it is closed nothing of it shows
 			local area = U.make("Frame", {
 				Name = "Area",
 				Position = UDim2.fromOffset(0, ROW_H),
@@ -2776,7 +2603,6 @@ local Library = (function()
 				ZIndex = 2,
 			}, frame)
 
-			-- the map: saturation across, brightness down
 			local map = U.make("Frame", {
 				Position = UDim2.new(0, 12, 0, AREA_PAD),
 				Size = UDim2.new(1, -46, 0, PICK_H),
@@ -2815,7 +2641,6 @@ local Library = (function()
 			U.corner(mapCursor, 5)
 			U.stroke(mapCursor, T.white, 0, 2)
 
-			-- the hue bar
 			local bar = U.make("Frame", {
 				AnchorPoint = Vector2.new(1, 0),
 				Position = UDim2.new(1, -12, 0, AREA_PAD),
@@ -2840,7 +2665,6 @@ local Library = (function()
 			U.corner(barCursor, 2)
 			U.stroke(barCursor, Color3.new(0, 0, 0), 0.6, 1)
 
-			-- R G B and hex
 			local fields = U.make("Frame", {
 				Position = UDim2.new(0, 12, 0, FIELDS_Y),
 				Size = UDim2.new(1, -24, 0, FIELD_H),
@@ -2890,7 +2714,6 @@ local Library = (function()
 				boxes.hex.Text = string.format("#%02X%02X%02X", r, g, b)
 			end
 
-			-- takes the current hue / saturation / value and publishes the color if it changed
 			local function commit(quiet)
 				local color = quantize(Color3.fromHSV(hue, sat, val))
 				paint()
@@ -2927,7 +2750,6 @@ local Library = (function()
 			end
 			function el:_fire() U.run(self.callback, self.value) end
 
-			-- the pointer is turned into a position inside the map / bar (see U.insetMode for the height)
 			local function place(input, withInset)
 				local y = U.pointerY(input, withInset)
 				sat = math.clamp((input.Position.X - map.AbsolutePosition.X) / math.max(1, map.AbsoluteSize.X), 0, 1)
@@ -2992,9 +2814,6 @@ local Library = (function()
 			return finish(row, el, cfg, frame, sep)
 		end
 
-		----------------------------------------------------------------
-		-- Divider (a line, with a word in the middle if you give it one)
-		----------------------------------------------------------------
 		function E.divider(row, cfg)
 			cfg = cfg or {}
 			local text = tostring(cfg.text or "")
@@ -3047,9 +2866,6 @@ local Library = (function()
 			return row:_handle(item)
 		end
 
-		----------------------------------------------------------------
-		-- Section (the small heading above a box)
-		----------------------------------------------------------------
 		function E.section(row, cfg)
 			cfg = cfg or {}
 			local name = tostring(cfg.name or "Section")
@@ -3086,9 +2902,6 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Rows, tabs and the window object
-	----------------------------------------------------------------
 	local Row, Tab, Window = {}, {}, {}
 	Row.__index = Row
 	Tab.__index = Tab
@@ -3099,8 +2912,6 @@ local Library = (function()
 		"CreateInput", "CreateKeybind", "CreateColorPicker", "CreateDivider",
 	}
 
-	-- Row: one of the two scrolling columns. Components that follow each other form one box; a section or a
-	-- standalone divider breaks the box.
 	do
 		local function makeCard(parent)
 			local card = U.make("Frame", {
@@ -3137,7 +2948,6 @@ local Library = (function()
 		end
 
 		function Row:_layout()
-			-- items that finished hiding sit out of the boxes (parked on the row, invisible)
 			local items = {}
 			for _, item in ipairs(self._items) do
 				if item.gone then
@@ -3150,8 +2960,6 @@ local Library = (function()
 			local count = #items
 			local blocks = {}
 
-			-- sections are free; every run of other items between sections becomes a box,
-			-- except dividers at the start or the end of the run (those stay outside)
 			local i = 1
 			while i <= count do
 				if items[i].kind == "section" then
@@ -3208,8 +3016,6 @@ local Library = (function()
 			end
 		end
 
-		-- What every Create... call returns: handle:Hide() collapses the component away, handle:Show() brings it back.
-		-- (a soft cover fades over it while it folds, and the box around it closes up)
 		function Row:_handle(item, el)
 			local row = self
 			local hidden = false
@@ -3274,7 +3080,7 @@ local Library = (function()
 				frame.Visible = true
 				if item._clip == nil then item._clip = frame.ClipsDescendants end
 				frame.ClipsDescendants = true
-				row:_layout() -- back into its box right away
+				row:_layout()
 				local c = cover()
 				if wasGone then c.BackgroundTransparency = 0 end
 				c.Visible = true
@@ -3290,7 +3096,6 @@ local Library = (function()
 				if el and el._applyChildren then el:_applyChildren() end
 			end
 
-			-- hides it right away, no animation (used for a child that starts out hidden)
 			function handle._hideNow()
 				if hidden then return end
 				hidden = true
@@ -3305,9 +3110,6 @@ local Library = (function()
 			handle._item = item
 			handle._el = el
 
-			-- Toggle:CreateToggle({ WhenOn = true, ... }) and every other Create...: a normal component that sits right
-			-- under the toggle and is only visible while the toggle is on (WhenOn = true) or off (WhenOn = false).
-			-- Only a toggle gets these.
 			if el and el.kind == "toggle" then
 				local children = {}
 				local lastItem = item
@@ -3351,8 +3153,6 @@ local Library = (function()
 		function Row:CreateDivider(cfg) return E.divider(self, cfg or {}) end
 	end
 
-	-- Tab: tab:CreateLeftRow() / tab:CreateRightRow() choose where the components below go.
-	-- (they also return the row, so row:CreateToggle(...) works too)
 	do
 		function Tab:CreateLeftRow()
 			self._current = self.Left
@@ -3364,7 +3164,6 @@ local Library = (function()
 			return self.Right
 		end
 
-		-- Tab:CreateMTab({ name, icon, isDefault }): a tab under this tab (it has all the Create... of a tab)
 		function Tab:CreateMTab(config)
 			config = config or {}
 			local window = self._window
@@ -3381,12 +3180,10 @@ local Library = (function()
 				end
 			end
 			window:_refreshMinis(false)
-			-- a default mini tab takes over right away if its tab is the open one
 			if self._default == mini and window._selected == self then window:_select(mini) end
 			return mini
 		end
 
-		-- shows or collapses a mini tab's sidebar button
 		function Tab:_setMiniShown(show, animate)
 			if self._miniShown == show then return end
 			self._miniShown = show
@@ -3417,9 +3214,6 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Window internals
-	----------------------------------------------------------------
 	function W.newRow(tab, side)
 		local frame = U.make("Frame", {
 			Name = side .. "Row",
@@ -3443,7 +3237,7 @@ local Library = (function()
 		local tab = setmetatable({
 			_window = window,
 			_title = tostring(config.title or config.name or "Tab"),
-			_parent = parent,   -- set for a mini tab: the tab it sits under
+			_parent = parent,
 			_minis = {},
 		}, Tab)
 		if parent then
@@ -3451,7 +3245,6 @@ local Library = (function()
 			tab._flagBase = parent._title .. "/" .. tab._title
 		end
 
-		-- the sidebar button (a mini tab is smaller, sits a little to the right, and starts out collapsed)
 		local order
 		if isSettings then
 			order = 1000000
@@ -3506,7 +3299,6 @@ local Library = (function()
 			window:_select(tab)
 		end)
 
-		-- the page: one scrolling frame holding both rows, so they scroll together
 		local page = U.make("ScrollingFrame", {
 			Name = tab._title,
 			Size = UDim2.fromScale(1, 1),
@@ -3554,7 +3346,6 @@ local Library = (function()
 	end
 
 	function Window:_select(tab)
-		-- a tab that has a default mini tab never shows a page of its own: it opens the mini tab
 		if not tab._parent and tab._default then tab = tab._default end
 		if self._selected == tab then return end
 		local previous = self._selected
@@ -3562,7 +3353,7 @@ local Library = (function()
 		local group = tab._parent or tab
 		for _, other in ipairs(self.Tabs) do
 			local on = other == tab
-			local lit = on or other == group -- the main tab stays lit while one of its mini tabs is open
+			local lit = on or other == group
 			U.tween(other._button, 0.2, { BackgroundTransparency = on and 0 or 1 })
 			U.tween(other._label, 0.2, { TextColor3 = lit and T.text or T.sub })
 			if other._icon then
@@ -3577,7 +3368,6 @@ local Library = (function()
 		U.tween(tab._page, 0.35, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
 	end
 
-	-- mini tabs are only in the sidebar while their main tab (or one of its mini tabs) is the open one
 	function Window:_refreshMinis(animate)
 		local selected = self._selected
 		local group = selected and (selected._parent or selected)
@@ -3586,7 +3376,6 @@ local Library = (function()
 		end
 	end
 
-	-- takes you to a tab (by its handle or its title)
 	function Window:Navigate(target)
 		for _, tab in ipairs(self.Tabs) do
 			if tab == target or tab._title == target then
@@ -3601,15 +3390,11 @@ local Library = (function()
 	function Window:CreateTab(config)
 		config = config or {}
 		local tab = W.newTab(self, config, false)
-		-- the first tab you make is the one that opens (Settings is only the start until then)
 		if self._userTabs == 0 then self:_select(tab) end
 		self._userTabs += 1
 		return tab
 	end
 
-	----------------------------------------------------------------
-	-- Values, saving, resetting
-	----------------------------------------------------------------
 	function Window:_register(el, row, cfg, frame, sep)
 		local tab = row._tab
 		el._tab = tab
@@ -3641,7 +3426,6 @@ local Library = (function()
 		self._allList[#self._allList + 1] = el
 		if el._natural then self._values[el.flag] = el:_natural() end
 
-		-- start from the last session when Auto Load Last Settings is on
 		if self._settings.autoLoad then
 			local last = self._store.last.values[el.flag]
 			if last ~= nil then self:_applyData(el, last) end
@@ -3651,7 +3435,6 @@ local Library = (function()
 		return row:_handle(item, el)
 	end
 
-	-- applies saved data to a component and runs its callback (on the next frame, so your script has finished)
 	function Window:_applyData(el, data)
 		if el._load and el:_load(data) then
 			task.defer(function()
@@ -3702,7 +3485,6 @@ local Library = (function()
 		S.write(self._paths.extras .. "/Window.json", self._store.window)
 	end
 
-	-- remembers the last session (a second and a half after the last change)
 	function Window:_changed()
 		if self._flushQueued or self._unloaded then return end
 		self._flushQueued = true
@@ -3759,7 +3541,6 @@ local Library = (function()
 		return true
 	end
 
-	-- the names of the files in the Configs folder ("My-Config.json" is listed as "My Config")
 	function Window:ListConfigs()
 		local names = {}
 		for name in pairs(S.configs(self._paths)) do names[#names + 1] = name end
@@ -3781,7 +3562,6 @@ local Library = (function()
 		end
 	end
 
-	-- every component back to the value it was created with (callbacks run)
 	function Window:_resetAll()
 		for _, el in ipairs(self._allList) do self:_resetElement(el) end
 		for _, el in ipairs(self._settingEls) do self:_resetElement(el) end
@@ -3811,16 +3591,12 @@ local Library = (function()
 		end
 	end
 
-	-- every component back to default, then the window (and its mobile buttons) is gone
 	function Window:Unload()
 		if self._unloaded then return end
 		self:_resetAll()
 		self:_destroy()
 	end
 
-	----------------------------------------------------------------
-	-- Open / closed (mobile: a pill, PC: a keybind)
-	----------------------------------------------------------------
 	function Window:_setOpen(state)
 		if self._unloaded or self._open == state then return end
 		self._open = state
@@ -3850,7 +3626,6 @@ local Library = (function()
 		self:_setOpen(not self._open)
 	end
 
-	-- PC or mobile changed: the close button and the pill follow, with animations
 	function Window:_applyMode(animate)
 		if self._layoutHeader then self:_layoutHeader(animate) end
 		if not self._open then
@@ -3858,7 +3633,6 @@ local Library = (function()
 		end
 	end
 
-	-- touch and controller = mobile, keyboard and mouse = PC; it follows whatever was used last
 	function W.mode(window)
 		local function classify(inputType)
 			if inputType == Enum.UserInputType.Touch or inputType.Name:find("^Gamepad") then return true end
@@ -3880,7 +3654,6 @@ local Library = (function()
 		end)
 	end
 
-	-- the small pill at the top center: icon + title + the cropped icon. Click anywhere to reopen.
 	function W.pill(window, config)
 		local gui = U.gui()
 		local title = window.Name
@@ -3900,7 +3673,6 @@ local Library = (function()
 			Visible = false,
 		}, gui)
 		U.corner(pill, 18)
-		-- the outline belongs to the pill itself, not to its contents, so hiding has to fade it too
 		local pillStroke = U.stroke(pill, T.white, 0.88)
 		if hasLogo then
 			U.make("ImageLabel", {
@@ -3929,7 +3701,6 @@ local Library = (function()
 			ScaleType = Enum.ScaleType.Fit,
 		}, pill)
 
-		-- the click area: the whole pill, on top of everything in it
 		local hit = U.button(pill, { Name = "Hit", Size = UDim2.fromScale(1, 1), ZIndex = 10 })
 		local function reopen() window:_setOpen(true) end
 		hit.Activated:Connect(reopen)
@@ -3940,7 +3711,6 @@ local Library = (function()
 		window._pillGui = pill
 		local token = 0
 
-		-- "Hide Mobile Pill": it stays there and stays clickable, you just can't see it
 		function window:_pillRefresh(animate)
 			local hidden = self._settings.hidePill
 			local target = hidden and 0.995 or 0
@@ -3971,9 +3741,6 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- The window shell: glow, body, drag bar, resize corner
-	----------------------------------------------------------------
 	function W.shell(window, config)
 		local gui = U.gui()
 		local conns = window._conns
@@ -3992,8 +3759,6 @@ local Library = (function()
 			return Vector2.new(math.max(1, math.min(size.X, maxX)), math.max(1, math.min(size.Y, maxY)))
 		end
 
-		-- Off Screen Protection on: the whole window stays on screen.
-		-- Off: it can hang over the edges, but the drag bar stays reachable.
 		local function clampCenter(center, size)
 			local v = U.viewport()
 			local half = size / 2
@@ -4035,7 +3800,6 @@ local Library = (function()
 		U.tween(popScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
 		window._holder, window._popScale = holder, popScale
 
-		-- glow: a soft image behind the window (9-sliced so resizing never distorts it)
 		local glow = U.make("ImageLabel", {
 			Name = "Glow",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -4064,7 +3828,6 @@ local Library = (function()
 			end
 		end)
 
-		-- the body (gray, a little see-through)
 		local root = U.make("Frame", {
 			Name = "Body",
 			Size = UDim2.fromScale(1, 1),
@@ -4078,7 +3841,6 @@ local Library = (function()
 		U.stroke(root, T.white, 0.9)
 		window._root = root
 
-		-- the lighter panel on the right: its top strip holds search + close, the rest is the page
 		local panel = U.make("Frame", {
 			Name = "Panel",
 			Position = UDim2.new(0, SIDEBAR_W, 0, PAD),
@@ -4115,7 +3877,6 @@ local Library = (function()
 			ZIndex = 2,
 		}, root)
 
-		-- drag bar: outside the body, just below it
 		local dragHit = U.button(holder, {
 			Name = "DragHit",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -4135,7 +3896,6 @@ local Library = (function()
 		}, dragHit)
 		U.corner(bar, UDim.new(1, 0))
 
-		-- resize corner: a hollow quarter circle drawn with round dots
 		local handle = U.button(root, {
 			Name = "ResizeHandle",
 			AnchorPoint = Vector2.new(1, 1),
@@ -4176,7 +3936,6 @@ local Library = (function()
 			window:_writeWindow()
 		end
 
-		-- drag: from the bar below, or from the top bar (window._startDrag is used by the header)
 		local function startDrag(input)
 			if dragging or resizing then return end
 			local start, origin = U.p2(input), posTarget
@@ -4205,7 +3964,6 @@ local Library = (function()
 			if not dragging then U.tween(bar, 0.25, { BackgroundTransparency = C.BAR_IDLE }) end
 		end)
 
-		-- resize (the corner)
 		handle.InputBegan:Connect(function(input)
 			if not U.isPress(input) or dragging or resizing then return end
 			local startSize2, start = sizeTarget, U.p2(input)
@@ -4239,7 +3997,6 @@ local Library = (function()
 			if not resizing then U.tween(iconGroup, 0.25, { GroupTransparency = C.ICON_IDLE }) end
 		end)
 
-		-- smooth follow (same feel as the mobile buttons)
 		conns[#conns + 1] = RunService.RenderStepped:Connect(function(dt)
 			sizeTarget = fit(sizeTarget)
 			posTarget = clampCenter(posTarget, sizeTarget)
@@ -4252,9 +4009,6 @@ local Library = (function()
 		end)
 	end
 
-	----------------------------------------------------------------
-	-- Header: logo, title, subtitle, search, close
-	----------------------------------------------------------------
 	function W.header(window, config)
 		local root = window._root
 		local HEADER_H = C.HEADER_H
@@ -4268,7 +4022,6 @@ local Library = (function()
 		}, root)
 		window._header = header
 
-		-- the top bar drags the window too (the buttons and the search box sit above this)
 		local dragArea = U.button(header, { Name = "DragArea", Size = UDim2.fromScale(1, 1), ZIndex = 1 })
 		dragArea.InputBegan:Connect(function(input)
 			if U.isPress(input) and window._startDrag then window._startDrag(input) end
@@ -4376,7 +4129,6 @@ local Library = (function()
 			ZIndex = 7,
 		}, searchBox)
 
-		-- where the buttons sit: the close button is only there on mobile, search takes its place on PC
 		local function searchRight() return window._mobile and (12 + 28 + 4) or 12 end
 
 		function window:_layoutHeader(animate)
@@ -4436,15 +4188,11 @@ local Library = (function()
 			if searchOpen then window:_runSearch(input.Text) end
 		end)
 
-		-- the close button (mobile): collapses the window into the pill
 		closeButton.Activated:Connect(function()
 			window:_setOpen(false)
 		end)
 	end
 
-	----------------------------------------------------------------
-	-- Search: finds components on every tab; tapping one takes you there
-	----------------------------------------------------------------
 	function W.search(window)
 		local page = U.make("ScrollingFrame", {
 			Name = "SearchResults",
@@ -4546,7 +4294,6 @@ local Library = (function()
 			end
 		end
 
-		-- opens the tab, scrolls to the component and flashes it
 		function window:_goTo(entry)
 			self:_closeSearch()
 			self:_select(entry.tab)
@@ -4569,9 +4316,6 @@ local Library = (function()
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Sidebar: tab list + the profile card
-	----------------------------------------------------------------
 	function W.sidebar(window)
 		local sidebar = window._sidebar
 		local PROFILE_H = C.PROFILE_H
@@ -4590,14 +4334,13 @@ local Library = (function()
 		U.make("UIListLayout", {
 			Padding = UDim.new(0, 3),
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			HorizontalAlignment = Enum.HorizontalAlignment.Right, -- (mini tabs are narrower, so they sit indented)
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		}, list)
 		U.make("UIPadding", {
 			PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 4),
 		}, list)
 		window._tabList = list
 
-		-- profile: headshot, display name, username (no arrow)
 		local profile = U.make("Frame", {
 			Name = "Profile",
 			AnchorPoint = Vector2.new(0, 1),
@@ -4639,9 +4382,6 @@ local Library = (function()
 		})
 	end
 
-	----------------------------------------------------------------
-	-- The Settings tab (always there, always last)
-	----------------------------------------------------------------
 	function W.buildSettings(window, tab)
 		local settings = window._settings
 
@@ -4790,9 +4530,6 @@ local Library = (function()
 		})
 	end
 
-	----------------------------------------------------------------
-	-- Library:CreateWindow
-	----------------------------------------------------------------
 	function Library:CreateWindow(config)
 		config = config or {}
 		ensureInit()
@@ -4812,7 +4549,6 @@ local Library = (function()
 			_openToken = 0,
 		}, Window)
 
-		-- RuinWare/<Script-Name>/: Settings.json, Configs/, Extras/ (last session, window position, mobile buttons)
 		window._paths = S.paths(window.Name)
 		S.ensure(window._paths)
 		local store = {
@@ -4833,7 +4569,6 @@ local Library = (function()
 		}
 		N.enabled = window._settings.notifications
 
-		-- window.Flags.Name reads a value, window.Flags.Name = value writes it
 		window.Flags = setmetatable({}, {
 			__index = function(_, flag) return window._values[flag] end,
 			__newindex = function(_, flag, value)
@@ -4850,7 +4585,6 @@ local Library = (function()
 		W.pill(window, config)
 		W.mode(window)
 
-		-- the Settings tab (made first, listed last); it is what shows until you make a tab
 		local settingsTab = W.newTab(window, { title = "Settings", icon = ICON_SETTINGS }, true)
 		window._settingsTab = settingsTab
 		W.buildSettings(window, settingsTab)
@@ -4861,7 +4595,6 @@ local Library = (function()
 		return window
 	end
 
-	-- notifications and toasts belong to the library, not to a window
 	function Library:Notify(props)
 		ensureInit()
 		N.notify(props)
